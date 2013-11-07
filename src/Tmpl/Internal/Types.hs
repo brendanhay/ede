@@ -7,7 +7,7 @@ import qualified Data.Text.Lazy      as LText
 
 type LText = LText.Text
 
-newtype Ident = Ident Text
+newtype Ident = Ident { unident :: Text }
     deriving (Show)
 
 data Meta = Meta !Int !Int !String
@@ -20,7 +20,7 @@ data Expr
     = ELit  !Literal
     | EVar  !Ident
     | ENeg  !Expr
-    | EBin  !BinOp !Expr  !Expr
+    | EBin  !BinOp (Expr Bool)  (Expr Bool)
     | ERel  !RelOp !Expr  !Expr
     | ECond !Expr  [Expr] [Expr]
     | ELoop !Bind  !Ident [Expr] [Expr]

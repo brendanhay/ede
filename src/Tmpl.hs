@@ -4,6 +4,7 @@ module Tmpl where
 
 import           Control.Applicative
 import           Data.Aeson
+import qualified Data.HashMap.Strict       as Map
 import           Data.Text                 (Text)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO         as LText
@@ -38,8 +39,9 @@ rend = do
   where
     o = object
         [ "ident" .= ("ident_value!" :: Text)
-        , "list1"  .= ([1,2,3,4] :: [Int])
-        , "list2"  .= ([] :: [Text])
+        , "list1" .= (["hi", "ho", "off", "we", "go"] :: [Text])
+        , "list2" .= ([] :: [Text])
+        , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
         ]
 
 load :: FilePath -> IO (Either ParseError [Expr])

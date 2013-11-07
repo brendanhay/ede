@@ -1,18 +1,21 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 module Tmpl.Internal.Interpreter where
 
 import           Control.Applicative
+import           Control.Monad              (zipWithM_)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Error  hiding (Error)
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Writer
 import           Data.Aeson
 import           Data.Attoparsec.Number     (Number(..))
-import           Data.Foldable              (mapM_)
+import           Data.Foldable              (Foldable, mapM_)
 import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
+import           Data.Text                  (Text)
 import           Data.Text.Buildable        (Buildable)
 import qualified Data.Text.Buildable        as Buildable
 import           Data.Text.Format           (Format)
@@ -65,27 +68,41 @@ build = Env . lift . tell . Buildable.build
 expression :: Expr -> Env ()
 expression (ELit l) = build l
 expression (EVar k) = require k >>= render
-
 expression (ECond expr l r) = do
     p <- condition expr
     mapM_ expression $ if p then l else r
 
-expression (ELoop bind vs l r) = require vs >>= f
-    case bind of
-        
-
-loop (Bind (Ident k) v) =
-    
-
+expression (ELoop (Bind (Ident prim) (fmap unident -> sec)) b l r) = do
+    b' <- require b
+    case b' of
+        (Array  a) -> array a
+        (Object o) -> object o
+        e -> failf "for loop expects an array at '{}' but got: {}"
+            [show prim, show e]
   where
+    array a
+        | Vector.null a = alternate
+        | otherwise     = maybe (nominal a) (`indexed` a) sec
 
-    f (Array vs) | Vector.null vs = mapM_ expression r
-    f (Array vs) = mapM_ (\x -> bind (Map.insert k x) $ mapM_ expression l) vs
+    indexed s = zipWithM_ (\i n -> conseq $ ins prim i . ins s n) ns
+        . Vector.toList
 
-    -- f (Object o) | Map.null o = mapM_ expression r
-    -- f (Object o) =
+    ns = Number . I <$> [1..]
 
-    f o = failf "for loop expects an array at '{}' but got: {}" [show v, show o]
+    object o
+        | Map.null o = alternate
+        | otherwise  = maybe (nominal $ Map.elems o) (`keyed` o) sec
+
+    keyed s = mapM_ (\(x, y) -> conseq $ ins prim (String x) . ins s y)
+        . Map.toList
+
+    nominal :: Foldable t => t Value -> Env ()
+    nominal = mapM_ (\v -> conseq $ ins prim v)
+
+    conseq f  = bind f $ mapM_ expression l
+    alternate = mapM_ expression r
+
+    ins = Map.insert
 
 expression expr = failf "invalid expression: {}" [expr]
 
