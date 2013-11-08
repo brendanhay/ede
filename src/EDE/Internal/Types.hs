@@ -14,6 +14,11 @@ import           Data.Text.Format          (format)
 import qualified Data.Text.Lazy            as LText
 import           Data.Text.Lazy.Builder
 
+-- FIXME:
+-- type expression metadata extraction function
+-- unsound monoid instance for untyped expressions
+--   should probably propagate left expression's metadata
+
 type LText = LText.Text
 type Frag  = Builder
 
@@ -95,8 +100,6 @@ data TExp a where
 
 deriving instance Show (TExp a)
 
--- FIXME: meta data extraction function
-
 data UExp
     = UText !Meta !Text
     | UBool !Meta !Bool
@@ -112,10 +115,9 @@ data UExp
     | ULoop !Meta !Bind  !Ident !UExp !UExp
       deriving (Show)
 
--- FIXME: Hrmm.
 instance Monoid UExp where
-    mempty      = UFrag (Meta "mempty"  0 0) mempty
-    mappend a b = UApp  (Meta "mappend" 0 0) a b
+    mempty      = UFrag Unknown mempty
+    mappend a b = UApp  Unknown a b
 
 data BinOp
     = And
