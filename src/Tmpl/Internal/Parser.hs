@@ -2,30 +2,31 @@
 
 module Tmpl.Internal.Parser where
 
-import           Control.Applicative   ((<$>), (<*>), (<*), (*>), pure)
+import           Control.Applicative    ((<$>), (<*>), (<*), (*>), pure)
 import           Control.Monad
-import           Data.Foldable         (foldl', foldr')
+import           Data.Foldable          (foldl', foldr')
 import           Data.Monoid
-import qualified Data.Text             as Text
-import           Text.Parsec           hiding (parse)
+import qualified Data.Text              as Text
+import           Data.Text.Lazy.Builder
+import           Text.Parsec            hiding (parse)
 import           Text.Parsec.Expr
-import           Text.Parsec.Text.Lazy (Parser)
-import           Tmpl.Internal.Lexer   as Lexer
+import           Text.Parsec.Text.Lazy  (Parser)
+import           Tmpl.Internal.Lexer    as Lexer
 import           Tmpl.Internal.Types
 
 -- FIXME:
 -- Support negation of exprs with parens
 
-parse :: LText -> Either ParseError UExpr
+parse :: LText -> Either ParseError UExp
 parse = runParser template () "parse"
 
-template :: Parser UExpr
+template :: Parser UExp
 template = foldr' (<>) mempty <$> manyTill expression (try eof)
 
-expression :: Parser UExpr
+expression :: Parser UExp
 expression = try $ choice [loop, conditional, variable, fragment]
 
-loop :: Parser UExpr
+loop :: Parser UExp
 loop = uncurry ULoop
     <$> section ((,)
         <$> (reserved "for" >> binding)
@@ -34,29 +35,29 @@ loop = uncurry ULoop
     <*> alternative
      <* keyword "endfor"
 
-conditional :: Parser UExpr
+conditional :: Parser UExp
 conditional = UCond
     <$> section (reserved "if" >> (try operation <|> fmap UVar ident))
     <*> consequent
     <*> alternative
      <* keyword "endif"
 
-variable :: Parser UExpr
+variable :: Parser UExp
 variable = UVar <$> between (symbol "{{") (string "}}") ident
 
-fragment :: Parser UExpr
+fragment :: Parser UExp
 fragment = pack <$> manyTill1 anyChar (try . lookAhead $ eof <|> next)
   where
-    pack = UText . Text.pack
+    pack = UFrag . fromString
     next = void $ char '{' >> oneOf "{%#"
 
-consequent :: Parser UExpr
+consequent :: Parser UExp
 consequent = foldr' (<>) mempty <$> many expression
 
-alternative :: Parser UExpr
+alternative :: Parser UExp
 alternative = option mempty . try $ keyword "else" >> consequent
 
-operation :: Parser UExpr
+operation :: Parser UExp
 operation = buildExpressionParser ops term <?> "expression"
   where
     ops = [ [Prefix            $ bNot UNeg]
@@ -70,7 +71,7 @@ operation = buildExpressionParser ops term <?> "expression"
           , [Infix (rLessEq    $ URel LessEqual) AssocLeft]
           ]
 
-term :: Parser UExpr
+term :: Parser UExp
 term = try variable <|> literal
 
 section :: Parser a -> Parser a
@@ -91,7 +92,7 @@ binding = "binding" ?? try pattern <|> (Bind <$> ident <*> pure Nothing)
         v <- ident <* symbol ")"
         return $ Bind k (Just v)
 
-literal :: Parser UExpr
+literal :: Parser UExp
 literal = "literal" ?? choice
     [ try bool
     , try integer
@@ -99,16 +100,16 @@ literal = "literal" ?? choice
     , text
     ]
 
-bool :: Parser UExpr
+bool :: Parser UExp
 bool = "bool" ?? UBool <$> (try true <|> false)
 
-integer :: Parser UExpr
+integer :: Parser UExp
 integer = "integer" ?? UInt <$> integerLiteral
 
-double :: Parser UExpr
+double :: Parser UExp
 double = "double" ?? UDbl <$> doubleLiteral
 
-text :: Parser UExpr
+text :: Parser UExp
 text = "text" ?? UText . Text.pack <$> stringLiteral
 
 manyTill1 :: Stream s m t

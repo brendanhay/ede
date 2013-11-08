@@ -10,16 +10,15 @@ import           Control.Monad              (liftM2, zipWithM_, foldM)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Error  hiding (Error)
 import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Writer
 import           Data.Aeson
 import           Data.Attoparsec.Number     (Number(..))
-import           Data.Foldable              (Foldable, mapM_)
+import           Data.Foldable              (Foldable, foldr', mapM_, toList, foldrM)
 import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                  (Text)
 import           Data.Text.Buildable        (Buildable)
-import qualified Data.Text.Buildable        as Buildable
+import qualified Data.Text.Buildable        as Build
 import           Data.Text.Format           (Format)
 import qualified Data.Text.Format           as Format
 import           Data.Text.Format.Params    (Params)
@@ -32,21 +31,17 @@ import           Tmpl.Internal.Types
 -- FIXME:
 -- Prevent rebinding/shadowing of variables
 
-type ReaderEnv = Reader Object
-type WriterEnv = WriterT Builder ReaderEnv
-type ErrorEnv  = ErrorT String WriterEnv
-
-newtype Env a = Env { unwrap :: ErrorEnv a }
+newtype Env a = Env { unwrap :: ErrorT String (Reader Object) a }
     deriving (Functor, Applicative, Monad)
 
-interpret :: Object -> TExpr a -> Either String Builder
-interpret obj = (\(r, b) -> fmap (const b) r) . runEnv obj . eval
+evaluate :: Object -> TExp Frag -> Either String Builder
+evaluate obj = runEnv obj . eval
 
-runEnv :: Object -> Env a -> (Either String a, Builder)
-runEnv obj env = runReader (runWriterT . runErrorT $ unwrap env) obj
+runEnv :: Object -> Env Builder -> Either String Builder
+runEnv obj env = runReader (runErrorT $ unwrap env) obj
 
 bind :: (Object -> Object) -> Env a -> Env a
-bind f = Env . (mapErrorT . mapWriterT $ withReader f) . unwrap
+bind f = Env . (mapErrorT $ withReader f) . unwrap
 
 lookup :: Ident -> Env (Maybe Value)
 lookup (Ident k) = Env $ Map.lookup k <$> lift (lift ask)
@@ -63,18 +58,18 @@ failf f = fail . fmt f
 fmt :: Params ps => Format -> ps -> String
 fmt f = LText.unpack . Format.format f
 
-build :: Buildable a => a -> Env ()
-build = Env . lift . tell . Buildable.build
-
-eval :: TExpr a -> Env a
-
-eval (TCons a b) = eval a >> eval b
-
+eval :: TExp a -> Env a
+eval (TFrag b) = return $ Bld b
 eval (TText t) = return t
 eval (TBool b) = return b
 eval (TInt  i) = return i
 eval (TDbl  d) = return d
-eval (TVar  v) = require v
+eval (TVar  v) = Val <$> require v
+
+eval (TApp a b) = do
+    a' <- eval a
+    b' <- eval b
+    a' `fappend` b'
 
 eval (TNeg e) = not <$> eval e
 
@@ -98,21 +93,43 @@ eval (TLoop (Bind prim msec) i l r) = require i >>= loop
     s = unident <$> msec
 
     loop (Array a)
-        | Vector.null a = alternate
-        | Just s' <- s  = indexed s' . zip indices $ Vector.toList a
-        | otherwise     = consequent $ Vector.toList a
+        | Vector.null a = eval r
+--        | Just s' <- s  = indexed s' . zip indices $ Vector.toList a
+        | otherwise     = consequent a
 
     loop e = failf "for loop expects an array or hashmap at '{}', got: {}"
         [show i, show e]
 
-    consequent = mapM (\v -> bind (ins p v) $ eval l)
-    alternate  = (:[]) <$> eval r
+    consequent xs = do
+        fs <- mapM (\v -> bind (ins p v) $ eval l) $ toList xs
+        foldrM fappend (Bld mempty) fs
 
-    indexed s' = mapM (\(v, n) -> bind (ins p v . ins s' n) $ eval l)
+    -- indexed s' = mapM_ (\(v, n) -> bind (ins p v . ins s' n) $ eval l)
 
-    indices = Number . I <$> [1..]
+    -- indices = Number . I <$> [1..]
 
-    -- binder :: Text -> TExpr a -> Value -> Env (TExpr a)
+    ins = Map.insert
+
+eval e = failf "unable to eval: {}" [show e]
+
+evalM2 :: (a -> a -> b) -> TExp a -> TExp a -> Env b
+evalM2 f x y = liftM2 f (eval x) (eval y)
+
+fappend :: (Functor m, Monad m) => Frag -> Frag -> m Frag
+fappend a b = Bld <$> liftM2 (<>) (render a) (render b)
+
+render :: Monad m => Frag -> m Builder
+render (Val (Object _))     = fail "unable to render object value."
+render (Val (Array  _))     = fail "unable to render array value."
+render (Val Null)           = fail "unable to render null value."
+render (Val (Number (I n))) = return $ Build.build n
+render (Val (Number (D d))) = return $ Build.build d
+render (Val (Bool   b))     = return $ Build.build b
+render (Val (String s))     = return $ Build.build s
+render (Bld bld)            = return bld
+
+
+    -- binder :: Text -> TExp a -> Value -> Env (TExp a)
 
     -- binder :: Text -> Text -> Value -> Env Text
     -- binder k e v = bind (ins k v) $ return e
@@ -146,12 +163,7 @@ eval (TLoop (Bind prim msec) i l r) = require i >>= loop
     -- bindScope :: Foldable t => t Value -> Env a
     -- bindScope = mapM_ (\v -> bind $ ins (unident k) v)
 
-    ins = Map.insert
-
-evalM2 :: (a -> a -> b) -> TExpr a -> TExpr a -> Env b
-evalM2 f x y = liftM2 f (eval x) (eval y)
-
--- expression :: Expr -> Env ()
+-- expression :: Exp -> Env ()
 
 -- expression (ELit l) = build l
 -- expression (EVar k) = require k >>= render
@@ -193,7 +205,7 @@ evalM2 f x y = liftM2 f (eval x) (eval y)
 
 -- expression expr = failf "invalid expression: {}" [expr]
 
--- condition :: Expr -> Env Bool
+-- condition :: Exp -> Env Bool
 -- condition (ELit LNil)      = return False
 -- condition (ELit (LBool b)) = return b
 -- condition (ELit _)         = return True
@@ -203,7 +215,7 @@ evalM2 f x y = liftM2 f (eval x) (eval y)
 -- condition (ERel op x y)    = relational op x y
 -- condition expr             = failf "invalid '{}' as condition predicate." [expr]
 
--- literal :: Expr -> Env Literal
+-- literal :: Exp -> Env Literal
 -- literal (ELit l) = return l
 -- literal (EVar v) = do
 --     x <- require v
@@ -216,7 +228,7 @@ evalM2 f x y = liftM2 f (eval x) (eval y)
 --         e            -> failf "invalid used of '{}' as literal value." [show e]
 -- literal expr = failf "invalid use of '{}' as literal value." [show expr]
 
--- binary :: BinOp -> Expr -> Expr -> Env Bool
+-- binary :: BinOp -> Exp -> Exp -> Env Bool
 -- binary op x y = do
 --     a <- condition x
 --     b <- condition y
@@ -224,7 +236,7 @@ evalM2 f x y = liftM2 f (eval x) (eval y)
 --         And -> a && b
 --         Or  -> a || b
 
--- relational :: RelOp -> Expr -> Expr -> Env Bool
+-- relational :: RelOp -> Exp -> Exp -> Env Bool
 -- relational op l r = cmp <$> literal l <*> literal r >>= fmap (result op)
 --   where
 --     cmp (LChar x) (LChar y) = f x y
@@ -252,12 +264,3 @@ evalM2 f x y = liftM2 f (eval x) (eval y)
 --     result NotEqual GT     = True
 --     result NotEqual LT     = True
 --     result _  _            = False
-
-render :: Value -> Env ()
-render (String s)     = build s
-render (Number (I n)) = build n
-render (Number (D d)) = build d
-render (Bool   b)     = build b
-render (Object _)     = fail "unable to render object value."
-render (Array  _)     = fail "unable to render array value."
-render Null           = fail "unable to render null value."

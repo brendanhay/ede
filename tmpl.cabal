@@ -22,6 +22,7 @@ library
       , Tmpl.Internal.Interpreter
       , Tmpl.Internal.Lexer
       , Tmpl.Internal.Parser
+      , Tmpl.Internal.TypeCheck
       , Tmpl.Internal.Types
 
     ghc-options:       -Wall

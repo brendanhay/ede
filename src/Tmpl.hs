@@ -5,11 +5,12 @@ module Tmpl where
 import           Control.Applicative
 import           Data.Aeson
 import qualified Data.HashMap.Strict       as Map
+import           Data.Monoid
 import           Data.Text                 (Text)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO         as LText
 import           Text.Parsec               hiding (parse)
-import           Tmpl.Internal.Check
+import           Tmpl.Internal.TypeCheck
 import           Tmpl.Internal.Interpreter
 import           Tmpl.Internal.Parser
 import           Tmpl.Internal.Types
@@ -21,8 +22,13 @@ rend = do
     print u
 
     let (Right us) = u
+        c          = typeCheck us
 
-    print $ check us
+    print c
+
+    let (Right cs)   = c
+
+    print $ evaluate o cs
 
   --   let (Right es)   = l
   --       (Object obj) = o
@@ -40,13 +46,13 @@ rend = do
 
   --   putStrLn "Builder:"
   --   LText.putStr $ toLazyText b
-  -- where
-  --   o = object
-  --       [ "ident" .= ("ident_value!" :: Text)
-  --       , "list1" .= (["hi", "ho", "off", "we", "go"] :: [Text])
-  --       , "list2" .= ([] :: [Text])
-  --       , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
-  --       ]
+  where
+    Object o = object
+        [ "ident" .= ("ident_value!" :: Text)
+        , "list1" .= (["hi", "ho", "off", "we", "go"] :: [Text])
+        , "list2" .= ([] :: [Text])
+        , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
+        ]
 
-load :: FilePath -> IO (Either ParseError UExpr)
+load :: FilePath -> IO (Either ParseError UExp)
 load path = parse <$> LText.readFile path
