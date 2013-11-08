@@ -4,16 +4,16 @@ module EDE where
 
 import           Control.Applicative
 import           Data.Aeson
-import qualified Data.HashMap.Strict       as Map
+import qualified Data.HashMap.Strict      as Map
 import           Data.Monoid
-import           Data.Text                 (Text)
+import           Data.Text                (Text)
 import           Data.Text.Lazy.Builder
-import qualified Data.Text.Lazy.IO         as LText
-import           Text.Parsec               hiding (parse)
-import           EDE.Internal.TypeCheck
+import qualified Data.Text.Lazy.IO        as LText
 import           EDE.Internal.Interpreter
 import           EDE.Internal.Parser
+import           EDE.Internal.TypeChecker
 import           EDE.Internal.Types
+import           Text.Parsec              hiding (parse)
 
 --rend :: IO (Either String [Expr])
 

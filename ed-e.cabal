@@ -33,7 +33,7 @@ library
         EDE.Internal.Interpreter
       , EDE.Internal.Lexer
       , EDE.Internal.Parser
-      , EDE.Internal.TypeCheck
+      , EDE.Internal.TypeChecker
       , EDE.Internal.Types
 
     ghc-options:       -Wall
