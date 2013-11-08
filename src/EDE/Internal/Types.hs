@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-module EDE.Internal.Types where
+module Tmpl.Internal.Types where
 
 import           Data.Aeson
 import           Data.Monoid
@@ -97,14 +97,3 @@ data RelOp
 
 instance Buildable Ident where
     build (Ident k) = build k
-
--- instance Buildable Exp where
---     build = build . show
-
--- instance Buildable Literal where
---     build (LChar c) = build c
---     build (LText t) = build t
---     build (LBool b) = build b
---     build (LInt  i) = build i
---     build (LDoub d) = build d
---     build LNil      = mempty
