@@ -90,4 +90,3 @@ order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
 throw :: Params ps => Meta -> Format -> ps -> Either TypeError a
 throw m f = Left . TypeError m . format f
-
