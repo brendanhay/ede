@@ -20,7 +20,6 @@ import qualified Data.Text.Buildable        as Build
 import           Data.Text.Format           (Format)
 import qualified Data.Text.Format           as Format
 import           Data.Text.Format.Params    (Params)
-import qualified Data.Text.Lazy             as LText
 import qualified Data.Vector                as Vector
 import           EDE.Internal.Types
 import           Prelude                    hiding (lookup)
@@ -53,7 +52,7 @@ eval (TInt  _ i) = return i
 eval (TDbl  _ d) = return d
 eval (TVar  m v) = require m v >>= render m
 
-eval (TApp _ a b) = liftM2 (<>) (eval a) (eval b)
+eval (TApp _ a b) = evalM2 (<>) a b
 
 eval (TNeg _ e) = not <$> eval e
 
