@@ -1,85 +1,90 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
 
- module EDE.Internal.TypeChecker where
+module EDE.Internal.TypeChecker where
 
-import Control.Monad
-import Data.Monoid
-import EDE.Internal.Types
+import           Control.Monad
+import           Data.Text.Format
+import           Data.Text.Format.Params (Params)
+import qualified Data.Text.Lazy          as LText
+import           EDE.Internal.Types
 
-typeCheck :: Type a => UExp -> Either String (TExp a)
+typeCheck :: Type a => UExp -> Either TypeError (TExp a)
 typeCheck = f <=< check
   where
-    f :: Type a => AExp -> Either String (TExp a)
+    f :: Type a => AExp -> Either TypeError (TExp a)
     f = g typeof
 
-    g :: TType a -> AExp -> Either String (TExp a)
+    g :: TType a -> AExp -> Either TypeError (TExp a)
     g t (e ::: t') = do
-        Eq <- equal t t'
+        -- FIXME: write meta extractor
+        Eq <- equal (Meta "typeCheck:g" 0 0) t t'
         return e
 
-check :: UExp -> Either String AExp
+check :: UExp -> Either TypeError AExp
 
-check (UText t) = return $ TText t ::: TTText
-check (UBool b) = return $ TBool b ::: TTBool
-check (UInt  i) = return $ TInt  i ::: TTInt
-check (UDbl  d) = return $ TDbl  d ::: TTDbl
-check (UVar  v) = return $ TVar  v ::: TTFrag
-check (UFrag b) = return $ TFrag b ::: TTFrag
+check (UText m t) = return $ TText m t ::: TTText
+check (UBool m b) = return $ TBool m b ::: TTBool
+check (UInt  m i) = return $ TInt  m i ::: TTInt
+check (UDbl  m d) = return $ TDbl  m d ::: TTDbl
+check (UVar  m v) = return $ TVar  m v ::: TTFrag
+check (UFrag m b) = return $ TFrag m b ::: TTFrag
 
-check (UApp a b) = do
+check (UApp m a b) = do
     a' ::: at <- check a
     b' ::: bt <- check b
-    Eq <- equal at TTFrag
-    Eq <- equal bt TTFrag
-    return $ TApp a' b' ::: TTFrag
+    Eq <- equal m at TTFrag
+    Eq <- equal m bt TTFrag
+    return $ TApp m a' b' ::: TTFrag
 
-check (UNeg e) = do
+check (UNeg m e) = do
     e' ::: TTBool <- check e
-    return $ TNeg e' ::: TTBool
+    return $ TNeg m e' ::: TTBool
 
-check (UBin op x y) = do
+check (UBin m op x y) = do
     x' ::: TTBool <- check x
     y' ::: TTBool <- check y
-    return $ TBin op x' y' ::: TTBool
+    return $ TBin m op x' y' ::: TTBool
 
-check (URel op x y) = do
+check (URel m op x y) = do
     x' ::: xt <- check x
     y' ::: yt <- check y
-    Eq  <- equal xt yt
-    Ord <- order xt
-    return $ TRel op x' y' ::: TTBool
+    Eq  <- equal m xt yt
+    Ord <- order m xt
+    return $ TRel m op x' y' ::: TTBool
 
-check (UCond p l r) = do
+check (UCond m p l r) = do
     p' ::: pt     <- check p
     l' ::: TTFrag <- check l
     r' ::: TTFrag <- check r
-    Eq <- equal pt TTBool
-    return $ TCond p' l' r' ::: TTFrag
+    Eq <- equal m pt TTBool
+    return $ TCond m p' l' r' ::: TTFrag
 
-check (ULoop b i l r) = do
+check (ULoop m b i l r) = do
     l' ::: TTFrag <- check l
     r' ::: TTFrag <- check r
-    return $ TLoop b i l' r' ::: TTFrag
+    return $ TLoop m b i l' r' ::: TTFrag
 
 data Equal a b where
     Eq :: Equal a a
 
-equal :: TType a -> TType b -> Either String (Equal a b)
-equal TTText TTText = Right Eq
-equal TTBool TTBool = Right Eq
-equal TTInt  TTInt  = Right Eq
-equal TTDbl  TTDbl  = Right Eq
-equal TTFrag TTFrag = Right Eq
-equal a b = Left $
-    concat ["type equality check ", show a, " ~ ", show b, " failed."]
+equal :: Meta -> TType a -> TType b -> Either TypeError (Equal a b)
+equal _ TTText TTText = Right Eq
+equal _ TTBool TTBool = Right Eq
+equal _ TTInt  TTInt  = Right Eq
+equal _ TTDbl  TTDbl  = Right Eq
+equal _ TTFrag TTFrag = Right Eq
+equal m a b = throw m "type equality check {} ~ {} failed." [show a, show b]
 
 data Order a where
     Ord :: Ord a => Order a
 
-order :: TType a -> Either String (Order a)
-order TTText = Right Ord
-order TTBool = Right Ord
-order TTInt  = Right Ord
-order TTDbl  = Right Ord
-order t = Left $
-    concat ["constraint check Ord a => a ~ ", show t, "failed."]
+order :: Meta -> TType a -> Either TypeError (Order a)
+order _ TTText = Right Ord
+order _ TTBool = Right Ord
+order _ TTInt  = Right Ord
+order _ TTDbl  = Right Ord
+order m t = throw m "constraint check Ord a => a ~ {} failed." [show t]
+
+throw :: Params ps => Meta -> Format -> ps -> Either TypeError a
+throw m f = Left . TypeError m . LText.unpack . format f

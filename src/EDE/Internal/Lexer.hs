@@ -32,27 +32,6 @@ symbol = Parsec.symbol lexer
 whiteSpace :: Parser ()
 whiteSpace = Parsec.whiteSpace lexer
 
-true, false :: Parser Bool
-true  = res "true" True
-false = res "false" False
-
-bNot, bAnd, bOr :: a -> Parser a
-bNot = op "!"
-bAnd = op "&&"
-bOr  = op "||"
-
-rEq, rNotEq, rGreater, rGreaterEq, rLess, rLessEq :: a -> Parser a
-rEq        = op "=="
-rNotEq     = op "/="
-rGreater   = op ">"
-rGreaterEq = op ">="
-rLess      = op "<"
-rLessEq    = op "<="
-
-res, op :: String -> a -> Parser a
-res s = (reserved s >>) . return
-op  s = (reservedOp s >>) . return
-
 lexer :: GenTokenParser Text () Identity
 lexer = Parsec.makeTokenParser rules
 
@@ -67,12 +46,12 @@ rules = Parsec.LanguageDef
     , Parsec.opStart         = Parsec.opLetter rules
     , Parsec.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
     , Parsec.caseSensitive   = False
-    , Parsec.reservedNames   = reservedNames
-    , Parsec.reservedOpNames = reservedOps
+    , Parsec.reservedNames   = names
+    , Parsec.reservedOpNames = operators
     }
 
-reservedNames :: [String]
-reservedNames = ["if", "endif", "for", "in", "endfor", "else", "true", "false"]
+names :: [String]
+names = ["if", "endif", "for", "in", "endfor", "else", "true", "false"]
 
-reservedOps :: [String]
-reservedOps = [">", ">=", "<", "=<", "==", "/=", "!", "||", "&&"]
+operators :: [String]
+operators = [">", ">=", "<", "=<", "==", "/=", "!", "||", "&&"]

@@ -18,7 +18,7 @@ import           Text.Parsec              hiding (parse)
 --rend :: IO (Either String [Expr])
 
 rend = do
-    u <- load "test.tmpl"
+    u <- load "test.ede"
     print u
 
     let (Right us) = u

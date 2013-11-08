@@ -4,21 +4,22 @@ module EDE.Internal.Parser where
 
 import           Control.Applicative    ((<$>), (<*>), (<*), (*>), pure)
 import           Control.Monad
-import           Data.Foldable          (foldl', foldr')
+import           Data.Foldable          (foldr')
 import           Data.Monoid
 import qualified Data.Text              as Text
 import           Data.Text.Lazy.Builder
-import           Text.Parsec            hiding (parse)
+import           EDE.Internal.Lexer
+import           EDE.Internal.Types     hiding (ident)
+import qualified Text.Parsec            as Parsec
+import           Text.Parsec            hiding (runParser, parse)
 import           Text.Parsec.Expr
 import           Text.Parsec.Text.Lazy  (Parser)
-import           EDE.Internal.Lexer    as Lexer
-import           EDE.Internal.Types
 
 -- FIXME:
 -- Support negation of exprs with parens
 
-parse :: LText -> Either ParseError UExp
-parse = runParser template () "parse"
+runParser :: String -> LText -> Either ParseError UExp
+runParser name = Parsec.runParser template () name
 
 template :: Parser UExp
 template = foldr' (<>) mempty <$> manyTill expression (try eof)
@@ -27,28 +28,36 @@ expression :: Parser UExp
 expression = try $ choice [loop, conditional, variable, fragment]
 
 loop :: Parser UExp
-loop = uncurry ULoop
-    <$> section ((,)
+loop = do
+    m <- meta
+    b <- section ((,)
         <$> (reserved "for" >> binding)
         <*> (reserved "in"  >> ident))
-    <*> consequent
-    <*> alternative
-     <* keyword "endfor"
+    uncurry (ULoop m) b
+        <$> consequent
+        <*> alternative
+         <* keyword "endfor"
 
 conditional :: Parser UExp
 conditional = UCond
-    <$> section (reserved "if" >> (try operation <|> fmap UVar ident))
+    <$> meta
+    <*> section (reserved "if" >> p)
     <*> consequent
     <*> alternative
      <* keyword "endif"
+  where
+    p = try operation <|> (UVar <$> meta <*> ident)
 
 variable :: Parser UExp
-variable = UVar <$> between (symbol "{{") (string "}}") ident
+variable = UVar
+    <$> meta
+    <*> between (symbol "{{") (string "}}") ident
 
 fragment :: Parser UExp
-fragment = pack <$> manyTill1 anyChar (try . lookAhead $ eof <|> next)
+fragment = UFrag
+    <$> meta
+    <*> (fromString <$> manyTill1 anyChar (try . lookAhead $ eof <|> next))
   where
-    pack = UFrag . fromString
     next = void $ char '{' >> oneOf "{%#"
 
 consequent :: Parser UExp
@@ -56,20 +65,6 @@ consequent = foldr' (<>) mempty <$> many expression
 
 alternative :: Parser UExp
 alternative = option mempty . try $ keyword "else" >> consequent
-
-operation :: Parser UExp
-operation = buildExpressionParser ops term <?> "expression"
-  where
-    ops = [ [Prefix            $ bNot UNeg]
-          , [Infix (bAnd       $ UBin And) AssocLeft]
-          , [Infix (bOr        $ UBin Or) AssocLeft]
-          , [Infix (rEq        $ URel Equal) AssocLeft]
-          , [Infix (rNotEq     $ URel NotEqual) AssocLeft]
-          , [Infix (rGreater   $ URel Greater) AssocLeft]
-          , [Infix (rGreaterEq $ URel GreaterEqual) AssocLeft]
-          , [Infix (rLess      $ URel Less) AssocLeft]
-          , [Infix (rLessEq    $ URel LessEqual) AssocLeft]
-          ]
 
 term :: Parser UExp
 term = try variable <|> literal
@@ -85,12 +80,17 @@ ident :: Parser Ident
 ident = "ident" ?? Ident . Text.pack <$> identifier
 
 binding :: Parser Bind
-binding = "binding" ?? try pattern <|> (Bind <$> ident <*> pure Nothing)
+binding = "binding" ?? try pattern <|> nominal
   where
-    pattern = do
-        k <- symbol "(" *> ident <* symbol ","
-        v <- ident <* symbol ")"
-        return $ Bind k (Just v)
+    pattern = Bind
+        <$> meta
+        <*> (symbol "(" *> ident <* symbol ",")
+        <*> (Just <$> (ident <* symbol ")"))
+
+    nominal = Bind
+        <$> meta
+        <*> ident
+        <*> pure Nothing
 
 literal :: Parser UExp
 literal = "literal" ?? choice
@@ -101,22 +101,59 @@ literal = "literal" ?? choice
     ]
 
 bool :: Parser UExp
-bool = "bool" ?? UBool <$> (try true <|> false)
+bool = parse "bool" UBool (try true <|> false)
 
 integer :: Parser UExp
-integer = "integer" ?? UInt <$> integerLiteral
+integer = parse "integer" UInt integerLiteral
 
 double :: Parser UExp
-double = "double" ?? UDbl <$> doubleLiteral
+double = parse "double" UDbl doubleLiteral
 
 text :: Parser UExp
-text = "text" ?? UText . Text.pack <$> stringLiteral
+text = parse "text" (\m -> UText m . Text.pack) stringLiteral
+
+parse :: String -> (Meta -> a -> b) -> Parser a -> Parser b
+parse name f p = do
+    m <- meta
+    (f m <$> p) <?> name
+
+operation :: Parser UExp
+operation = buildExpressionParser ops term <?> "operation"
+  where
+    ops = [ [Prefix $ op "!" UNeg]
+          , [Infix (bin "&&" And)          AssocLeft]
+          , [Infix (bin "||" Or)           AssocLeft]
+          , [Infix (rel "==" Equal)        AssocLeft]
+          , [Infix (rel "/=" NotEqual)     AssocLeft]
+          , [Infix (rel ">"  Greater)      AssocLeft]
+          , [Infix (rel ">=" GreaterEqual) AssocLeft]
+          , [Infix (rel "<"  Less)         AssocLeft]
+          , [Infix (rel "<=" LessEqual)    AssocLeft]
+          ]
+
+    bin o = op o . flip UBin
+    rel o = op o . flip URel
+
+    op o f = f <$> (reservedOp o >> meta)
+
+true, false :: Parser Bool
+true  = res "true"  True
+false = res "false" False
+
+res :: String -> a -> Parser a
+res s = (reserved s >>) . return
+
+meta :: Parser Meta
+meta = do
+    p <- getPosition
+    return $ Meta (sourceName p) (sourceLine p) (sourceColumn p)
 
 manyTill1 :: Stream s m t
           => ParsecT s u m a
           -> ParsecT s u m b
           -> ParsecT s u m [a]
 manyTill1 p end = liftM2 (:) p (manyTill p end)
+
 
 infix 0 ??
 

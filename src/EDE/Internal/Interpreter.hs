@@ -7,7 +7,7 @@ module EDE.Internal.Interpreter where
 import           Control.Applicative
 import           Control.Monad              (liftM2, zipWithM_, foldM)
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Error  hiding (Error)
+import           Control.Monad.Trans.Error
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
 import           Data.Attoparsec.Number     (Number(..))
@@ -30,13 +30,13 @@ import           EDE.Internal.Types
 -- FIXME:
 -- Prevent rebinding/shadowing of variables
 
-newtype Env a = Env { unwrap :: ErrorT String (Reader Object) a }
+newtype Env a = Env { unwrap :: ErrorT EvalError (Reader Object) a }
     deriving (Functor, Applicative, Monad)
 
-evaluate :: Object -> TExp Frag -> Either String Frag
+evaluate :: Object -> TExp Frag -> Either EvalError Frag
 evaluate obj = runEnv obj . eval
 
-runEnv :: Object -> Env Frag -> Either String Frag
+runEnv :: Object -> Env Frag -> Either EvalError Frag
 runEnv obj env = runReader (runErrorT $ unwrap env) obj
 
 bind :: (Object -> Object) -> Env a -> Env a
@@ -51,8 +51,8 @@ require k = lookup k !? fmt "binding '{}' doesn't exist." [k]
 (!?) :: Env (Maybe a) -> String -> Env a
 (!?) m e = m >>= maybe (fail e) return
 
-failf :: (Monad m, Params a) => Format -> a -> m b
-failf f = fail . fmt f
+-- failf :: (Monad m, Params a) => Format -> a -> m b
+throw m f = Env . throwError . EvalError m . fmt f
 
 fmt :: Params ps => Format -> ps -> String
 fmt f = LText.unpack . Format.format f
@@ -83,17 +83,17 @@ eval (TCond p l r) = do
     p' <- eval p
     eval $ if p' then l else r
 
-eval (TLoop (Bind prim msec) i l r) = require i >>= loop
+eval (TLoop b i l r) = require i >>= loop
   where
-    p = unident prim
-    s = unident <$> msec
+    p = ident $ bindPrim b
+    s = ident <$> bindSec b
 
     loop (Array a)
         | Vector.null a = eval r
 --        | Just s' <- s  = indexed s' . zip indices $ Vector.toList a
         | otherwise     = consequent a
 
-    loop e = failf "for loop expects an array or hashmap at '{}', got: {}"
+    loop e = throw "for loop expects an array or hashmap at '{}', got: {}"
         [show i, show e]
 
     consequent xs = do

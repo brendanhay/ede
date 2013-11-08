@@ -1,28 +1,46 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GADTs                     #-}
+{-# LANGUAGE StandaloneDeriving        #-}
+{-# LANGUAGE TypeSynonymInstances      #-}
 
 module EDE.Internal.Types where
 
-import           Data.Aeson
+import           Control.Monad.Trans.Error
 import           Data.Monoid
-import           Data.Text              (Text)
+import           Data.Text                 (Text)
 import           Data.Text.Buildable
-import qualified Data.Text.Lazy         as LText
+import qualified Data.Text.Lazy            as LText
 import           Data.Text.Lazy.Builder
 
 type LText = LText.Text
+type Frag  = Builder
 
-newtype Ident = Ident { unident :: Text }
+data Meta = Meta
+    { metaSrc :: !String
+    , metaRow :: !Int
+    , metaCol :: !Int
+    } deriving (Eq, Show)
+
+data TypeError = TypeError !Meta !String
+    deriving (Eq, Show)
+
+data EvalError = EvalError !Meta !String
+    deriving (Eq, Show)
+
+instance Error EvalError where
+    strMsg s = EvalError (Meta s 0 0) s
+
+newtype Ident = Ident { ident :: Text }
     deriving (Show)
 
-type Frag = Builder
+instance Buildable Ident where
+    build = build . ident
 
-data Meta = Meta !Int !Int !String
-    deriving (Show)
-
-data Bind = Bind !Ident (Maybe Ident)
-    deriving (Show)
+data Bind = Bind
+    { bindMeta :: !Meta
+    , bindPrim :: !Ident
+    , bindSec  :: Maybe Ident
+    } deriving (Show)
 
 data AExp = forall a. TExp a ::: TType a
 
@@ -77,9 +95,10 @@ data UExp
     | ULoop !Meta !Bind  !Ident !UExp !UExp
       deriving (Show)
 
+-- FIXME: Hrmm.
 instance Monoid UExp where
-    mempty      = UFrag mempty
-    mappend a b = UApp a b
+    mempty      = UFrag (Meta "mempty"  0 0) mempty
+    mappend a b = UApp  (Meta "mappend" 0 0) a b
 
 data BinOp
     = And
