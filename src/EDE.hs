@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Tmpl where
+module EDE where
 
 import           Control.Applicative
 import           Data.Aeson
@@ -10,10 +10,10 @@ import           Data.Text                 (Text)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO         as LText
 import           Text.Parsec               hiding (parse)
-import           Tmpl.Internal.TypeCheck
-import           Tmpl.Internal.Interpreter
-import           Tmpl.Internal.Parser
-import           Tmpl.Internal.Types
+import           EDE.Internal.TypeCheck
+import           EDE.Internal.Interpreter
+import           EDE.Internal.Parser
+import           EDE.Internal.Types
 
 --rend :: IO (Either String [Expr])
 

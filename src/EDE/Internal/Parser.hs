@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Tmpl.Internal.Parser where
+module EDE.Internal.Parser where
 
 import           Control.Applicative    ((<$>), (<*>), (<*), (*>), pure)
 import           Control.Monad
@@ -11,8 +11,8 @@ import           Data.Text.Lazy.Builder
 import           Text.Parsec            hiding (parse)
 import           Text.Parsec.Expr
 import           Text.Parsec.Text.Lazy  (Parser)
-import           Tmpl.Internal.Lexer    as Lexer
-import           Tmpl.Internal.Types
+import           EDE.Internal.Lexer    as Lexer
+import           EDE.Internal.Types
 
 -- FIXME:
 -- Support negation of exprs with parens

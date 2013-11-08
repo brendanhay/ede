@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-module Tmpl.Internal.Types where
+module EDE.Internal.Types where
 
 import           Data.Aeson
 import           Data.Monoid

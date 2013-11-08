@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
-module Tmpl.Internal.Interpreter where
+module EDE.Internal.Interpreter where
 
 import           Control.Applicative
 import           Control.Monad              (liftM2, zipWithM_, foldM)
@@ -25,7 +25,7 @@ import qualified Data.Text.Lazy             as LText
 import           Data.Text.Lazy.Builder     (Builder)
 import qualified Data.Vector                as Vector
 import           Prelude                    hiding (lookup, mapM_)
-import           Tmpl.Internal.Types
+import           EDE.Internal.Types
 
 -- FIXME:
 -- Prevent rebinding/shadowing of variables

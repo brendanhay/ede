@@ -1,4 +1,4 @@
-module Tmpl.Internal.Lexer where
+module EDE.Internal.Lexer where
 
 import           Data.Functor.Identity
 import           Data.Text.Lazy        (Text)
