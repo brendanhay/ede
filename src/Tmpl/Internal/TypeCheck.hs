@@ -50,9 +50,10 @@ check (URel op x y) = do
     return $ TRel op x' y' ::: TTBool
 
 check (UCond p l r) = do
-    p' ::: TTBool <- check p
-    l' ::: TTFrag  <- check l
-    r' ::: TTFrag  <- check r
+    p' ::: pt     <- check p
+    l' ::: TTFrag <- check l
+    r' ::: TTFrag <- check r
+    Eq <- equal pt TTBool
     return $ TCond p' l' r' ::: TTFrag
 
 check (ULoop b i l r) = do
@@ -69,8 +70,8 @@ equal TTBool TTBool = Right Eq
 equal TTInt  TTInt  = Right Eq
 equal TTDbl  TTDbl  = Right Eq
 equal TTFrag TTFrag = Right Eq
-equal a      b      = Left $ concat
-    ["type equality check ", show a, " ~ ", show b, " failed."]
+equal a b = Left $
+    concat ["type equality check ", show a, " ~ ", show b, " failed."]
 
 data Order a where
     Ord :: Ord a => Order a
@@ -80,5 +81,5 @@ order TTText = Right Ord
 order TTBool = Right Ord
 order TTInt  = Right Ord
 order TTDbl  = Right Ord
-order t      = Left $ concat
-    ["constraint check Ord a => a ~ ", show t, "failed."]
+order t = Left $
+    concat ["constraint check Ord a => a ~ ", show t, "failed."]

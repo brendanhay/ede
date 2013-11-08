@@ -16,6 +16,8 @@ type LText = LText.Text
 newtype Ident = Ident { unident :: Text }
     deriving (Show)
 
+type Frag = Builder
+
 data Meta = Meta !Int !Int !String
     deriving (Show)
 
@@ -25,10 +27,6 @@ data Bind = Bind !Ident (Maybe Ident)
 data AExp = forall a. TExp a ::: TType a
 
 deriving instance Show AExp
-
-data Frag
-    = Bld Builder
-    | Val Value
 
 data TType a where
     TTText :: TType Text
@@ -49,34 +47,34 @@ instance Type Double  where typeof = TTDbl
 instance Type Frag    where typeof = TTFrag
 
 data TExp a where
-    TText :: Text           -> TExp Text
-    TBool :: Bool           -> TExp Bool
-    TInt  :: Integer        -> TExp Integer
-    TDbl  :: Double         -> TExp Double
-    TVar  :: Ident          -> TExp Frag
-    TFrag :: Builder        -> TExp Frag
-    TApp  :: TExp Frag      -> TExp Frag  -> TExp Frag
-    TNeg  :: TExp Bool      -> TExp Bool
-    TBin  :: BinOp          -> TExp Bool  -> TExp Bool -> TExp Bool
-    TRel  :: Ord a => RelOp -> TExp a     -> TExp a    -> TExp Bool
-    TCond :: TExp Bool      -> TExp Frag  -> TExp Frag -> TExp Frag
-    TLoop :: Bind           -> Ident      -> TExp Frag -> TExp Frag -> TExp Frag
+    TText :: Meta -> Text           -> TExp Text
+    TBool :: Meta -> Bool           -> TExp Bool
+    TInt  :: Meta -> Integer        -> TExp Integer
+    TDbl  :: Meta -> Double         -> TExp Double
+    TVar  :: Meta -> Ident          -> TExp Frag
+    TFrag :: Meta -> Frag           -> TExp Frag
+    TApp  :: Meta -> TExp Frag      -> TExp Frag -> TExp Frag
+    TNeg  :: Meta -> TExp Bool      -> TExp Bool
+    TBin  :: Meta -> BinOp          -> TExp Bool -> TExp Bool -> TExp Bool
+    TRel  :: Meta -> Ord a => RelOp -> TExp a    -> TExp a    -> TExp Bool
+    TCond :: Meta -> TExp Bool      -> TExp Frag -> TExp Frag -> TExp Frag
+    TLoop :: Meta -> Bind           -> Ident     -> TExp Frag -> TExp Frag -> TExp Frag
 
 deriving instance Show (TExp a)
 
 data UExp
-    = UText !Text
-    | UBool !Bool
-    | UInt  !Integer
-    | UDbl  !Double
-    | UVar  !Ident
-    | UFrag !Builder
-    | UApp  !UExp  !UExp
-    | UNeg  !UExp
-    | UBin  !BinOp !UExp  !UExp
-    | URel  !RelOp !UExp  !UExp
-    | UCond !UExp  !UExp  !UExp
-    | ULoop !Bind  !Ident !UExp !UExp
+    = UText !Meta !Text
+    | UBool !Meta !Bool
+    | UInt  !Meta !Integer
+    | UDbl  !Meta !Double
+    | UVar  !Meta !Ident
+    | UFrag !Meta !Frag
+    | UApp  !Meta !UExp  !UExp
+    | UNeg  !Meta !UExp
+    | UBin  !Meta !BinOp !UExp  !UExp
+    | URel  !Meta !RelOp !UExp  !UExp
+    | UCond !Meta !UExp  !UExp  !UExp
+    | ULoop !Meta !Bind  !Ident !UExp !UExp
       deriving (Show)
 
 instance Monoid UExp where

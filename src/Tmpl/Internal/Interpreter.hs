@@ -1,7 +1,6 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE ViewPatterns               #-}
 
 module Tmpl.Internal.Interpreter where
 
@@ -34,17 +33,17 @@ import           Tmpl.Internal.Types
 newtype Env a = Env { unwrap :: ErrorT String (Reader Object) a }
     deriving (Functor, Applicative, Monad)
 
-evaluate :: Object -> TExp Frag -> Either String Builder
+evaluate :: Object -> TExp Frag -> Either String Frag
 evaluate obj = runEnv obj . eval
 
-runEnv :: Object -> Env Builder -> Either String Builder
+runEnv :: Object -> Env Frag -> Either String Frag
 runEnv obj env = runReader (runErrorT $ unwrap env) obj
 
 bind :: (Object -> Object) -> Env a -> Env a
 bind f = Env . (mapErrorT $ withReader f) . unwrap
 
 lookup :: Ident -> Env (Maybe Value)
-lookup (Ident k) = Env $ Map.lookup k <$> lift (lift ask)
+lookup (Ident k) = Env $ Map.lookup k <$> lift ask
 
 require :: Ident -> Env Value
 require k = lookup k !? fmt "binding '{}' doesn't exist." [k]
@@ -59,17 +58,14 @@ fmt :: Params ps => Format -> ps -> String
 fmt f = LText.unpack . Format.format f
 
 eval :: TExp a -> Env a
-eval (TFrag b) = return $ Bld b
+eval (TFrag b) = return b
 eval (TText t) = return t
 eval (TBool b) = return b
 eval (TInt  i) = return i
 eval (TDbl  d) = return d
-eval (TVar  v) = Val <$> require v
+eval (TVar  v) = require v >>= render
 
-eval (TApp a b) = do
-    a' <- eval a
-    b' <- eval b
-    a' `fappend` b'
+eval (TApp a b) = liftM2 (<>) (eval a) (eval b)
 
 eval (TNeg e) = not <$> eval e
 
@@ -102,7 +98,7 @@ eval (TLoop (Bind prim msec) i l r) = require i >>= loop
 
     consequent xs = do
         fs <- mapM (\v -> bind (ins p v) $ eval l) $ toList xs
-        foldrM fappend (Bld mempty) fs
+        return $ foldr' (<>) mempty fs
 
     -- indexed s' = mapM_ (\(v, n) -> bind (ins p v . ins s' n) $ eval l)
 
@@ -110,24 +106,17 @@ eval (TLoop (Bind prim msec) i l r) = require i >>= loop
 
     ins = Map.insert
 
-eval e = failf "unable to eval: {}" [show e]
-
 evalM2 :: (a -> a -> b) -> TExp a -> TExp a -> Env b
 evalM2 f x y = liftM2 f (eval x) (eval y)
 
-fappend :: (Functor m, Monad m) => Frag -> Frag -> m Frag
-fappend a b = Bld <$> liftM2 (<>) (render a) (render b)
-
-render :: Monad m => Frag -> m Builder
-render (Val (Object _))     = fail "unable to render object value."
-render (Val (Array  _))     = fail "unable to render array value."
-render (Val Null)           = fail "unable to render null value."
-render (Val (Number (I n))) = return $ Build.build n
-render (Val (Number (D d))) = return $ Build.build d
-render (Val (Bool   b))     = return $ Build.build b
-render (Val (String s))     = return $ Build.build s
-render (Bld bld)            = return bld
-
+render :: Monad m => Value -> m Frag
+render (Number (I n)) = return $ Build.build n
+render (Number (D d)) = return $ Build.build d
+render (Bool   b)     = return $ Build.build b
+render (String s)     = return $ Build.build s
+render (Object _)     = fail "unable to render object value."
+render (Array  _)     = fail "unable to render array value."
+render Null           = fail "unable to render null value."
 
     -- binder :: Text -> TExp a -> Value -> Env (TExp a)
 
