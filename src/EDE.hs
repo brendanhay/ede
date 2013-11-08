@@ -14,37 +14,25 @@ import           EDE.Internal.TypeChecker
 import           EDE.Internal.Types
 import           Text.Parsec              (ParseError)
 
---rend :: IO (Either String [Expr])
+-- FIXME:
+-- syntax/semantic test suite
+-- criterion benchmarks
 
+rend :: IO ()
 rend = do
     u <- load "test.ede"
-    print u
 
-    let (Right us) = u
-        c          = typeCheck us
+    let (Right u') = u
+        t          = typeCheck u'
+        (Right t') = t
+        b          = evaluate o t'
+        (Right b') = b
 
-    print c
+    putStrLn "Template:"
+    readFile "test.ede" >>= putStrLn
 
-    let (Right cs)   = c
-
-    print $ evaluate o cs
-
-  --   let (Right es)   = l
-  --       (Object obj) = o
-  --       x            = evaluate obj es
-
-  --   print x
-
-  --   let Right b = x
-
-  --   putStrLn "Template:"
-  --   readFile "test.tmpl" >>= putStrLn
-
-  --   putStrLn "Expressions:"
-  --   print es
-
-  --   putStrLn "Builder:"
-  --   LText.putStr $ toLazyText b
+    putStrLn "Builder:"
+    LText.putStr $ toLazyText b'
   where
     Object o = object
         [ "ident" .= ("ident_value!" :: Text)
