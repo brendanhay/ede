@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-module Tmpl.Internal.Types where
+module EDE.Internal.Types where
 
 import           Data.Aeson
 import           Data.Monoid
@@ -47,18 +47,18 @@ instance Type Double  where typeof = TTDbl
 instance Type Frag    where typeof = TTFrag
 
 data TExp a where
-    TText :: Meta -> Text           -> TExp Text
-    TBool :: Meta -> Bool           -> TExp Bool
-    TInt  :: Meta -> Integer        -> TExp Integer
-    TDbl  :: Meta -> Double         -> TExp Double
-    TVar  :: Meta -> Ident          -> TExp Frag
-    TFrag :: Meta -> Frag           -> TExp Frag
-    TApp  :: Meta -> TExp Frag      -> TExp Frag -> TExp Frag
-    TNeg  :: Meta -> TExp Bool      -> TExp Bool
-    TBin  :: Meta -> BinOp          -> TExp Bool -> TExp Bool -> TExp Bool
-    TRel  :: Meta -> Ord a => RelOp -> TExp a    -> TExp a    -> TExp Bool
-    TCond :: Meta -> TExp Bool      -> TExp Frag -> TExp Frag -> TExp Frag
-    TLoop :: Meta -> Bind           -> Ident     -> TExp Frag -> TExp Frag -> TExp Frag
+    TText :: Meta          -> Text      -> TExp Text
+    TBool :: Meta          -> Bool      -> TExp Bool
+    TInt  :: Meta          -> Integer   -> TExp Integer
+    TDbl  :: Meta          -> Double    -> TExp Double
+    TVar  :: Meta          -> Ident     -> TExp Frag
+    TFrag :: Meta          -> Frag      -> TExp Frag
+    TApp  :: Meta          -> TExp Frag -> TExp Frag -> TExp Frag
+    TNeg  :: Meta          -> TExp Bool -> TExp Bool
+    TBin  :: Meta          -> BinOp     -> TExp Bool -> TExp Bool -> TExp Bool
+    TRel  :: Ord a => Meta -> RelOp     -> TExp a    -> TExp a    -> TExp Bool
+    TCond :: Meta          -> TExp Bool -> TExp Frag -> TExp Frag -> TExp Frag
+    TLoop :: Meta          -> Bind      -> Ident     -> TExp Frag -> TExp Frag -> TExp Frag
 
 deriving instance Show (TExp a)
 
@@ -94,6 +94,3 @@ data RelOp
     | Less
     | LessEqual
       deriving (Show)
-
-instance Buildable Ident where
-    build (Ident k) = build k

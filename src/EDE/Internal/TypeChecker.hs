@@ -1,10 +1,10 @@
 {-# LANGUAGE GADTs #-}
 
-module Tmpl.Internal.TypeChecker where
+ module EDE.Internal.TypeChecker where
 
 import Control.Monad
 import Data.Monoid
-import Tmpl.Internal.Types
+import EDE.Internal.Types
 
 typeCheck :: Type a => UExp -> Either String (TExp a)
 typeCheck = f <=< check
