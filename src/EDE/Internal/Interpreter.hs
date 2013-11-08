@@ -77,13 +77,17 @@ eval (TLoop m b i l r) = require m i >>= loop
     loop (Array a)
         | Vector.null a = eval r
         | Just s' <- s  = indexed s' . zip indices $ Vector.toList a
-        | otherwise     = consequent a
+        | otherwise     = consequent $ Vector.toList a
+
+    loop (Object o)
+        | Map.null o    = eval r
+        | otherwise     = consequent $ Map.elems o
 
     loop e = throw m "for loop expects an array or hashmap at '{}', got: {}"
         [show i, show e]
 
     consequent xs = do
-        fs <- mapM (\v -> bind (ins p v) $ eval l) $ toList xs
+        fs <- mapM (\v -> bind (ins p v) $ eval l) xs
         return $ foldr' (<>) mempty fs
 
     indexed nk xs = do
