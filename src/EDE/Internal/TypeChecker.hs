@@ -8,6 +8,10 @@ import Data.Text.Format
 import Data.Text.Format.Params (Params)
 import EDE.Internal.Types
 
+-- FIXME:
+-- use metadata extraction function from types to annotate
+-- equality check on line 22
+
 typeCheck :: Type a => UExp -> Either TypeError (TExp a)
 typeCheck = f <=< check
   where
@@ -16,8 +20,7 @@ typeCheck = f <=< check
 
     g :: TType a -> AExp -> Either TypeError (TExp a)
     g t (e ::: t') = do
-        -- FIXME: write meta extractor
-        Eq <- equal (Meta "typeCheck:g" 0 0) t t'
+        Eq <- equal Unknown t t'
         return e
 
 check :: UExp -> Either TypeError AExp
