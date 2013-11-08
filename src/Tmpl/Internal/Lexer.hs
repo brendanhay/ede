@@ -20,11 +20,11 @@ reservedOp = Parsec.reservedOp lexer
 stringLiteral :: Parser String
 stringLiteral = Parsec.stringLiteral lexer
 
-charLiteral :: Parser Char
-charLiteral = Parsec.charLiteral lexer
+integerLiteral :: Parser Integer
+integerLiteral = Parsec.integer lexer
 
-naturalOrFloat :: Parser (Either Integer Double)
-naturalOrFloat = Parsec.naturalOrFloat lexer
+doubleLiteral :: Parser Double
+doubleLiteral = Parsec.float lexer
 
 symbol :: String -> Parser String
 symbol = Parsec.symbol lexer
@@ -43,7 +43,7 @@ bOr  = op "||"
 
 rEq, rNotEq, rGreater, rGreaterEq, rLess, rLessEq :: a -> Parser a
 rEq        = op "=="
-rNotEq     = op "!="
+rNotEq     = op "/="
 rGreater   = op ">"
 rGreaterEq = op ">="
 rLess      = op "<"
@@ -75,4 +75,4 @@ reservedNames :: [String]
 reservedNames = ["if", "endif", "for", "in", "endfor", "else", "true", "false"]
 
 reservedOps :: [String]
-reservedOps = [">", ">=", "<", "=<", "==", "!", "!=", "||", "&&"]
+reservedOps = [">", ">=", "<", "=<", "==", "/=", "!", "||", "&&"]

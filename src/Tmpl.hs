@@ -9,6 +9,7 @@ import           Data.Text                 (Text)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO         as LText
 import           Text.Parsec               hiding (parse)
+import           Tmpl.Internal.Check
 import           Tmpl.Internal.Interpreter
 import           Tmpl.Internal.Parser
 import           Tmpl.Internal.Types
@@ -16,33 +17,36 @@ import           Tmpl.Internal.Types
 --rend :: IO (Either String [Expr])
 
 rend = do
-    l <- load "test.tmpl"
+    u <- load "test.tmpl"
+    print u
 
-    print l
+    let (Right us) = u
 
-    let (Right es)   = l
-        (Object obj) = o
-        x            = evaluate obj es
+    print $ check us
 
-    print x
+  --   let (Right es)   = l
+  --       (Object obj) = o
+  --       x            = evaluate obj es
 
-    let Right b = x
+  --   print x
 
-    putStrLn "Template:"
-    readFile "test.tmpl" >>= putStrLn
+  --   let Right b = x
 
-    putStrLn "Expressions:"
-    print es
+  --   putStrLn "Template:"
+  --   readFile "test.tmpl" >>= putStrLn
 
-    putStrLn "Builder:"
-    LText.putStr $ toLazyText b
-  where
-    o = object
-        [ "ident" .= ("ident_value!" :: Text)
-        , "list1" .= (["hi", "ho", "off", "we", "go"] :: [Text])
-        , "list2" .= ([] :: [Text])
-        , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
-        ]
+  --   putStrLn "Expressions:"
+  --   print es
 
-load :: FilePath -> IO (Either ParseError [Expr])
+  --   putStrLn "Builder:"
+  --   LText.putStr $ toLazyText b
+  -- where
+  --   o = object
+  --       [ "ident" .= ("ident_value!" :: Text)
+  --       , "list1" .= (["hi", "ho", "off", "we", "go"] :: [Text])
+  --       , "list2" .= ([] :: [Text])
+  --       , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
+  --       ]
+
+load :: FilePath -> IO (Either ParseError UExpr)
 load path = parse <$> LText.readFile path
