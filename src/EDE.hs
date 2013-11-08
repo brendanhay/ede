@@ -26,7 +26,10 @@ rend = do
         t          = typeCheck u'
         (Right t') = t
         b          = evaluate o t'
-        (Right b') = b
+
+    print b
+
+    let (Right b') = b
 
     putStrLn "Template:"
     readFile "test.ede" >>= putStrLn

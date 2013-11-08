@@ -7,6 +7,7 @@ import           Control.Monad
 import           Data.Foldable          (foldr')
 import           Data.Monoid
 import qualified Data.Text              as Text
+import qualified Data.Text.Lazy         as LText
 import           Data.Text.Lazy.Builder
 import           EDE.Internal.Lexer
 import           EDE.Internal.Types     hiding (ident)
@@ -16,7 +17,8 @@ import           Text.Parsec.Expr
 import           Text.Parsec.Text.Lazy  (Parser)
 
 -- FIXME:
--- Support negation of exprs with parens
+-- support negation of exprs with parens
+-- add metadata to idents
 
 runParser :: String -> LText -> Either ParseError UExp
 runParser = Parsec.runParser template ()
@@ -110,7 +112,7 @@ double :: Parser UExp
 double = parse "double" UDbl doubleLiteral
 
 text :: Parser UExp
-text = parse "text" (\m -> UText m . Text.pack) stringLiteral
+text = parse "text" (\m -> UText m . LText.pack) stringLiteral
 
 parse :: String -> (Meta -> a -> b) -> Parser a -> Parser b
 parse name f p = do

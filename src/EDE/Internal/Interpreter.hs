@@ -15,10 +15,12 @@ import           Data.Foldable              (Foldable, foldr')
 import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
 import           Data.Monoid
+import qualified Data.Text                  as Text
 import qualified Data.Text.Buildable        as Build
 import           Data.Text.Format           (Format)
 import qualified Data.Text.Format           as Format
 import           Data.Text.Format.Params    (Params)
+import qualified Data.Text.Lazy             as LText
 import qualified Data.Vector                as Vector
 import           EDE.Internal.Types
 import           Prelude                    hiding (lookup)
@@ -82,8 +84,9 @@ eval (TLoop m b i l r) = require m i >>= loop
         | Map.null o    = alternate
         | Just s' <- s  = scope (keyed s') $ Map.toList o
         | otherwise     = scope consequent $ Map.elems o
-    loop e = throw m "for loop expects an array or hashmap at {{ {} }}, got: {}"
-        [show p, show e]
+    loop e = throw m
+        "loop target '{}' was expected to be array or hashmap, got: {}"
+        [ident i, Text.pack $ show e]
 
     alternate    = eval r
     consequent v = bind (ins p v) $ eval l

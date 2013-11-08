@@ -67,7 +67,7 @@ data AExp = forall a. TExp a ::: TType a
 deriving instance Show AExp
 
 data TType a where
-    TTText :: TType Text
+    TTText :: TType LText
     TTBool :: TType Bool
     TTInt  :: TType Integer
     TTDbl  :: TType Double
@@ -78,14 +78,14 @@ deriving instance Show (TType a)
 class Type a where
     typeof :: TType a
 
-instance Type Text    where typeof = TTText
+instance Type LText   where typeof = TTText
 instance Type Bool    where typeof = TTBool
 instance Type Integer where typeof = TTInt
 instance Type Double  where typeof = TTDbl
 instance Type Frag    where typeof = TTFrag
 
 data TExp a where
-    TText :: Meta          -> Text      -> TExp Text
+    TText :: Meta          -> LText     -> TExp LText
     TBool :: Meta          -> Bool      -> TExp Bool
     TInt  :: Meta          -> Integer   -> TExp Integer
     TDbl  :: Meta          -> Double    -> TExp Double
@@ -101,7 +101,7 @@ data TExp a where
 deriving instance Show (TExp a)
 
 data UExp
-    = UText !Meta !Text
+    = UText !Meta !LText
     | UBool !Meta !Bool
     | UInt  !Meta !Integer
     | UDbl  !Meta !Double
