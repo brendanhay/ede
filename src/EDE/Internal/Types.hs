@@ -116,8 +116,8 @@ data UExp
       deriving (Show)
 
 instance Monoid UExp where
-    mempty      = UFrag Unknown mempty
-    mappend a b = UApp  Unknown a b
+    mempty   = UFrag Unknown mempty
+    mappendb = UApp  Unknown
 
 data BinOp
     = And

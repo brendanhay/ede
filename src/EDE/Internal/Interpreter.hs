@@ -33,7 +33,7 @@ evaluate :: Object -> TExp Frag -> Either EvalError Frag
 evaluate obj e = runReader (runErrorT . unwrap $ eval e) obj
 
 bind :: (Object -> Object) -> Env a -> Env a
-bind f = Env . (mapErrorT $ withReader f) . unwrap
+bind f = Env . mapErrorT (withReader f) . unwrap
 
 require :: Meta -> Ident -> Env Value
 require m (Ident k) = do

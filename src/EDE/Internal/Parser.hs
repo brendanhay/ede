@@ -19,7 +19,7 @@ import           Text.Parsec.Text.Lazy  (Parser)
 -- Support negation of exprs with parens
 
 runParser :: String -> LText -> Either ParseError UExp
-runParser name = Parsec.runParser template () name
+runParser = Parsec.runParser template ()
 
 template :: Parser UExp
 template = foldr' (<>) mempty <$> manyTill expression (try eof)
