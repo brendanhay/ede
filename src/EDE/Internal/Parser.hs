@@ -154,7 +154,6 @@ manyTill1 :: Stream s m t
           -> ParsecT s u m [a]
 manyTill1 p end = liftM2 (:) p (manyTill p end)
 
-
 infix 0 ??
 
 (??) :: String -> ParsecT s u m a -> ParsecT s u m a

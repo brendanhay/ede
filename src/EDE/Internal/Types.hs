@@ -1,5 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs                     #-}
+{-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeSynonymInstances      #-}
 
@@ -9,26 +10,40 @@ import           Control.Monad.Trans.Error
 import           Data.Monoid
 import           Data.Text                 (Text)
 import           Data.Text.Buildable
+import           Data.Text.Format          (format)
 import qualified Data.Text.Lazy            as LText
 import           Data.Text.Lazy.Builder
 
 type LText = LText.Text
 type Frag  = Builder
 
-data Meta = Meta
-    { metaSrc :: !String
-    , metaRow :: !Int
-    , metaCol :: !Int
-    } deriving (Eq, Show)
+data Meta
+    = Meta !String !Int !Int
+    | Unknown
+      deriving (Eq)
 
-data TypeError = TypeError !Meta !String
-    deriving (Eq, Show)
+instance Show Meta where
+    show (Meta s r c) = concat [s, ":(", show r, ",", show c, ")"]
+    show Unknown      = "unknown"
 
-data EvalError = EvalError !Meta !String
-    deriving (Eq, Show)
+data TypeError = TypeError Meta LText
+    deriving (Eq)
+
+instance Show TypeError where
+    show (TypeError m msg) = formatError "TypeError" m msg
+
+data EvalError = EvalError Meta LText
+    deriving (Eq)
+
+instance Show EvalError where
+    show (EvalError m msg) = formatError "EvalError" m msg
+
+formatError :: LText -> Meta -> LText -> String
+formatError e m msg = LText.unpack $
+    format "{}\nPosition: {}\nMessage: {}" [e, LText.pack $ show m, msg]
 
 instance Error EvalError where
-    strMsg s = EvalError (Meta s 0 0) s
+    strMsg = EvalError Unknown . LText.pack
 
 newtype Ident = Ident { ident :: Text }
     deriving (Show)

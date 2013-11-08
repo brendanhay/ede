@@ -11,7 +11,7 @@ import           Control.Monad.Trans.Error
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
 import           Data.Attoparsec.Number     (Number(..))
-import           Data.Foldable              (Foldable, foldr', mapM_, toList, foldrM)
+import           Data.Foldable              (Foldable, foldr', toList)
 import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -19,10 +19,9 @@ import qualified Data.Text.Buildable        as Build
 import           Data.Text.Format           (Format)
 import qualified Data.Text.Format           as Format
 import           Data.Text.Format.Params    (Params)
-import qualified Data.Text.Lazy             as LText
 import qualified Data.Vector                as Vector
 import           EDE.Internal.Types
-import           Prelude                    hiding (lookup, mapM_)
+import           Prelude                    hiding (lookup)
 
 -- FIXME:
 -- Prevent rebinding/shadowing of variables
@@ -31,23 +30,18 @@ newtype Env a = Env { unwrap :: ErrorT EvalError (Reader Object) a }
     deriving (Functor, Applicative, Monad)
 
 evaluate :: Object -> TExp Frag -> Either EvalError Frag
-evaluate obj = runEnv obj . eval
-
-runEnv :: Object -> Env Frag -> Either EvalError Frag
-runEnv obj env = runReader (runErrorT $ unwrap env) obj
+evaluate obj e = runReader (runErrorT . unwrap $ eval e) obj
 
 bind :: (Object -> Object) -> Env a -> Env a
 bind f = Env . (mapErrorT $ withReader f) . unwrap
 
-lookup :: Ident -> Env (Maybe Value)
-lookup (Ident k) = Env $ Map.lookup k <$> lift ask
-
 require :: Meta -> Ident -> Env Value
-require m k = lookup k >>=
-    maybe (throw m "binding '{}' doesn't exist." [k]) return
+require m (Ident k) = do
+    mv <- Env $ Map.lookup k <$> lift ask
+    maybe (throw m "binding '{}' doesn't exist." [k]) return mv
 
 throw :: Params ps => Meta -> Format -> ps -> Env a
-throw m f = Env . throwError . EvalError m . LText.unpack . Format.format f
+throw m f = Env . throwError . EvalError m . Format.format f
 
 eval :: TExp a -> Env a
 eval (TFrag _ b) = return b

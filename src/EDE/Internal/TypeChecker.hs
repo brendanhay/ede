@@ -3,11 +3,10 @@
 
 module EDE.Internal.TypeChecker where
 
-import           Control.Monad
-import           Data.Text.Format
-import           Data.Text.Format.Params (Params)
-import qualified Data.Text.Lazy          as LText
-import           EDE.Internal.Types
+import Control.Monad
+import Data.Text.Format
+import Data.Text.Format.Params (Params)
+import EDE.Internal.Types
 
 typeCheck :: Type a => UExp -> Either TypeError (TExp a)
 typeCheck = f <=< check
@@ -74,7 +73,7 @@ equal _ TTBool TTBool = Right Eq
 equal _ TTInt  TTInt  = Right Eq
 equal _ TTDbl  TTDbl  = Right Eq
 equal _ TTFrag TTFrag = Right Eq
-equal m a b = throw m "type equality check {} ~ {} failed." [show a, show b]
+equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
 
 data Order a where
     Ord :: Ord a => Order a
@@ -84,7 +83,8 @@ order _ TTText = Right Ord
 order _ TTBool = Right Ord
 order _ TTInt  = Right Ord
 order _ TTDbl  = Right Ord
-order m t = throw m "constraint check Ord a => a ~ {} failed." [show t]
+order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
 throw :: Params ps => Meta -> Format -> ps -> Either TypeError a
-throw m f = Left . TypeError m . LText.unpack . format f
+throw m f = Left . TypeError m . format f
+
