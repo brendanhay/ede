@@ -80,6 +80,8 @@ data TExp a where
 
 deriving instance Show (TExp a)
 
+-- FIXME: meta data extraction function
+
 data UExp
     = UText !Meta !Text
     | UBool !Meta !Bool

@@ -5,7 +5,6 @@ module EDE where
 import           Control.Applicative
 import           Data.Aeson
 import qualified Data.HashMap.Strict      as Map
-import           Data.Monoid
 import           Data.Text                (Text)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO        as LText
@@ -13,7 +12,7 @@ import           EDE.Internal.Interpreter
 import           EDE.Internal.Parser
 import           EDE.Internal.TypeChecker
 import           EDE.Internal.Types
-import           Text.Parsec              hiding (parse)
+import           Text.Parsec              (ParseError)
 
 --rend :: IO (Either String [Expr])
 
@@ -55,4 +54,4 @@ rend = do
         ]
 
 load :: FilePath -> IO (Either ParseError UExp)
-load path = parse <$> LText.readFile path
+load path = runParser path <$> LText.readFile path
