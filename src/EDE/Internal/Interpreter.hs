@@ -75,31 +75,25 @@ eval (TLoop m b i l r) = require m i >>= loop
     s = ident <$> bindSec b
 
     loop (Array a)
-        | Vector.null a = eval r
-        | Just s' <- s  = indexed s' . zip indices $ Vector.toList a
-        | otherwise     = consequent $ Vector.toList a
-
+        | Vector.null a = alternate
+        | Just s' <- s  = scope (indexed s') . zip indices $ Vector.toList a
+        | otherwise     = scope consequent $ Vector.toList a
     loop (Object o)
-        | Map.null o    = eval r
-        | Just s' <- s  = keyed s' $ Map.toList o
-        | otherwise     = consequent $ Map.elems o
+        | Map.null o    = alternate
+        | Just s' <- s  = scope (keyed s') $ Map.toList o
+        | otherwise     = scope consequent $ Map.elems o
+    loop e = throw m "for loop expects an array or hashmap at {{ {} }}, got: {}"
+        [show p, show e]
 
-    loop e = throw m "for loop expects an array or hashmap at '{}', got: {}"
-        [show i, show e]
+    alternate    = eval r
+    consequent v = bind (ins p v) $ eval l
 
-    consequent xs = do
-        fs <- mapM (\v -> bind (ins p v) $ eval l) xs
-        return $ foldr' (<>) mempty fs
-
-    indexed nk xs = do
-        fs <- mapM (\(v, n) -> bind (ins p v . ins nk n) $ eval l) xs
-        return $ foldr' (<>) mempty fs
+    indexed s' (v, n) = bind (ins p v . ins s' n) $ eval l
+    keyed   s' (k, v) = bind (ins p (String k) . ins s' v) $ eval l
 
     indices = Number . I <$> [1..]
 
-    keyed vk xs = do
-        fs <- mapM (\(k, v) -> bind (ins p (String k) . ins vk v) $ eval l) xs
-        return $ foldr' (<>) mempty fs
+    scope f = fmap (foldr' (<>) mempty) . mapM f
 
     ins = Map.insert
 
