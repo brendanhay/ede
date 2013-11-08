@@ -11,7 +11,7 @@ import           Control.Monad.Trans.Error
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
 import           Data.Attoparsec.Number     (Number(..))
-import           Data.Foldable              (Foldable, foldr', toList)
+import           Data.Foldable              (Foldable, foldr')
 import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -81,6 +81,7 @@ eval (TLoop m b i l r) = require m i >>= loop
 
     loop (Object o)
         | Map.null o    = eval r
+        | Just s' <- s  = keyed s' $ Map.toList o
         | otherwise     = consequent $ Map.elems o
 
     loop e = throw m "for loop expects an array or hashmap at '{}', got: {}"
@@ -95,6 +96,10 @@ eval (TLoop m b i l r) = require m i >>= loop
         return $ foldr' (<>) mempty fs
 
     indices = Number . I <$> [1..]
+
+    keyed vk xs = do
+        fs <- mapM (\(k, v) -> bind (ins p (String k) . ins vk v) $ eval l) xs
+        return $ foldr' (<>) mempty fs
 
     ins = Map.insert
 
@@ -112,35 +117,3 @@ render m Null           = renderError m "null"
 
 renderError :: Meta -> LText -> Env a
 renderError m = throw m "unable to render {} value." . (:[])
-
--- expression (ELoop (Bind (Ident prim) (fmap unident -> sec)) b l r) = do
---     b' <- require b
---     case b' of
---         (Array  a) -> array a
---         (Object o) -> object o
---         e -> failf "for loop expects an array at '{}' but got: {}"
---             [show prim, show e]
---   where
---     array a
---         | Vector.null a = alternate
---         | otherwise     = maybe (nominal a) (`indexed` a) sec
-
---     indexed s = zipWithM_ (\i n -> conseq $ ins prim i . ins s n) ns
---         . Vector.toList
-
---     ns = Number . I <$> [1..]
-
---     object o
---         | Map.null o = alternate
---         | otherwise  = maybe (nominal $ Map.elems o) (`keyed` o) sec
-
---     keyed s = mapM_ (\(x, y) -> conseq $ ins prim (String x) . ins s y)
---         . Map.toList
-
---     nominal :: Foldable t => t Value -> Env ()
---     nominal = mapM_ (\v -> conseq $ ins prim v)
-
---     conseq f  = bind f $ mapM_ expression l
---     alternate = mapM_ expression r
-
---     ins = Map.insert
