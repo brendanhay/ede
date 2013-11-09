@@ -3,10 +3,11 @@
 
 module Text.EDE.Internal.TypeChecker where
 
-import Control.Monad
-import Data.Text.Format
-import Data.Text.Format.Params (Params)
-import Text.EDE.Internal.Types
+import           Control.Monad
+import           Data.Text.Format
+import           Data.Text.Format.Params (Params)
+import qualified Data.Text.Lazy          as LText
+import           Text.EDE.Internal.Types
 
 -- FIXME:
 -- use metadata extraction function from types to annotate
@@ -15,6 +16,7 @@ import Text.EDE.Internal.Types
 typeCheck :: Type a => UExp -> Result (TExp a)
 typeCheck = g typeof <=< check
   where
+    g :: TType a -> AExp -> Result (TExp a)
     g t (e ::: t') = do
         Eq <- equal Unknown t t'
         return e
@@ -85,4 +87,4 @@ order _ TTDbl  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
 throw :: Params ps => Meta -> Format -> ps -> Result a
-throw m f = TypeError m . format f
+throw m f = TypeError m . LText.unpack . format f

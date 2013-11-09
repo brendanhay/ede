@@ -4,14 +4,11 @@
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeSynonymInstances      #-}
 
-{-# LANGUAGE OverloadedStrings         #-}
-
 module Text.EDE.Internal.Types where
 
 import           Data.Monoid
 import           Data.Text              (Text)
 import           Data.Text.Buildable
-import           Data.Text.Format       (format)
 import qualified Data.Text.Lazy         as LText
 import           Data.Text.Lazy.Builder
 import qualified Text.Parsec            as Parsec
@@ -35,18 +32,28 @@ instance Show Meta where
     show Unknown      = "unknown"
 
 data Result a
-    = ParseError   !Meta !Parsec.ParseError
+    = Success      a
+    | ParseError   !Parsec.ParseError
     | TypeError    !Meta !String
     | CompileError !Meta !String
-    | Success      a
+
+instance Show a => Show (Result a) where
+    show = const "result"
+
+instance Functor Result where
+    fmap f (Success a) = Success $ f a
+
+    fmap _ (ParseError     e) = ParseError     e
+    fmap _ (TypeError    m e) = TypeError    m e
+    fmap _ (CompileError m e) = CompileError m e
 
 instance Monad Result where
-    return = Success
-    {-# INLINE return #-}
+    return          = Success
     Success a >>= k = k a
-    Error err >>= _ = Error err
-    {-# INLINE (>>=) #-}
 
+    ParseError     e >>= _ = ParseError     e
+    TypeError    m e >>= _ = TypeError    m e
+    CompileError m e >>= _ = CompileError m e
 
 newtype Ident = Ident { ident :: Text }
     deriving (Show)

@@ -2,17 +2,15 @@
 
 module Text.EDE where
 
-import           Control.Applicative
-import           Data.Aeson
-import qualified Data.HashMap.Strict      as Map
-import           Data.Text                (Text)
+import           Data.Aeson                    (Object, Value(..), (.=), object)
+import qualified Data.HashMap.Strict           as Map
+import           Data.Text                     (Text)
 import           Data.Text.Lazy.Builder
-import qualified Data.Text.Lazy.IO        as LText
+import qualified Data.Text.Lazy.IO             as LText
 import           Text.EDE.Internal.Compiler
 import           Text.EDE.Internal.Parser
 import           Text.EDE.Internal.TypeChecker
 import           Text.EDE.Internal.Types
-import           Text.Parsec              (ParseError)
 
 -- FIXME:
 -- syntax/semantic test suite
@@ -20,22 +18,10 @@ import           Text.Parsec              (ParseError)
 
 rend :: IO ()
 rend = do
-    u <- load "test.ede"
-
-    let (Right u') = u
-        t          = typeCheck u'
-        (Right t') = t
-        b          = compile o t'
-
-    print b
-
-    let (Right b') = b
-
-    putStrLn "Template:"
-    readFile "test.ede" >>= putStrLn
-
-    putStrLn "Builder:"
-    LText.putStr $ toLazyText b'
+    f <- LText.readFile "test.ede"
+    case render "test.ede" f o of
+        Success b -> LText.putStr $ toLazyText b
+        err       -> print err
   where
     Object o = object
         [ "ident" .= ("ident_value!" :: Text)
@@ -44,5 +30,8 @@ rend = do
         , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
         ]
 
-load :: FilePath -> IO (Either ParseError UExp)
-load path = runParser path <$> LText.readFile path
+render :: FilePath -> LText -> Object -> Result Frag
+render n tmpl obj = do
+    u <- runParser n tmpl
+    t <- typeCheck u
+    compile t obj

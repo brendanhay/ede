@@ -1,36 +1,33 @@
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Text.EDE.Internal.Compiler where
 
 import           Control.Applicative
 import           Control.Monad              (liftM2)
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Error
 import           Control.Monad.Trans.Reader
-import           Data.Aeson
+import           Data.Aeson                 (Object, Value(..))
 import           Data.Attoparsec.Number     (Number(..))
 import           Data.Foldable              (Foldable, foldr')
 import qualified Data.HashMap.Strict        as Map
-import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text                  as Text
 import qualified Data.Text.Buildable        as Build
 import           Data.Text.Format           (Format)
 import qualified Data.Text.Format           as Format
 import           Data.Text.Format.Params    (Params)
+import qualified Data.Text.Lazy             as LText
 import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
-import           Prelude                    hiding (lookup)
 
 -- FIXME:
 -- Prevent rebinding/shadowing of variables
 
-type Env a = Env (Reader Object (Result a))
+type Env = ReaderT Object Result
 
-compile :: Object -> TExp Frag -> Either CompileError Frag
-compile obj e = runReader (runErrorT . unwrap $ eval e) obj
+compile :: TExp a -> Object -> Result a
+compile e = runReaderT (eval e)
 
 eval :: TExp a -> Env a
 eval (TFrag _ b) = return b
@@ -38,7 +35,7 @@ eval (TText _ t) = return t
 eval (TBool _ b) = return b
 eval (TInt  _ i) = return i
 eval (TDbl  _ d) = return d
-eval (TVar  m v) = require m v >>= render m
+eval (TVar  m v) = require m v >>= build m
 
 eval (TApp _ a b) = evalM2 (<>) a b
 
@@ -76,12 +73,13 @@ eval (TLoop m b i l r) = require m i >>= loop
         [ident i, Text.pack $ show e]
 
     scope f = fmap (foldr' (<>) mempty) . mapM f
+    bind  f = withReaderT f $ eval l
 
     alternate    = eval r
-    consequent v = bind (ins p v) $ eval l
+    consequent v = bind (ins p v)
 
-    indexed s' (v, n) = bind (ins p v . ins s' n) $ eval l
-    keyed   s' (k, v) = bind (ins p (String k) . ins s' v) $ eval l
+    indexed s' (v, n) = bind (ins p v . ins s' n)
+    keyed   s' (k, v) = bind (ins p (String k) . ins s' v)
 
     indices = Number . I <$> [1..]
 
@@ -90,25 +88,21 @@ eval (TLoop m b i l r) = require m i >>= loop
 evalM2 :: (a -> a -> b) -> TExp a -> TExp a -> Env b
 evalM2 f x y = liftM2 f (eval x) (eval y)
 
-render :: Meta -> Value -> Env Frag
-render _ (Number (I n)) = return $ Build.build n
-render _ (Number (D d)) = return $ Build.build d
-render _ (Bool   b)     = return $ Build.build b
-render _ (String s)     = return $ Build.build s
-render m (Object _)     = renderError m "object"
-render m (Array  _)     = renderError m "array"
-render m Null           = renderError m "null"
+build :: Meta -> Value -> Env Frag
+build _ (Number (I n)) = return $ Build.build n
+build _ (Number (D d)) = return $ Build.build d
+build _ (Bool   b)     = return $ Build.build b
+build _ (String s)     = return $ Build.build s
+build m (Object _)     = buildError m "object"
+build m (Array  _)     = buildError m "array"
+build m Null           = buildError m "null"
 
-renderError :: Meta -> LText -> Env a
-renderError m = throw m "unable to render {} value." . (:[])
-
-bind :: (Object -> Object) -> Env a -> Env a
-bind f = Env . mapErrorT (withReader f) . unwrap
+buildError :: Meta -> LText -> Env a
+buildError m = throw m "unable to build renderable {} value." . (:[])
 
 require :: Meta -> Ident -> Env Value
-require m (Ident k) = do
-    mv <- Env $ Map.lookup k <$> lift ask
-    maybe (throw m "binding '{}' doesn't exist." [k]) return mv
+require m (Ident k) = ask >>=
+    maybe (throw m "binding '{}' doesn't exist." [k]) return . Map.lookup k
 
 throw :: Params ps => Meta -> Format -> ps -> Env a
-throw m f = Env . throwError . CompileError m . Format.format f
+throw m f = lift . CompileError m . LText.unpack . Format.format f

@@ -2,26 +2,25 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Control.Applicative    ((<$>), (<*>), (<*), (*>), pure)
+import           Control.Applicative     ((<$>), (<*>), (<*), (*>), pure)
 import           Control.Monad
-import           Data.Foldable          (foldr')
+import           Data.Foldable           (foldr')
 import           Data.Monoid
-import qualified Data.Text              as Text
-import qualified Data.Text.Lazy         as LText
+import qualified Data.Text               as Text
+import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
-import           Text.EDE.Internal.Types     hiding (ident)
-import qualified Text.Parsec            as Parsec
-import           Text.Parsec            hiding (runParser, parse)
+import           Text.EDE.Internal.Types hiding (ident)
+import           Text.Parsec             hiding (runParser, parse)
+import qualified Text.Parsec             as Parsec
 import           Text.Parsec.Expr
-import           Text.Parsec.Text.Lazy  (Parser)
+import           Text.Parsec.Text.Lazy   (Parser)
 
 -- FIXME:
 -- support negation of exprs with parens
--- add metadata to idents
 
-runParser :: String -> LText -> Either ParseError UExp
-runParser = Parsec.runParser template ()
+runParser :: String -> LText -> Result UExp
+runParser name = either ParseError Success . Parsec.runParser template () name
 
 template :: Parser UExp
 template = foldr' (<>) mempty <$> manyTill expression (try eof)
