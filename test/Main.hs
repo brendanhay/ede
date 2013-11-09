@@ -26,20 +26,24 @@ resources = "test/resources/"
 
 main :: IO ()
 main = defaultMain $ testGroup "ED-E"
-    [ test "variable"       $ object ["var" .= pack "World"]
-    , test "newline"        $ object ["var" .= pack "more"]
-    , test "cond-bool"      $ empty
-    , test "cond-alternate" $ empty
+    [ test "variable"         $ object ["var" .= pack "World"]
+    , test "newline"          $ object ["var" .= pack "more"]
+    , test "cond-bool"        $ empty
+    , test "cond-rel-integer" $ empty
+    , test "cond-alternate"   $ empty
     ]
 
 test :: String -> Value -> TestTree
-test name (Object o) = goldenVsString name (path ++ ".golden") $ do
+test name (Object o) = goldenVsStringDiff name diff (path ++ ".golden") $ do
     f <- LText.readFile (path ++ ".ede")
     case render name f o of
         Success b -> return . LText.encodeUtf8 $ toLazyText b
         err       -> error $ show err
   where
     path = resources ++ name
+
+diff :: String -> String -> [String]
+diff r n = ["diff", "-u", r, n]
 
 empty :: Value
 empty = object []

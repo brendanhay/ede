@@ -1,0 +1,23 @@
+{% if 1 > 2 %}
+nonono..
+{% endif %}
+
+{% if 1244 > 10 %}
+1244 > 10
+{% endif %}
+
+{% if 10 >= 10 %}
+10 >= 10
+{% endif %}
+
+{% if 1 < 10 %}
+1 < 10
+{% endif %}
+
+{% if 11 <= 10 %}
+nononono ...
+{% endif %}
+
+{% if 11 <= 10 %}
+nononono ...
+{% endif %}
