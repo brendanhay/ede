@@ -26,8 +26,9 @@ resources = "test/resources/"
 
 main :: IO ()
 main = defaultMain $ testGroup "ED-E"
-    [ test "variable"          $ object ["var" .= pack "World"]
-    , test "boolean-condition" $ object []
+    [ test "variable"       $ object ["var" .= pack "World"]
+    , test "cond-bool"      $ empty
+    , test "cond-alternate" $ empty
     ]
 
 test :: String -> Value -> TestTree
@@ -38,3 +39,6 @@ test name (Object o) = goldenVsString name (path ++ ".golden") $ do
         err       -> error $ show err
   where
     path = resources ++ name
+
+empty :: Value
+empty = object []
