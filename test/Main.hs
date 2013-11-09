@@ -27,6 +27,7 @@ resources = "test/resources/"
 main :: IO ()
 main = defaultMain $ testGroup "ED-E"
     [ test "variable"       $ object ["var" .= pack "World"]
+    , test "newline"        $ object ["var" .= pack "more"]
     , test "cond-bool"      $ empty
     , test "cond-alternate" $ empty
     ]
