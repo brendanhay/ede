@@ -25,7 +25,7 @@ rend = do
     let (Right u') = u
         t          = typeCheck u'
         (Right t') = t
-        b          = eval o t'
+        b          = compile o t'
 
     print b
 

@@ -4,15 +4,17 @@
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeSynonymInstances      #-}
 
+{-# LANGUAGE OverloadedStrings         #-}
+
 module Text.EDE.Internal.Types where
 
-import           Control.Monad.Trans.Error
 import           Data.Monoid
-import           Data.Text                 (Text)
+import           Data.Text              (Text)
 import           Data.Text.Buildable
-import           Data.Text.Format          (format)
-import qualified Data.Text.Lazy            as LText
+import           Data.Text.Format       (format)
+import qualified Data.Text.Lazy         as LText
 import           Data.Text.Lazy.Builder
+import qualified Text.Parsec            as Parsec
 
 -- FIXME:
 -- type expression metadata extraction function
@@ -32,24 +34,19 @@ instance Show Meta where
     show (Meta s r c) = concat [s, ":(", show r, ",", show c, ")"]
     show Unknown      = "unknown"
 
-data TypeError = TypeError Meta LText
-    deriving (Eq)
+data Result a
+    = ParseError   !Meta !Parsec.ParseError
+    | TypeError    !Meta !String
+    | CompileError !Meta !String
+    | Success      a
 
-instance Show TypeError where
-    show (TypeError m msg) = formatError "TypeError" m msg
+instance Monad Result where
+    return = Success
+    {-# INLINE return #-}
+    Success a >>= k = k a
+    Error err >>= _ = Error err
+    {-# INLINE (>>=) #-}
 
-data EvalError = EvalError Meta LText
-    deriving (Eq)
-
-instance Show EvalError where
-    show (EvalError m msg) = formatError "EvalError" m msg
-
-formatError :: LText -> Meta -> LText -> String
-formatError e m msg = LText.unpack $
-    format "{}\nPosition: {}\nMessage: {}" [e, LText.pack $ show m, msg]
-
-instance Error EvalError where
-    strMsg = EvalError Unknown . LText.pack
 
 newtype Ident = Ident { ident :: Text }
     deriving (Show)

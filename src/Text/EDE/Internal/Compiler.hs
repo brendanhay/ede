@@ -27,10 +27,9 @@ import           Prelude                    hiding (lookup)
 -- FIXME:
 -- Prevent rebinding/shadowing of variables
 
-newtype Env a = Env { unwrap :: ErrorT EvalError (Reader Object) a }
-    deriving (Functor, Applicative, Monad)
+type Env a = Env (Reader Object (Result a))
 
-compile :: Object -> TExp Frag -> Either EvalError Frag
+compile :: Object -> TExp Frag -> Either CompileError Frag
 compile obj e = runReader (runErrorT . unwrap $ eval e) obj
 
 eval :: TExp a -> Env a
@@ -112,4 +111,4 @@ require m (Ident k) = do
     maybe (throw m "binding '{}' doesn't exist." [k]) return mv
 
 throw :: Params ps => Meta -> Format -> ps -> Env a
-throw m f = Env . throwError . EvalError m . Format.format f
+throw m f = Env . throwError . CompileError m . Format.format f

@@ -12,18 +12,14 @@ import Text.EDE.Internal.Types
 -- use metadata extraction function from types to annotate
 -- equality check on line 22
 
-typeCheck :: Type a => UExp -> Either TypeError (TExp a)
-typeCheck = f <=< check
+typeCheck :: Type a => UExp -> Result (TExp a)
+typeCheck = g typeof <=< check
   where
-    f :: Type a => AExp -> Either TypeError (TExp a)
-    f = g typeof
-
-    g :: TType a -> AExp -> Either TypeError (TExp a)
     g t (e ::: t') = do
         Eq <- equal Unknown t t'
         return e
 
-check :: UExp -> Either TypeError AExp
+check :: UExp -> Result AExp
 
 check (UText m t) = return $ TText m t ::: TTText
 check (UBool m b) = return $ TBool m b ::: TTBool
@@ -70,23 +66,23 @@ check (ULoop m b i l r) = do
 data Equal a b where
     Eq :: Equal a a
 
-equal :: Meta -> TType a -> TType b -> Either TypeError (Equal a b)
-equal _ TTText TTText = Right Eq
-equal _ TTBool TTBool = Right Eq
-equal _ TTInt  TTInt  = Right Eq
-equal _ TTDbl  TTDbl  = Right Eq
-equal _ TTFrag TTFrag = Right Eq
+equal :: Meta -> TType a -> TType b -> Result (Equal a b)
+equal _ TTText TTText = return Eq
+equal _ TTBool TTBool = return Eq
+equal _ TTInt  TTInt  = return Eq
+equal _ TTDbl  TTDbl  = return Eq
+equal _ TTFrag TTFrag = return Eq
 equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
 
 data Order a where
     Ord :: Ord a => Order a
 
-order :: Meta -> TType a -> Either TypeError (Order a)
-order _ TTText = Right Ord
-order _ TTBool = Right Ord
-order _ TTInt  = Right Ord
-order _ TTDbl  = Right Ord
+order :: Meta -> TType a -> Result (Order a)
+order _ TTText = return Ord
+order _ TTBool = return Ord
+order _ TTInt  = return Ord
+order _ TTDbl  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
-throw :: Params ps => Meta -> Format -> ps -> Either TypeError a
-throw m f = Left . TypeError m . format f
+throw :: Params ps => Meta -> Format -> ps -> Result a
+throw m f = TypeError m . format f
