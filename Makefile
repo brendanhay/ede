@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 FLAGS := -j --disable-documentation --disable-library-coverage
 
-.PHONY: test lint doc
+.PHONY: test bench lint doc
 
 all: build
 
@@ -17,6 +17,9 @@ clean:
 
 test:
 	cabal install --enable-tests $(FLAGS)
+
+bench:
+	cabal install --enable-benchmarks $(FLAGS)
 
 lint:
 	hlint src

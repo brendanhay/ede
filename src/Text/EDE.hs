@@ -11,7 +11,17 @@
 -- Portability : non-portable (GHC extensions)
 
 -- |
-module Text.EDE where
+module Text.EDE
+    (
+    -- * Exported Types
+      Frag
+    , Meta   (..)
+    , Result (..)
+
+    -- * Rendering Functions
+    , rend
+    , render
+    ) where
 
 import           Data.Aeson                    (Object, Value(..), (.=), object)
 import qualified Data.HashMap.Strict           as Map
