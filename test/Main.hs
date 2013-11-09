@@ -28,10 +28,12 @@ main :: IO ()
 main = defaultMain $ testGroup "ED-E"
     [ test "variable"         ["var" .= pack "World"]
     , test "newline"          ["var" .= pack "more"]
+    , test "comment"          []
     , test "cond-bool"        []
     , test "cond-variable"    ["true_var" .= True, "false_var" .= False]
     , test "cond-alternate"   []
     , test "cond-bin-bool"    []
+    , test "cond-rel-integer" []
     , test "cond-rel-integer" []
     ]
 
