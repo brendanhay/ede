@@ -1,4 +1,4 @@
-module EDE.Internal.Lexer where
+module Text.EDE.Internal.Lexer where
 
 import           Data.Functor.Identity
 import           Data.Text.Lazy        (Text)

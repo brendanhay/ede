@@ -27,14 +27,14 @@ library
     hs-source-dirs:    src
 
     exposed-modules:
-        EDE
+        Text.EDE
 
     other-modules:
-        EDE.Internal.Interpreter
-      , EDE.Internal.Lexer
-      , EDE.Internal.Parser
-      , EDE.Internal.TypeChecker
-      , EDE.Internal.Types
+        Text.EDE.Internal.Compiler
+      , Text.EDE.Internal.Lexer
+      , Text.EDE.Internal.Parser
+      , Text.EDE.Internal.TypeChecker
+      , Text.EDE.Internal.Types
 
     ghc-options:       -Wall
 

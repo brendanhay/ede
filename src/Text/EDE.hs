@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module EDE where
+module Text.EDE where
 
 import           Control.Applicative
 import           Data.Aeson
@@ -8,10 +8,10 @@ import qualified Data.HashMap.Strict      as Map
 import           Data.Text                (Text)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO        as LText
-import           EDE.Internal.Interpreter
-import           EDE.Internal.Parser
-import           EDE.Internal.TypeChecker
-import           EDE.Internal.Types
+import           Text.EDE.Internal.Compiler
+import           Text.EDE.Internal.Parser
+import           Text.EDE.Internal.TypeChecker
+import           Text.EDE.Internal.Types
 import           Text.Parsec              (ParseError)
 
 -- FIXME:
@@ -25,7 +25,7 @@ rend = do
     let (Right u') = u
         t          = typeCheck u'
         (Right t') = t
-        b          = evaluate o t'
+        b          = eval o t'
 
     print b
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module EDE.Internal.Parser where
+module Text.EDE.Internal.Parser where
 
 import           Control.Applicative    ((<$>), (<*>), (<*), (*>), pure)
 import           Control.Monad
@@ -9,8 +9,8 @@ import           Data.Monoid
 import qualified Data.Text              as Text
 import qualified Data.Text.Lazy         as LText
 import           Data.Text.Lazy.Builder
-import           EDE.Internal.Lexer
-import           EDE.Internal.Types     hiding (ident)
+import           Text.EDE.Internal.Lexer
+import           Text.EDE.Internal.Types     hiding (ident)
 import qualified Text.Parsec            as Parsec
 import           Text.Parsec            hiding (runParser, parse)
 import           Text.Parsec.Expr

@@ -4,7 +4,7 @@
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeSynonymInstances      #-}
 
-module EDE.Internal.Types where
+module Text.EDE.Internal.Types where
 
 import           Control.Monad.Trans.Error
 import           Data.Monoid

@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
-module EDE.Internal.Interpreter where
+module Text.EDE.Internal.Compiler where
 
 import           Control.Applicative
 import           Control.Monad              (liftM2)
@@ -21,7 +21,7 @@ import           Data.Text.Format           (Format)
 import qualified Data.Text.Format           as Format
 import           Data.Text.Format.Params    (Params)
 import qualified Data.Vector                as Vector
-import           EDE.Internal.Types
+import           Text.EDE.Internal.Types
 import           Prelude                    hiding (lookup)
 
 -- FIXME:
@@ -30,19 +30,8 @@ import           Prelude                    hiding (lookup)
 newtype Env a = Env { unwrap :: ErrorT EvalError (Reader Object) a }
     deriving (Functor, Applicative, Monad)
 
-evaluate :: Object -> TExp Frag -> Either EvalError Frag
-evaluate obj e = runReader (runErrorT . unwrap $ eval e) obj
-
-bind :: (Object -> Object) -> Env a -> Env a
-bind f = Env . mapErrorT (withReader f) . unwrap
-
-require :: Meta -> Ident -> Env Value
-require m (Ident k) = do
-    mv <- Env $ Map.lookup k <$> lift ask
-    maybe (throw m "binding '{}' doesn't exist." [k]) return mv
-
-throw :: Params ps => Meta -> Format -> ps -> Env a
-throw m f = Env . throwError . EvalError m . Format.format f
+compile :: Object -> TExp Frag -> Either EvalError Frag
+compile obj e = runReader (runErrorT . unwrap $ eval e) obj
 
 eval :: TExp a -> Env a
 eval (TFrag _ b) = return b
@@ -87,6 +76,8 @@ eval (TLoop m b i l r) = require m i >>= loop
         "loop target '{}' was expected to be array or hashmap, got: {}"
         [ident i, Text.pack $ show e]
 
+    scope f = fmap (foldr' (<>) mempty) . mapM f
+
     alternate    = eval r
     consequent v = bind (ins p v) $ eval l
 
@@ -94,8 +85,6 @@ eval (TLoop m b i l r) = require m i >>= loop
     keyed   s' (k, v) = bind (ins p (String k) . ins s' v) $ eval l
 
     indices = Number . I <$> [1..]
-
-    scope f = fmap (foldr' (<>) mempty) . mapM f
 
     ins = Map.insert
 
@@ -113,3 +102,14 @@ render m Null           = renderError m "null"
 
 renderError :: Meta -> LText -> Env a
 renderError m = throw m "unable to render {} value." . (:[])
+
+bind :: (Object -> Object) -> Env a -> Env a
+bind f = Env . mapErrorT (withReader f) . unwrap
+
+require :: Meta -> Ident -> Env Value
+require m (Ident k) = do
+    mv <- Env $ Map.lookup k <$> lift ask
+    maybe (throw m "binding '{}' doesn't exist." [k]) return mv
+
+throw :: Params ps => Meta -> Format -> ps -> Env a
+throw m f = Env . throwError . EvalError m . Format.format f

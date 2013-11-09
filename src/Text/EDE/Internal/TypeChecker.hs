@@ -1,12 +1,12 @@
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module EDE.Internal.TypeChecker where
+module Text.EDE.Internal.TypeChecker where
 
 import Control.Monad
 import Data.Text.Format
 import Data.Text.Format.Params (Params)
-import EDE.Internal.Types
+import Text.EDE.Internal.Types
 
 -- FIXME:
 -- use metadata extraction function from types to annotate
