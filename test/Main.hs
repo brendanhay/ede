@@ -12,7 +12,7 @@
 
 module Main (main) where
 
-import           Data.Aeson              (Value(..), (.=), object)
+import           Data.Aeson.Types        hiding (Success)
 import           Data.Text               (pack)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.Encoding as LText
@@ -26,24 +26,24 @@ resources = "test/resources/"
 
 main :: IO ()
 main = defaultMain $ testGroup "ED-E"
-    [ test' "variable"         $ object ["var" .= pack "World"]
-    , test' "newline"          $ object ["var" .= pack "more"]
-    , test "cond-bool"
-    , test "cond-alternate"
-    , test "cond-rel-integer"
+    [ test "variable"         ["var" .= pack "World"]
+    , test "newline"          ["var" .= pack "more"]
+    , test "cond-bool"        []
+    , test "cond-variable"    ["true_var" .= True, "false_var" .= False]
+    , test "cond-alternate"   []
+    , test "cond-bin-bool"    []
+    , test "cond-rel-integer" []
     ]
 
-test :: String -> TestTree
-test = (`test'` object [])
-
-test' :: String -> Value -> TestTree
-test' name (Object o) = goldenVsStringDiff name diff (path ++ ".golden") $ do
+test :: String -> [Pair] -> TestTree
+test name ps = goldenVsStringDiff name diff (path ++ ".golden") $ do
     f <- LText.readFile (path ++ ".ede")
     case render name f o of
         Success b -> return . LText.encodeUtf8 $ toLazyText b
         err       -> error $ show err
   where
-    path = resources ++ name
+    Object o = object ps
+    path     = resources ++ name
 
 diff :: String -> String -> [String]
 diff r n = ["diff", "-u", r, n]

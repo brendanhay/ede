@@ -1,0 +1,22 @@
+{% if True && True %}
+True
+{% endif %}
+{% if True && False %}
+False
+{% endif %}
+{% if False && True %}
+False
+{% endif %}
+
+{% if True || True %}
+True
+{% endif %}
+{% if True || False %}
+True
+{% endif %}
+{% if False || True %}
+True
+{% endif %}
+{% if False || False %}
+False
+{% endif %}
