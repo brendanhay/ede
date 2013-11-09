@@ -18,6 +18,7 @@ import           Data.Text.Lazy.Builder
 -- type expression metadata extraction function
 -- unsound monoid instance for untyped expressions
 --   should probably propagate left expression's metadata
+-- correctly handle comments
 
 type LText = LText.Text
 type Frag  = Builder
