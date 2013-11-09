@@ -48,7 +48,11 @@ data Result a
     | CompileError !Meta !String
 
 instance Show a => Show (Result a) where
-    show = const "result"
+    show (Success a) = "Success: " ++ show a
+
+    show (ParseError     e) = "ParseError: " ++ show e
+    show (TypeError    m e) = concat ["TypeError: ", show m, " - ", e]
+    show (CompileError m e) = concat ["CompileError: ", show m, " - ", e]
 
 instance Functor Result where
     fmap f (Success a) = Success $ f a
