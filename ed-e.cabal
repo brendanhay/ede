@@ -60,6 +60,7 @@ test-suite ede-test
     build-depends:
         aeson
       , base         >= 4.6 && < 5
+      , directory
       , ed-e
       , text
       , tasty

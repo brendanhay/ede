@@ -11,6 +11,7 @@
 module Text.EDE.Internal.Lexer where
 
 import           Data.Functor.Identity
+import           Data.List             (nub)
 import           Data.Text.Lazy        (Text)
 import           Text.Parsec
 import           Text.Parsec.Language
@@ -38,6 +39,20 @@ doubleLiteral = Parsec.float lexer
 
 symbol :: String -> Parser String
 symbol = Parsec.symbol lexer
+
+comments :: Parser ()
+comments = try (string start) >> run
+  where
+    run =  (try (string end) >> return ())
+       <|> (comments >> run)
+       <|> (skipMany1 (noneOf startEnd) >> run)
+       <|> (oneOf startEnd >> run)
+       <?> "end of comment"
+
+    startEnd = nub $ end ++ start
+
+    start = Parsec.commentStart rules
+    end   = Parsec.commentEnd rules
 
 whiteSpace :: Parser ()
 whiteSpace = Parsec.whiteSpace lexer

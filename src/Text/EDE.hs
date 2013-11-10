@@ -37,6 +37,11 @@ import           Text.EDE.Internal.Types
 -- syntax/semantic test suite
 -- criterion benchmarks
 
+-- export a render which takes text
+
+-- export a renderFile which reads a file
+-- export separate render / compile steps for pre-compiled templates
+
 rend :: IO ()
 rend = do
     f <- LText.readFile "test.ede"

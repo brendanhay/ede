@@ -36,7 +36,7 @@ template :: Parser UExp
 template = foldr' (<>) mempty <$> manyTill expression (try eof)
 
 expression :: Parser UExp
-expression = try $ choice [loop, conditional, variable, fragment]
+expression = choice [try loop, try conditional, try variable, fragment]
 
 loop :: Parser UExp
 loop = do
@@ -65,11 +65,13 @@ variable = UVar
     <*> between (symbol "{{") (string "}}") ident
 
 fragment :: Parser UExp
-fragment = UFrag
-    <$> meta
-    <*> (fromString <$> manyTill1 anyChar (try . lookAhead $ eof <|> next))
+fragment = do
+    m <- meta
+    skipMany (comments >> optional newline)
+    s <- manyTill1 anyChar stop
+    return . UFrag m $ fromString s
   where
-    next = void $ char '{' >> oneOf "{%#"
+    stop = try . lookAhead $ eof <|> void (char '{' >> oneOf "{%#")
 
 consequent :: Parser UExp
 consequent = foldr' (<>) mempty <$> many expression

@@ -12,40 +12,45 @@
 
 module Main (main) where
 
+import           Control.Applicative
+import           Control.Arrow
+import qualified Data.Aeson              as Aeson
 import           Data.Aeson.Types        hiding (Success)
-import           Data.Text               (pack)
+import           Data.List               (isSuffixOf)
+import           Data.Maybe
+import qualified Data.Text               as Text
+import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.Encoding as LText
 import qualified Data.Text.Lazy.IO       as LText
+import           System.Directory
+import           System.IO.Unsafe
 import           Test.Tasty
 import           Test.Tasty.Golden
 import           Text.EDE
 
+main :: IO ()
+main = defaultMain . testGroup "ED-E" $ unsafePerformIO tests
+
 resources :: FilePath
 resources = "test/resources/"
 
-main :: IO ()
-main = defaultMain $ testGroup "ED-E"
-    [ test "variable"         ["var" .= pack "World"]
-    , test "newline"          ["var" .= pack "more"]
-    , test "comment"          []
-    , test "cond-bool"        []
-    , test "cond-variable"    ["true_var" .= True, "false_var" .= False]
-    , test "cond-alternate"   []
-    , test "cond-bin-bool"    []
-    , test "cond-rel-integer" []
-    , test "cond-rel-integer" []
-    ]
-
-test :: String -> [Pair] -> TestTree
-test name ps = goldenVsStringDiff name diff (path ++ ".golden") $ do
-    f <- LText.readFile (path ++ ".ede")
-    case render name f o of
-        Success b -> return . LText.encodeUtf8 $ toLazyText b
-        err       -> error $ show err
+tests :: IO [TestTree]
+tests = files >>= mapM (fmap test . load)
   where
-    Object o = object ps
-    path     = resources ++ name
+    files = map (resources ++) . filter (isSuffixOf ".ede")
+        <$> getDirectoryContents resources
 
-diff :: String -> String -> [String]
-diff r n = ["diff", "-u", r, n]
+    load f = (,)
+        <$> LText.readFile f
+        <*> pure (takeWhile (/= '.') f)
+
+    test (txt, name) =
+        let (js, ede) = second (LText.drop 4) $ LText.breakOn "---" txt
+            Just o    = fromJust . Aeson.decode $ LText.encodeUtf8 js
+        in  goldenVsStringDiff name diff (name ++ ".golden") $
+            case render name ede o of
+                Success b -> return . LText.encodeUtf8 $ toLazyText b
+                err       -> error $ show err
+
+    diff r n = ["diff", "-u", r, n]
