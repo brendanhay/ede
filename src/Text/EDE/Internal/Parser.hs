@@ -38,6 +38,14 @@ template = foldr' (<>) mempty <$> manyTill expression (try eof)
 expression :: Parser UExp
 expression = choice [try loop, try conditional, try variable, fragment]
 
+fragment :: Parser UExp
+fragment = do
+    skipMany $ comments <* optional newline
+    UFrag <$> meta <*> (fromString <$> manyTill1 anyChar stop)
+  where
+    stop = try . lookAhead $ next <|> eof
+    next = void (char '{' >> oneOf "{%#")
+
 loop :: Parser UExp
 loop = do
     m <- meta
@@ -45,7 +53,7 @@ loop = do
         <$> (reserved "for" >> binding)
         <*> (reserved "in"  >> ident))
     uncurry (ULoop m) b
-        <$> consequent
+        <$> expression
         <*> alternative
          <* keyword "endfor"
 
@@ -53,7 +61,7 @@ conditional :: Parser UExp
 conditional = UCond
     <$> meta
     <*> section (reserved "if" >> p)
-    <*> consequent
+    <*> expression
     <*> alternative
      <* keyword "endif"
   where
@@ -64,24 +72,14 @@ variable = UVar
     <$> meta
     <*> between (symbol "{{") (string "}}") ident
 
-fragment :: Parser UExp
-fragment = do
-    skipMany (comments >> optional newline)
-    UFrag <$> meta <*> (fromString <$> manyTill1 anyChar next)
-  where
-    next = try . lookAhead $ eof <|> void (char '{' >> oneOf "{%#")
-
-consequent :: Parser UExp
-consequent = foldr' (<>) mempty <$> many expression
-
 alternative :: Parser UExp
-alternative = option mempty . try $ keyword "else" >> consequent
+alternative = option mempty . try $ keyword "else" >> expression
 
 term :: Parser UExp
 term = try variable <|> literal
 
 section :: Parser a -> Parser a
-section p = ("section" ??) . try $
+section p = "section" ??
     between (symbol "{%") (string "%}") p <* optional newline
 
 keyword :: String -> Parser ()
