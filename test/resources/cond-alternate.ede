@@ -1,5 +1,0 @@
-{% if False %}
-Hi
-{% else %}
-Ho
-{% endif %}

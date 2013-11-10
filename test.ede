@@ -1,40 +1,15 @@
-Hi {{ ident }}!
+{# Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium
+   doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore #}
+Hi
+{# veritatis et quasi architecto beatae vitae dicta sunt explicabo. #}
 
-{% if true %}
-   p left branch
-{% endif %}
+{# Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit,
+sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
+Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet,
+consectetur, adipisci velit, sed quia non numquam eius modi tempora
+incidunt ut labore et dolore magnam aliquam quaerat voluptatem.
 
-{% for var in list1 %}
-    list1 {{ var }}
-{% endfor %}
 
-{% for var in list2 %}
-    list2 consequent
-    {{ ident }}
-{% else %}
-    list2 alternative
-{% endfor %}
 
-{% for (k, v) in list1 %}
-    {{ k }} : {{ v }}
-{% else %}
-    destruct list1 alternate
-{% endfor %}
-
-{% for v in hash1 %}
-    {{ v }}
-{% else %}
-    hash1 alternate
-{% endfor %}
-
-{% for (k, v) in hash1 %}
-    {{ k }} : {{ v }}
-{% else %}
-    destruct hash1 alternate
-{% endfor %}
-
-{% if 1 == 1 %}
-   p left branch
-{% else %}
-   p right branch
-{% endif %}
+#}
+Ho

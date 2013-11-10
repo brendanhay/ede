@@ -1,6 +1,0 @@
-{% if True %}
-True
-{% endif %}
-{% if False %}
-False
-{% endif %}

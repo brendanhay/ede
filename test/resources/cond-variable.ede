@@ -1,9 +1,0 @@
-{% if true_var %}
-True
-{% else %}
-False
-{% endif %}
-
-{% if false_var && false_var %}
-True
-{% endif %}
