@@ -66,12 +66,10 @@ variable = UVar
 
 fragment :: Parser UExp
 fragment = do
-    m <- meta
     skipMany (comments >> optional newline)
-    s <- manyTill1 anyChar stop
-    return . UFrag m $ fromString s
+    UFrag <$> meta <*> (fromString <$> manyTill1 anyChar next)
   where
-    stop = try . lookAhead $ eof <|> void (char '{' >> oneOf "{%#")
+    next = try . lookAhead $ eof <|> void (char '{' >> oneOf "{%#")
 
 consequent :: Parser UExp
 consequent = foldr' (<>) mempty <$> many expression
