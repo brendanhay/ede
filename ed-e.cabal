@@ -49,7 +49,7 @@ library
       , unordered-containers
       , vector
 
-test-suite ede-test
+test-suite ed-e-test
     default-language:  Haskell2010
     type:              exitcode-stdio-1.0
     hs-source-dirs:    test
@@ -66,7 +66,7 @@ test-suite ede-test
       , tasty
       , tasty-golden
 
-benchmark ede-bench
+benchmark ed-e-bench
     default-language:  Haskell2010
     type:              exitcode-stdio-1.0
     hs-source-dirs:    bench
