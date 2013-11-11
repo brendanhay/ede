@@ -1,4 +1,4 @@
-{ "yes": "sfuck arse", "no": false }
+{ "yes": "graugh", "no": false }
 ---
 {% if true %}
 True
