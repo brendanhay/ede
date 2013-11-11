@@ -35,8 +35,6 @@ module Text.EDE
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Data.Aeson                    (Object, Value(..), (.=), object)
-import qualified Data.HashMap.Strict           as Map
-import           Data.Text                     (Text)
 import qualified Data.Text.Lazy                as LText
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO             as LText

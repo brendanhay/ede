@@ -20,7 +20,6 @@ import           Data.Aeson             (Array, Object)
 import           Data.Monoid
 import           Data.Text              (Text)
 import           Data.Text.Buildable
-import qualified Data.Text.Lazy         as LText
 import           Data.Text.Lazy.Builder
 import qualified Text.Parsec            as Parsec
 
@@ -119,9 +118,6 @@ data TExp a where
     TCond ::          Meta -> TExp Bool -> TExp Frag -> TExp Frag -> TExp Frag
     TLoop ::          Meta -> Bind      -> TExp a    -> TExp Frag -> TExp Frag -> TExp Frag
 
-tmeta :: TExp a -> Meta
-tmeta _ = (Meta "tmeta" 0 0)
-
 deriving instance Show (TExp a)
 
 data UExp
@@ -143,9 +139,6 @@ instance Monoid UExp where
     mempty      = UFrag (Meta "mempty" 0 0) (FBld mempty)
     mappend a b = UCons (umeta a) a b
 
-umeta :: UExp -> Meta
-umeta _ = (Meta "meta" 0 0)
-
 data BinOp
     = And
     | Or
@@ -159,3 +152,33 @@ data RelOp
     | Less
     | LessEqual
       deriving (Show)
+
+tmeta :: TExp a -> Meta
+tmeta t = case t of
+    TText m _       -> m
+    TBool m _       -> m
+    TInt  m _       -> m
+    TDbl  m _       -> m
+    TVar  m _ _     -> m
+    TFrag m _       -> m
+    TCons m _ _     -> m
+    TNeg  m _       -> m
+    TBin  m _ _ _   -> m
+    TRel  m _ _ _   -> m
+    TCond m _ _ _   -> m
+    TLoop m _ _ _ _ -> m
+
+umeta :: UExp -> Meta
+umeta u = case u of
+    UText m _       -> m
+    UBool m _       -> m
+    UInt  m _       -> m
+    UDbl  m _       -> m
+    UVar  m _       -> m
+    UFrag m _       -> m
+    UCons m _ _     -> m
+    UNeg  m _       -> m
+    UBin  m _ _ _   -> m
+    URel  m _ _ _   -> m
+    UCond m _ _ _   -> m
+    ULoop m _ _ _ _ -> m
