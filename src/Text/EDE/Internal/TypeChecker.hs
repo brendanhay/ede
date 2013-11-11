@@ -13,47 +13,58 @@
 
 module Text.EDE.Internal.TypeChecker where
 
+import           Control.Applicative
 import           Control.Monad
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Reader
+import           Data.Maybe
+import           Data.Aeson                 (Array, Object, Value(..))
+import           Data.Attoparsec.Number     (Number(..))
+import qualified Data.HashMap.Strict        as Map
 import           Data.Text.Format
-import           Data.Text.Format.Params (Params)
-import qualified Data.Text.Lazy          as LText
+import           Data.Text.Format.Params    (Params)
+import qualified Data.Text.Lazy             as LText
+import           Prelude                    hiding (lookup)
 import           Text.EDE.Internal.Types
 
--- FIXME:
--- use metadata extraction function from types to annotate
--- equality check on line 22
+typeCheck :: Type a => UExp -> Env (TExp a)
+typeCheck = cast typeof <=< check
 
-typeCheck :: Type a => UExp -> Result (TExp a)
-typeCheck = g typeof <=< check
-  where
-    g :: TType a -> AExp -> Result (TExp a)
-    g t (e ::: t') = do
-        Eq <- equal Unknown t t'
-        return e
+cast :: TType a -> AExp -> Env (TExp a)
+cast t (e ::: t') = do
+    Eq <- equal (tmeta e) t t'
+    return e
 
-check :: UExp -> Result AExp
+check :: UExp -> Env AExp
 
 check (UText m t) = return $ TText m t ::: TTText
 check (UBool m b) = return $ TBool m b ::: TTBool
 check (UInt  m i) = return $ TInt  m i ::: TTInt
 check (UDbl  m d) = return $ TDbl  m d ::: TTDbl
-check (UVar  m v) = return $ TVar  m v ::: TTFrag
 check (UFrag m b) = return $ TFrag m b ::: TTFrag
 
-check (UApp m a b) = do
-    a' ::: at <- check a
-    b' ::: bt <- check b
-    Eq <- equal m at TTFrag
-    Eq <- equal m bt TTFrag
-    return $ TApp m a' b' ::: TTFrag
+check (UVar m i) = f <$> require m i
+  where
+    f (String _)     = TVar m i TTText ::: TTText
+    f (Bool   _)     = TVar m i TTBool ::: TTBool
+    f (Number (I _)) = TVar m i TTInt  ::: TTInt
+    f (Number (D _)) = TVar m i TTDbl  ::: TTDbl
+    f (Object _)     = TVar m i TTMap  ::: TTMap
+    f (Array  _)     = TVar m i TTList ::: TTList
+    f Null           = TVar m i TTBool ::: TTBool
+
+check (UCons m a b) = do
+    a' ::: TTFrag <- check a
+    b' ::: TTFrag <- check b
+    return $ TCons m a' b' ::: TTFrag
 
 check (UNeg m e) = do
-    e' ::: TTBool <- check e
+    e' ::: TTBool <- predicate e
     return $ TNeg m e' ::: TTBool
 
 check (UBin m op x y) = do
-    x' ::: TTBool <- check x
-    y' ::: TTBool <- check y
+    x' ::: TTBool <- predicate x
+    y' ::: TTBool <- predicate y
     return $ TBin m op x' y' ::: TTBool
 
 check (URel m op x y) = do
@@ -64,21 +75,28 @@ check (URel m op x y) = do
     return $ TRel m op x' y' ::: TTBool
 
 check (UCond m p l r) = do
-    p' ::: pt     <- check p
+    p' ::: TTBool <- predicate p
     l' ::: TTFrag <- check l
     r' ::: TTFrag <- check r
-    Eq <- equal m pt TTBool
     return $ TCond m p' l' r' ::: TTFrag
 
 check (ULoop m b i l r) = do
+    c  ::: _      <- collection
     l' ::: TTFrag <- check l
     r' ::: TTFrag <- check r
-    return $ TLoop m b i l' r' ::: TTFrag
+    return $ TLoop m b c l' r' ::: TTFrag
+  where
+    collection = do
+        u@(_ ::: t) <- check $ UVar m i
+        case t of
+            TTMap  -> return u
+            TTList -> return u
+            _      -> throw m "unsupported collection type {} in loop." [show t]
 
 data Equal a b where
     Eq :: Equal a a
 
-equal :: Meta -> TType a -> TType b -> Result (Equal a b)
+equal :: Meta -> TType a -> TType b -> Env (Equal a b)
 equal _ TTText TTText = return Eq
 equal _ TTBool TTBool = return Eq
 equal _ TTInt  TTInt  = return Eq
@@ -89,12 +107,25 @@ equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
 data Order a where
     Ord :: Ord a => Order a
 
-order :: Meta -> TType a -> Result (Order a)
+order :: Meta -> TType a -> Env (Order a)
 order _ TTText = return Ord
 order _ TTBool = return Ord
 order _ TTInt  = return Ord
 order _ TTDbl  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
-throw :: Params ps => Meta -> Format -> ps -> Result a
-throw m f = TypeError m . LText.unpack . format f
+require :: Meta -> Ident -> Env Value
+require m (Ident k) = ask >>=
+    maybe (throw m "binding '{}' doesn't exist." [k]) return . Map.lookup k
+
+throw :: Params ps => Meta -> Format -> ps -> Env a
+throw m f = lift . TypeError m . LText.unpack . format f
+
+predicate :: UExp -> Env AExp
+predicate u@(UVar m i) = do
+    p <- isJust . Map.lookup (ident i) <$> ask
+    u'@(_ ::: ut) <- if p then check u else return $ TBool m False ::: TTBool
+    return $ case ut of
+        TTBool -> u'
+        _      -> TBool m True ::: TTBool
+predicate u = check u

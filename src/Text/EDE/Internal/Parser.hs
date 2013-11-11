@@ -15,14 +15,15 @@ module Text.EDE.Internal.Parser where
 import           Control.Applicative     ((<$>), (<*>), (<*), (*>), pure)
 import           Control.Monad
 import           Data.Foldable           (foldr')
+import           Data.Foldable           (foldrM)
 import           Data.Monoid
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types hiding (ident)
-import           Text.Parsec             hiding (runParser, parse)
 import qualified Text.Parsec             as Parsec
+import           Text.Parsec             hiding (runParser, parse)
 import           Text.Parsec.Expr
 import           Text.Parsec.Text.Lazy   (Parser)
 
@@ -33,57 +34,66 @@ runParser :: String -> LText -> Result UExp
 runParser name = either ParseError Success . Parsec.runParser template () name
 
 template :: Parser UExp
-template = foldr' (<>) mempty <$> manyTill expression (try eof)
+template = pack $ manyTill expression (try eof)
 
 expression :: Parser UExp
-expression = choice [try loop, try conditional, try variable, fragment]
+expression = choice [loop, conditional, fragment]
 
 fragment :: Parser UExp
-fragment = do
+fragment = try variable <|> do
     skipMany $ comments <* optional newline
-    UFrag <$> meta <*> (fromString <$> manyTill1 anyChar stop)
+    UFrag <$> meta <*> (FBld . fromString <$> manyTill1 anyChar stop)
   where
     stop = try . lookAhead $ next <|> eof
     next = void (char '{' >> oneOf "{%#")
 
+variable :: Parser UExp
+variable = do
+    m <- meta
+    v <- between (symbol "{{") (string "}}") ident
+    return . UFrag m $ FVar m v
+
 loop :: Parser UExp
 loop = do
     m <- meta
-    b <- section ((,)
+    (b, i) <- try $ section ((,)
         <$> (reserved "for" >> binding)
         <*> (reserved "in"  >> ident))
-    uncurry (ULoop m) b
-        <$> expression
-        <*> alternative
-         <* keyword "endfor"
+    c <- consequent end
+    a <- alternative end
+    end
+    return $ ULoop m b i c a
+  where
+    end = keyword "endfor"
 
 conditional :: Parser UExp
 conditional = UCond
     <$> meta
-    <*> section (reserved "if" >> p)
+    <*> try (section $ reserved "if" >> pre)
     <*> expression
-    <*> alternative
-     <* keyword "endif"
+    <*> alternative end
+     <* end
   where
-    p = try operation <|> (UVar <$> meta <*> ident)
+    pre = try operation <|> (UVar <$> meta <*> ident)
+    end = keyword "endif"
 
-variable :: Parser UExp
-variable = UVar
-    <$> meta
-    <*> between (symbol "{{") (string "}}") ident
+consequent :: Parser () -> Parser UExp
+consequent end = pack . manyTill expression . try . lookAhead $
+    try (keyword "else") <|> end
 
-alternative :: Parser UExp
-alternative = option mempty . try $ keyword "else" >> expression
+alternative :: Parser () -> Parser UExp
+alternative end = pack . option mempty $
+    try (keyword "else") >> manyTill expression (try $ lookAhead end)
 
 term :: Parser UExp
 term = try variable <|> literal
 
+keyword :: String -> Parser ()
+keyword = ("keyword" ??) . section . reserved
+
 section :: Parser a -> Parser a
 section p = "section" ??
     between (symbol "{%") (string "%}") p <* optional newline
-
-keyword :: String -> Parser ()
-keyword = ("keyword" ??) . section . reserved
 
 ident :: Parser Ident
 ident = "ident" ?? Ident . Text.pack <$> identifier
@@ -119,7 +129,7 @@ double :: Parser UExp
 double = parse "double" UDbl doubleLiteral
 
 text :: Parser UExp
-text = parse "text" (\m -> UText m . LText.pack) stringLiteral
+text = parse "text" (\m -> UText m . Text.pack) stringLiteral
 
 parse :: String -> (Meta -> a -> b) -> Parser a -> Parser b
 parse name f p = do
@@ -156,6 +166,9 @@ meta :: Parser Meta
 meta = do
     p <- getPosition
     return $ Meta (sourceName p) (sourceLine p) (sourceColumn p)
+
+pack :: Parser [UExp] -> Parser UExp
+pack = fmap (foldr' (<>) mempty)
 
 manyTill1 :: Stream s m t
           => ParsecT s u m a

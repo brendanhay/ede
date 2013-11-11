@@ -16,12 +16,16 @@
 
 module Text.EDE.Internal.Types where
 
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Reader
+import           Data.Aeson                 (Array, Object, Value(..))
+import qualified Data.HashMap.Strict        as Map
 import           Data.Monoid
-import           Data.Text              (Text)
+import           Data.Text                  (Text)
 import           Data.Text.Buildable
-import qualified Data.Text.Lazy         as LText
+import qualified Data.Text.Lazy             as LText
 import           Data.Text.Lazy.Builder
-import qualified Text.Parsec            as Parsec
+import qualified Text.Parsec                as Parsec
 
 -- FIXME:
 -- type expression metadata extraction function
@@ -30,16 +34,14 @@ import qualified Text.Parsec            as Parsec
 -- correctly handle comments
 
 type LText = LText.Text
-type Frag  = Builder
 
-data Meta
-    = Meta !String !Int !Int
-    | Unknown
-      deriving (Eq)
+type Env = ReaderT Object Result
+
+data Meta = Meta !String !Int !Int
+    deriving (Eq)
 
 instance Show Meta where
     show (Meta s r c) = concat [s, ":(", show r, ",", show c, ")"]
-    show Unknown      = "unknown"
 
 data Result a
     = Success      a
@@ -86,47 +88,57 @@ data AExp = forall a. TExp a ::: TType a
 deriving instance Show AExp
 
 data TType a where
-    TTText :: TType LText
+    TTText :: TType Text
     TTBool :: TType Bool
     TTInt  :: TType Integer
     TTDbl  :: TType Double
     TTFrag :: TType Frag
+    TTMap  :: TType Object
+    TTList :: TType Array
 
 deriving instance Show (TType a)
 
 class Type a where
     typeof :: TType a
 
-instance Type LText   where typeof = TTText
+instance Type Text    where typeof = TTText
 instance Type Bool    where typeof = TTBool
 instance Type Integer where typeof = TTInt
 instance Type Double  where typeof = TTDbl
 instance Type Frag    where typeof = TTFrag
 
+data Frag
+    = FBld Builder
+    | FVar !Meta !Ident
+      deriving (Show)
+
 data TExp a where
-    TText :: Meta          -> LText     -> TExp LText
-    TBool :: Meta          -> Bool      -> TExp Bool
-    TInt  :: Meta          -> Integer   -> TExp Integer
-    TDbl  :: Meta          -> Double    -> TExp Double
-    TVar  :: Meta          -> Ident     -> TExp Frag
-    TFrag :: Meta          -> Frag      -> TExp Frag
-    TApp  :: Meta          -> TExp Frag -> TExp Frag -> TExp Frag
-    TNeg  :: Meta          -> TExp Bool -> TExp Bool
-    TBin  :: Meta          -> BinOp     -> TExp Bool -> TExp Bool -> TExp Bool
+    TText ::          Meta -> Text      -> TExp Text
+    TBool ::          Meta -> Bool      -> TExp Bool
+    TInt  ::          Meta -> Integer   -> TExp Integer
+    TDbl  ::          Meta -> Double    -> TExp Double
+    TVar  ::          Meta -> Ident     -> TType a   -> TExp a
+    TFrag ::          Meta -> Frag      -> TExp Frag
+    TCons ::          Meta -> TExp Frag -> TExp Frag -> TExp Frag
+    TNeg  ::          Meta -> TExp Bool -> TExp Bool
+    TBin  ::          Meta -> BinOp     -> TExp Bool -> TExp Bool -> TExp Bool
     TRel  :: Ord a => Meta -> RelOp     -> TExp a    -> TExp a    -> TExp Bool
-    TCond :: Meta          -> TExp Bool -> TExp Frag -> TExp Frag -> TExp Frag
-    TLoop :: Meta          -> Bind      -> Ident     -> TExp Frag -> TExp Frag -> TExp Frag
+    TCond ::          Meta -> TExp Bool -> TExp Frag -> TExp Frag -> TExp Frag
+    TLoop ::          Meta -> Bind      -> TExp a    -> TExp Frag -> TExp Frag -> TExp Frag
+
+tmeta :: TExp a -> Meta
+tmeta _ = (Meta "tmeta" 0 0)
 
 deriving instance Show (TExp a)
 
 data UExp
-    = UText !Meta !LText
+    = UText !Meta !Text
     | UBool !Meta !Bool
     | UInt  !Meta !Integer
     | UDbl  !Meta !Double
     | UVar  !Meta !Ident
     | UFrag !Meta !Frag
-    | UApp  !Meta !UExp  !UExp
+    | UCons !Meta !UExp  !UExp
     | UNeg  !Meta !UExp
     | UBin  !Meta !BinOp !UExp  !UExp
     | URel  !Meta !RelOp !UExp  !UExp
@@ -135,8 +147,11 @@ data UExp
       deriving (Show)
 
 instance Monoid UExp where
-    mempty  = UFrag Unknown mempty
-    mappend = UApp  Unknown
+    mempty      = UFrag (Meta "mempty" 0 0) (FBld mempty)
+    mappend a b = UCons (umeta a) a b
+
+umeta :: UExp -> Meta
+umeta _ = (Meta "meta" 0 0)
 
 data BinOp
     = And

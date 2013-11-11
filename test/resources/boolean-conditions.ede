@@ -1,8 +1,14 @@
-{}
+{ "yes": "sfuck arse", "no": false }
 ---
 {% if true %}
 True
 {% endif %}
-{% if false %}
-False
+{% if yes %}
+yes
+{% endif %}
+{% if no %}
+no
+{% endif %}
+{% if unknown %}
+no
 {% endif %}
