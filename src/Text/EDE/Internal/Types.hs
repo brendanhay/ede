@@ -23,14 +23,11 @@ import           Data.Text.Buildable
 import           Data.Text.Lazy.Builder
 import qualified Text.Parsec            as Parsec
 
--- FIXME:
--- type expression metadata extraction function
--- unsound monoid instance for untyped expressions
---   should probably propagate left expression's metadata
--- correctly handle comments
-
-data Meta = Meta !String !Int !Int
-    deriving (Eq)
+data Meta = Meta
+    { rc :: !String
+    , row :: !Int
+    , col :: !Int
+    } deriving (Eq)
 
 instance Show Meta where
     show (Meta s r c) = concat [s, ":(", show r, ",", show c, ")"]
@@ -41,8 +38,8 @@ data Result a
     | TypeError    !Meta !String
     | CompileError !Meta !String
 
-instance Show a => Show (Result a) where
-    show (Success a) = "Success: " ++ show a
+instance Show (Result a) where
+    show (Success _) = "Success"
 
     show (ParseError     e) = "ParseError: " ++ show e
     show (TypeError    m e) = concat ["TypeError: ", show m, " - ", e]
@@ -137,7 +134,7 @@ data UExp
 
 instance Monoid UExp where
     mempty      = UFrag (Meta "mempty" 0 0) (FBld mempty)
-    mappend a b = UCons (umeta a) a b
+    mappend a b = UCons (umeta b) a b
 
 data BinOp
     = And

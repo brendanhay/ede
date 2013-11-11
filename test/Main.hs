@@ -15,10 +15,8 @@ module Main (main) where
 import           Control.Applicative
 import           Control.Arrow
 import qualified Data.Aeson              as Aeson
-import           Data.Aeson.Types        hiding (Success)
 import           Data.List               (isSuffixOf)
 import           Data.Maybe
-import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.Encoding as LText
@@ -49,8 +47,8 @@ tests = files >>= mapM (fmap test . load)
         let (js, ede) = second (LText.drop 4) $ LText.breakOn "---" txt
             Just o    = fromJust . Aeson.decode $ LText.encodeUtf8 js
         in  goldenVsStringDiff name diff (name ++ ".golden") $
-            case render ede o of
-                Success b -> return . LText.encodeUtf8 $ toLazyText b
-                err       -> error $ show err
+                either error output $ render ede o
 
     diff r n = ["diff", "-u", r, n]
+
+    output = return . LText.encodeUtf8 . toLazyText

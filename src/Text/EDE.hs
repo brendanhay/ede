@@ -13,28 +13,14 @@
 -- |
 module Text.EDE
     (
-    -- * Types
-      Meta   (..)
-    , Result (..)
-
     -- * Rendering Functions
-    , render
+      render
     , renderFile
-
-    -- * Data.Text.Lazy.Builder
-    , Builder
-    , toLazyText
-
-    -- * Aeson
-    , Object
-    , Value  (..)
-    , (.=)
-    , object
     ) where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
-import           Data.Aeson                    (Object, Value(..), (.=), object)
+import           Data.Aeson                    (Object)
 import qualified Data.Text.Lazy                as LText
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO             as LText
@@ -48,13 +34,13 @@ import           Text.EDE.Internal.Types
 -- syntax/semantic test suite
 -- criterion benchmarks
 
-render :: LText.Text -> Object -> Result Builder
+render :: LText.Text -> Object -> Either String Builder
 render tmpl obj = evaluate obj
       $ lift (runParser "render" tmpl)
     >>= typeCheck
     >>= compile
 
-renderFile :: MonadIO m => FilePath -> Object -> m (Result Builder)
+renderFile :: MonadIO m => FilePath -> Object -> m (Either String Builder)
 renderFile path obj = do
     tmpl <- liftIO $ LText.readFile path
     return $ render tmpl obj

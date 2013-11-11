@@ -39,8 +39,11 @@ import           Text.EDE.Internal.Types
 
 type Env = ReaderT Object Result
 
-evaluate :: Object -> Env a -> Result a
-evaluate = flip runReaderT
+evaluate :: Object -> Env a -> Either String a
+evaluate obj = f  . flip runReaderT obj
+  where
+     f (Success x) = Right x
+     f e           = Left $ show e
 
 bound :: Ident -> Env Bool
 bound (Ident k) = isJust . Map.lookup k <$> ask
