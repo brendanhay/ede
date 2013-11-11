@@ -14,6 +14,7 @@ module Text.EDE.Internal.Environment
     (
     -- * Evaluation Environment
       Env
+    , evaluate
 
     -- * Variables
     , bound
@@ -37,6 +38,9 @@ import qualified Data.Text.Lazy             as LText
 import           Text.EDE.Internal.Types
 
 type Env = ReaderT Object Result
+
+evaluate :: Object -> Env a -> Result a
+evaluate = flip runReaderT
 
 bound :: Ident -> Env Bool
 bound (Ident k) = isJust . Map.lookup k <$> ask

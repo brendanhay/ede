@@ -24,6 +24,7 @@ import qualified Data.HashMap.Strict           as Map
 import           Data.Monoid
 import           Data.Text                     (Text)
 import qualified Data.Text.Buildable           as Build
+import qualified Data.Text.Lazy                as LText
 import           Data.Text.Lazy.Builder        (Builder)
 import qualified Data.Vector                   as Vector
 import           Text.EDE.Internal.Environment
@@ -125,5 +126,5 @@ build m (Object _)     = buildError m "object"
 build m (Array  _)     = buildError m "array"
 build m Null           = buildError m "null"
 
-buildError :: Meta -> LazyText -> Env a
+buildError :: Meta -> LText.Text -> Env a
 buildError m = compileError m "unable to build {} value." . (:[])

@@ -17,6 +17,7 @@ import           Control.Monad
 import           Data.Foldable           (foldr')
 import           Data.Monoid
 import qualified Data.Text               as Text
+import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types hiding (ident)
@@ -28,7 +29,7 @@ import           Text.Parsec.Text.Lazy   (Parser)
 -- FIXME:
 -- support negation of exprs with parens
 
-runParser :: String -> LazyText -> Result UExp
+runParser :: String -> LText.Text -> Result UExp
 runParser name = either ParseError Success . Parsec.runParser template () name
 
 template :: Parser UExp

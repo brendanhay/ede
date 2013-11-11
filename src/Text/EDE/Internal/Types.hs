@@ -30,8 +30,6 @@ import qualified Text.Parsec            as Parsec
 --   should probably propagate left expression's metadata
 -- correctly handle comments
 
-type LazyText = LText.Text
-
 data Meta = Meta !String !Int !Int
     deriving (Eq)
 

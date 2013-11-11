@@ -13,24 +13,35 @@
 -- |
 module Text.EDE
     (
-    -- * Exported Types
-      Builder
-    , Meta   (..)
+    -- * Types
+      Meta   (..)
     , Result (..)
 
     -- * Rendering Functions
-    , rend
     , render
+    , renderFile
+
+    -- * Data.Text.Lazy.Builder
+    , Builder
+    , toLazyText
+
+    -- * Aeson
+    , Object
+    , Value  (..)
+    , (.=)
+    , object
     ) where
 
+import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Reader
 import           Data.Aeson                    (Object, Value(..), (.=), object)
 import qualified Data.HashMap.Strict           as Map
 import           Data.Text                     (Text)
+import qualified Data.Text.Lazy                as LText
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO             as LText
 import           Text.EDE.Internal.Compiler
+import           Text.EDE.Internal.Environment
 import           Text.EDE.Internal.Parser
 import           Text.EDE.Internal.TypeChecker
 import           Text.EDE.Internal.Types
@@ -39,27 +50,13 @@ import           Text.EDE.Internal.Types
 -- syntax/semantic test suite
 -- criterion benchmarks
 
--- export a render which takes text
+render :: LText.Text -> Object -> Result Builder
+render tmpl obj = evaluate obj
+      $ lift (runParser "render" tmpl)
+    >>= typeCheck
+    >>= compile
 
--- export a renderFile which reads a file
--- export separate render / compile steps for pre-compiled templates
-
-rend :: IO ()
-rend = do
-    f <- LText.readFile "test.ede"
-    case render "test.ede" f o of
-        Success b -> LText.putStr $ toLazyText b
-        err       -> print err
-  where
-    Object o = object
-        [ "ident" .= ("ident_value!" :: Text)
-        , "list1" .= (["hi", "ho", "off", "we", "go"] :: [Text])
-        , "list2" .= ([] :: [Text])
-        , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
-        ]
-
-render :: FilePath -> LazyText -> Object -> Result Builder
-render n tmpl obj = flip runReaderT obj $ do
-    u <- lift $ runParser n tmpl
-    t <- typeCheck u
-    compile t
+renderFile :: MonadIO m => FilePath -> Object -> m (Result Builder)
+renderFile path obj = do
+    tmpl <- liftIO $ LText.readFile path
+    return $ render tmpl obj
