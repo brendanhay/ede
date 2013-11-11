@@ -10,6 +10,7 @@
 
 module Text.EDE.Internal.Lexer where
 
+import           Control.Monad
 import           Data.Functor.Identity
 import           Data.List             (nub)
 import           Data.Text.Lazy        (Text)
@@ -43,7 +44,7 @@ symbol = Parsec.symbol lexer
 comments :: Parser ()
 comments = try (string start) >> run
   where
-    run =  (try (string end) >> return ())
+    run =  (void . try $ string end)
        <|> (comments >> run)
        <|> (skipMany1 (noneOf startEnd) >> run)
        <|> (oneOf startEnd >> run)

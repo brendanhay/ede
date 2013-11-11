@@ -13,7 +13,7 @@
 -- |
 module Text.EDE
     (
-    -- * Rendering Functions
+    -- * Rendering
       render
     , renderFile
     ) where
@@ -28,7 +28,6 @@ import           Text.EDE.Internal.Compiler
 import           Text.EDE.Internal.Environment
 import           Text.EDE.Internal.Parser
 import           Text.EDE.Internal.TypeChecker
-import           Text.EDE.Internal.Types
 
 -- FIXME:
 -- syntax/semantic test suite
