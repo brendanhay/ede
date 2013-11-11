@@ -11,32 +11,19 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.TypeChecker where
+module Text.EDE.Internal.TypeChecker (typeCheck) where
 
-import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Reader
-import           Data.Maybe
-import           Data.Aeson                 (Array, Object, Value(..))
-import           Data.Attoparsec.Number     (Number(..))
-import qualified Data.HashMap.Strict        as Map
-import           Data.Text.Format
-import           Data.Text.Format.Params    (Params)
-import qualified Data.Text.Lazy             as LText
-import           Prelude                    hiding (lookup)
-import           Text.EDE.Internal.Types
+import Control.Applicative
+import Control.Monad
+import Data.Aeson                    (Value(..))
+import Data.Attoparsec.Number        (Number(..))
+import Text.EDE.Internal.Environment
+import Text.EDE.Internal.Types
 
 typeCheck :: Type a => UExp -> Env (TExp a)
 typeCheck = cast typeof <=< check
 
-cast :: TType a -> AExp -> Env (TExp a)
-cast t (e ::: t') = do
-    Eq <- equal (tmeta e) t t'
-    return e
-
 check :: UExp -> Env AExp
-
 check (UText m t) = return $ TText m t ::: TTText
 check (UBool m b) = return $ TBool m b ::: TTBool
 check (UInt  m i) = return $ TInt  m i ::: TTInt
@@ -91,7 +78,21 @@ check (ULoop m b i l r) = do
         case t of
             TTMap  -> return u
             TTList -> return u
-            _      -> throw m "unsupported collection type {} in loop." [show t]
+            _ -> typeError m "unsupported collection type {} in loop." [show t]
+
+cast :: TType a -> AExp -> Env (TExp a)
+cast t (e ::: t') = do
+    Eq <- equal (tmeta e) t t'
+    return e
+
+predicate :: UExp -> Env AExp
+predicate x@(UVar m i) = do
+    p <- bound i
+    y@(_ ::: ut) <- if p then check x else return $ TBool m False ::: TTBool
+    return $ case ut of
+        TTBool -> y
+        _      -> TBool m True ::: TTBool
+predicate u = check u
 
 data Equal a b where
     Eq :: Equal a a
@@ -102,7 +103,7 @@ equal _ TTBool TTBool = return Eq
 equal _ TTInt  TTInt  = return Eq
 equal _ TTDbl  TTDbl  = return Eq
 equal _ TTFrag TTFrag = return Eq
-equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
+equal m a b = typeError m "type equality check of {} ~ {} failed." [show a, show b]
 
 data Order a where
     Ord :: Ord a => Order a
@@ -112,20 +113,4 @@ order _ TTText = return Ord
 order _ TTBool = return Ord
 order _ TTInt  = return Ord
 order _ TTDbl  = return Ord
-order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
-
-require :: Meta -> Ident -> Env Value
-require m (Ident k) = ask >>=
-    maybe (throw m "binding '{}' doesn't exist." [k]) return . Map.lookup k
-
-throw :: Params ps => Meta -> Format -> ps -> Env a
-throw m f = lift . TypeError m . LText.unpack . format f
-
-predicate :: UExp -> Env AExp
-predicate u@(UVar m i) = do
-    p <- isJust . Map.lookup (ident i) <$> ask
-    u'@(_ ::: ut) <- if p then check u else return $ TBool m False ::: TTBool
-    return $ case ut of
-        TTBool -> u'
-        _      -> TBool m True ::: TTBool
-predicate u = check u
+order m t = typeError m "constraint check of Ord a => a ~ {} failed." [show t]

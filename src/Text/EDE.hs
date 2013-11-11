@@ -30,7 +30,7 @@ import qualified Data.HashMap.Strict           as Map
 import           Data.Text                     (Text)
 import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.IO             as LText
-import           Text.EDE.Internal.Compiler    hiding (render)
+import           Text.EDE.Internal.Compiler
 import           Text.EDE.Internal.Parser
 import           Text.EDE.Internal.TypeChecker
 import           Text.EDE.Internal.Types
@@ -58,7 +58,7 @@ rend = do
         , "hash1" .= Map.fromList [("key" :: Text, "value" :: Text), ("1", "2")]
         ]
 
-render :: FilePath -> LText -> Object -> Result Builder
+render :: FilePath -> LazyText -> Object -> Result Builder
 render n tmpl obj = flip runReaderT obj $ do
     u <- lift $ runParser n tmpl
     t <- typeCheck u

@@ -16,16 +16,13 @@
 
 module Text.EDE.Internal.Types where
 
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Reader
-import           Data.Aeson                 (Array, Object, Value(..))
-import qualified Data.HashMap.Strict        as Map
+import           Data.Aeson             (Array, Object)
 import           Data.Monoid
-import           Data.Text                  (Text)
+import           Data.Text              (Text)
 import           Data.Text.Buildable
-import qualified Data.Text.Lazy             as LText
+import qualified Data.Text.Lazy         as LText
 import           Data.Text.Lazy.Builder
-import qualified Text.Parsec                as Parsec
+import qualified Text.Parsec            as Parsec
 
 -- FIXME:
 -- type expression metadata extraction function
@@ -33,9 +30,7 @@ import qualified Text.Parsec                as Parsec
 --   should probably propagate left expression's metadata
 -- correctly handle comments
 
-type LText = LText.Text
-
-type Env = ReaderT Object Result
+type LazyText = LText.Text
 
 data Meta = Meta !String !Int !Int
     deriving (Eq)

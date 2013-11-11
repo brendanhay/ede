@@ -12,25 +12,21 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Compiler where
+module Text.EDE.Internal.Compiler (compile) where
 
 import           Control.Applicative
-import           Control.Monad              (liftM2)
-import           Control.Monad.Trans.Class
+import           Control.Monad                 (liftM2)
 import           Control.Monad.Trans.Reader
-import           Data.Aeson                 (Object, Value(..))
-import           Data.Attoparsec.Number     (Number(..))
-import           Data.Foldable              (Foldable, foldrM)
-import qualified Data.HashMap.Strict        as Map
+import           Data.Aeson                    (Object, Value(..))
+import           Data.Attoparsec.Number        (Number(..))
+import           Data.Foldable                 (Foldable, foldrM)
+import qualified Data.HashMap.Strict           as Map
 import           Data.Monoid
-import           Data.Text                  (Text)
-import qualified Data.Text.Buildable        as Build
-import           Data.Text.Format           (Format)
-import qualified Data.Text.Format           as Format
-import           Data.Text.Format.Params    (Params)
-import qualified Data.Text.Lazy             as LText
-import           Data.Text.Lazy.Builder     (Builder)
-import qualified Data.Vector                as Vector
+import           Data.Text                     (Text)
+import qualified Data.Text.Buildable           as Build
+import           Data.Text.Lazy.Builder        (Builder)
+import qualified Data.Vector                   as Vector
+import           Text.EDE.Internal.Environment
 import           Text.EDE.Internal.Types
 
 -- FIXME:
@@ -52,7 +48,8 @@ eval (TVar m i TTInt)  = require m i >>= \(Number (I n)) -> return n
 eval (TVar m i TTDbl)  = require m i >>= \(Number (D n)) -> return n
 eval (TVar m i TTMap)  = require m i >>= \(Object o)     -> return o
 eval (TVar m i TTList) = require m i >>= \(Array  a)     -> return a
-eval (TVar m i t) = throw m "type mistmatch for binding {} :: {}" [show i, show t]
+eval (TVar m i t) =
+    compileError m "type mistmatch for binding {} :: {}" [show i, show t]
 
 eval (TCons _ a b) = do
     a' <- eval a
@@ -98,7 +95,7 @@ eval (TLoop _ (destruct -> (p, s)) i@(TVar _ _ TTMap) l r) = eval i >>= f
     body v = bind (Map.insert p v) l
 
 eval (TLoop m _ e _ _) =
-    throw m "invalid loop expression {}" [show e]
+    compileError m "invalid loop expression {}" [show e]
 
 evalM2 :: (a -> a -> b) -> TExp a -> TExp a -> Env b
 evalM2 f x y = liftM2 f (eval x) (eval y)
@@ -128,12 +125,5 @@ build m (Object _)     = buildError m "object"
 build m (Array  _)     = buildError m "array"
 build m Null           = buildError m "null"
 
-buildError :: Meta -> LText -> Env a
-buildError m = throw m "unable to build {} value." . (:[])
-
-require :: Meta -> Ident -> Env Value
-require m (Ident k) = ask >>=
-    maybe (throw m "binding '{}' doesn't exist." [k]) return . Map.lookup k
-
-throw :: Params ps => Meta -> Format -> ps -> Env a
-throw m f = lift . CompileError m . LText.unpack . Format.format f
+buildError :: Meta -> LazyText -> Env a
+buildError m = compileError m "unable to build {} value." . (:[])

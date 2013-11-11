@@ -3,6 +3,14 @@
 
 Hi {{ ident }}!
 
+{% if ident %}
+    ident
+{% endif %}
+{% if ide %}
+    ide
+{% endif %}
+
+
 {% if true %}
     p left branch
 {% endif %}
