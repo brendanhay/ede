@@ -49,7 +49,7 @@ tests = files >>= mapM (fmap test . load)
         let (js, ede) = second (LText.drop 4) $ LText.breakOn "---" txt
             Just o    = fromJust . Aeson.decode $ LText.encodeUtf8 js
         in  goldenVsStringDiff name diff (name ++ ".golden") $
-            case render name ede o of
+            case render ede o of
                 Success b -> return . LText.encodeUtf8 $ toLazyText b
                 err       -> error $ show err
 
