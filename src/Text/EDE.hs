@@ -18,22 +18,22 @@ module Text.EDE
     , renderFile
     ) where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class
+import           Control.Monad.IO.Class        (MonadIO, liftIO)
+import           Control.Monad.Trans.Class     (lift)
 import           Data.Aeson                    (Object)
-import qualified Data.Text.Lazy                as LText
-import           Data.Text.Lazy.Builder
+import           Data.Text.Lazy                (Text)
+import           Data.Text.Lazy.Builder        (Builder)
 import qualified Data.Text.Lazy.IO             as LText
-import           Text.EDE.Internal.Compiler
-import           Text.EDE.Internal.Environment
-import           Text.EDE.Internal.Parser
-import           Text.EDE.Internal.TypeChecker
+import           Text.EDE.Internal.Compiler    (compile)
+import           Text.EDE.Internal.Environment (evaluate)
+import           Text.EDE.Internal.Parser      (runParser)
+import           Text.EDE.Internal.TypeChecker (typeCheck)
 
 -- FIXME:
 -- syntax/semantic test suite
 -- criterion benchmarks
 
-render :: LText.Text -> Object -> Either String Builder
+render :: Text -> Object -> Either String Builder
 render tmpl obj = evaluate obj
       $ lift (runParser "render" tmpl)
     >>= typeCheck
