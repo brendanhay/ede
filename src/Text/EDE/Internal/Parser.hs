@@ -27,6 +27,8 @@ import           Text.Parsec.Expr
 import           Text.Parsec.Text.Lazy   (Parser)
 
 -- FIXME:
+-- make the parsing more strict, error on invalid sections
+--   rather than consuming as fragments
 -- support negation of exprs with parens
 
 runParser :: String -> LText.Text -> Result UExp
