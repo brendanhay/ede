@@ -36,7 +36,7 @@ template :: Parser UExp
 template = pack $ manyTill expression (try eof)
 
 expression :: Parser UExp
-expression = choice [loop, conditional, fragment]
+expression = choice [loop, conditional, scope, fragment]
 
 fragment :: Parser UExp
 fragment = try variable <|> do
@@ -69,12 +69,21 @@ conditional :: Parser UExp
 conditional = UCond
     <$> meta
     <*> try (section $ reserved "if" >> pre)
-    <*> expression
+    <*> consequent end
     <*> alternative end
      <* end
   where
     pre = try operation <|> (UVar <$> meta <*> ident)
     end = keyword "endif"
+
+scope :: Parser UExp
+scope = UScope
+    <$> meta
+    <*> try (section $ reserved "scope" >> ident)
+    <*> consequent end
+     <* end
+  where
+    end = keyword "endscope"
 
 consequent :: Parser () -> Parser UExp
 consequent end = pack . manyTill expression . try . lookAhead $

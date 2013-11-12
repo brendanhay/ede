@@ -98,6 +98,10 @@ eval (TLoop _ (destruct -> (p, s)) i@(TVar _ _ TTMap) l r) = eval i >>= f
 eval (TLoop m _ e _ _) =
     compileError m "invalid loop expression {}" [show e]
 
+eval (TScope _ i@(TVar _ _ TTMap) e) = eval i >>= \env -> bind (const env) e
+eval (TScope m _ e) =
+    compileError m "invalid scope expression {}" [show e]
+
 evalM2 :: (a -> a -> b) -> TExp a -> TExp a -> Env b
 evalM2 f x y = liftM2 f (eval x) (eval y)
 

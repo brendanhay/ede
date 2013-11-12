@@ -80,6 +80,13 @@ check (ULoop m b i l r) = do
             TTList -> return u
             _ -> typeError m "unsupported collection type {} in loop." [show t]
 
+check (UScope m i e) = do
+    v' ::: vt <- check $ UVar m i
+    e' ::: et <- check e
+    Eq <- equal m vt TTMap
+    Eq <- equal m et TTFrag
+    return $ TScope m v' e' ::: TTFrag
+
 cast :: TType a -> AExp -> Env (TExp a)
 cast t (e ::: t') = do
     Eq <- equal (tmeta e) t t'
@@ -103,6 +110,8 @@ equal _ TTBool TTBool = return Eq
 equal _ TTInt  TTInt  = return Eq
 equal _ TTDbl  TTDbl  = return Eq
 equal _ TTFrag TTFrag = return Eq
+equal _ TTMap  TTMap  = return Eq
+equal _ TTList TTList = return Eq
 equal m a b = typeError m "type equality check of {} ~ {} failed." [show a, show b]
 
 data Order a where
