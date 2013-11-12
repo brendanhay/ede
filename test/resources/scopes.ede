@@ -1,5 +1,0 @@
-{ "map": { "hi": "Ho" } }
----
-{% scope map %}
-{{ hi }}
-{% endscope %}

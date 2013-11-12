@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- Module      : Text.EDE.Internal.Compiler
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
@@ -22,7 +22,6 @@ import           Data.Attoparsec.Number        (Number(..))
 import           Data.Foldable                 (Foldable, foldrM)
 import qualified Data.HashMap.Strict           as Map
 import           Data.Monoid
-import           Data.Text                     (Text)
 import qualified Data.Text.Buildable           as Build
 import qualified Data.Text.Lazy                as LText
 import           Data.Text.Lazy.Builder        (Builder)
@@ -73,40 +72,33 @@ eval (TCond _ p l r) = do
     p' <- eval p
     eval $ if p' then l else r
 
-eval (TLoop _ (destruct -> (p, s)) i@(TVar _ _ TTList) l r) = eval i >>= f
+eval (TLoop _ Bind{..} i@(TVar _ _ TTList) l r) = eval i >>= f
   where
-    f x | Vector.null x = eval r
-        | Just s' <- s  = loop (indexed s') . zip indices $ Vector.toList x
-        | otherwise     = loop body x
+    f x | Vector.null x   = eval r
+        | Just s' <- bSec = loop (indexed s') . zip indices $ Vector.toList x
+        | otherwise       = loop body x
 
-    indexed s' (v, n) = bind (Map.insert p v . Map.insert s' n) l
+    indexed s' (v, n) = bind (Map.insert bPrim v . Map.insert s' n) l
 
     indices = Number . I <$> [1..]
 
-    body v = bind (Map.insert p v) l
+    body v = bind (Map.insert bPrim v) l
 
-eval (TLoop _ (destruct -> (p, s)) i@(TVar _ _ TTMap) l r) = eval i >>= f
+eval (TLoop _ Bind{..} i@(TVar _ _ TTMap) l r) = eval i >>= f
   where
-    f x | Map.null x   = eval r
-        | Just s' <- s = loop (keyed s') $ Map.toList x
-        | otherwise    = loop body $ Map.elems x
+    f x | Map.null x      = eval r
+        | Just s' <- bSec = loop (keyed s') $ Map.toList x
+        | otherwise       = loop body $ Map.elems x
 
-    keyed s' (k, v) = bind (Map.insert p (String k) . Map.insert s' v) l
+    keyed s' (k, v) = bind (Map.insert bPrim (String k) . Map.insert s' v) l
 
-    body v = bind (Map.insert p v) l
+    body v = bind (Map.insert bPrim v) l
 
 eval (TLoop m _ e _ _) =
     compileError m "invalid loop expression {}" [show e]
 
-eval (TScope _ i@(TVar _ _ TTMap) e) = eval i >>= \env -> bind (const env) e
-eval (TScope m _ e) =
-    compileError m "invalid scope expression {}" [show e]
-
 evalM2 :: (a -> a -> b) -> TExp a -> TExp a -> Env b
 evalM2 f x y = liftM2 f (eval x) (eval y)
-
-destruct :: Bind -> (Text, Maybe Text)
-destruct (Bind _ p ms) = (ident p, ident <$> ms)
 
 bind :: (Object -> Object) -> TExp Frag -> Env Frag
 bind f = withReaderT f . eval

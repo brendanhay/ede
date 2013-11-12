@@ -77,7 +77,7 @@ rules = Parsec.LanguageDef
     }
 
 names :: [String]
-names = ["if", "endif", "for", "in", "endfor", "else", "true", "false", "scope", "endscope"]
+names = ["if", "endif", "for", "in", "endfor", "else", "true", "false", "with", "endwith"]
 
 operators :: [String]
 operators = [">", ">=", "<", "=<", "==", "/=", "!", "||", "&&"]

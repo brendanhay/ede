@@ -31,10 +31,12 @@ import           Control.Monad.Trans.Reader
 import           Data.Aeson                 (Object, Value(..))
 import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
+import           Data.Text                  (Text)
 import           Data.Text.Format           (Format)
 import qualified Data.Text.Format           as Format
 import           Data.Text.Format.Params    (Params)
 import qualified Data.Text.Lazy             as LText
+import           Prelude                    hiding (lookup)
 import           Text.EDE.Internal.Types
 
 type Env = ReaderT Object Result
@@ -46,12 +48,17 @@ evaluate obj = f  . flip runReaderT obj
      f e           = Left $ show e
 
 bound :: Ident -> Env Bool
-bound (Ident k) = isJust . Map.lookup k <$> ask
+bound (Ident ks) = isJust . lookup ks . (Just . Object) <$> ask
 
 require :: Meta -> Ident -> Env Value
-require m (Ident k) = do
-    mv <- Map.lookup k <$> ask
-    maybe (compileError m "binding '{}' doesn't exist." [k]) return mv
+require m i@(Ident ks) = do
+    mv <- lookup ks . (Just . Object) <$> ask
+    maybe (compileError m "binding '{}' doesn't exist." [i]) return mv
+
+lookup :: [Text] -> Maybe Value -> Maybe Value
+lookup (k:ks) (Just (Object o)) = lookup ks $ Map.lookup k o
+lookup []     v                 = v
+lookup _      _                 = Nothing
 
 typeError :: Params ps => Meta -> Format -> ps -> Env a
 typeError m f = lift . TypeError m . LText.unpack . Format.format f

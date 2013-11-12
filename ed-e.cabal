@@ -66,15 +66,3 @@ test-suite ed-e-test
       , text
       , tasty
       , tasty-golden
-
-benchmark ed-e-bench
-    default-language:  Haskell2010
-    type:              exitcode-stdio-1.0
-    hs-source-dirs:    bench
-    main-is:           Main.hs
-
-    ghc-options:      -Wall
-
-    build-depends:
-        base      >= 4.6 && < 5
-      , criterion

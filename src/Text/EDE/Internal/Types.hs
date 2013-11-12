@@ -19,14 +19,15 @@ module Text.EDE.Internal.Types where
 import           Data.Aeson             (Array, Object)
 import           Data.Monoid
 import           Data.Text              (Text)
+import qualified Data.Text              as Text
 import           Data.Text.Buildable
 import           Data.Text.Lazy.Builder
 import qualified Text.Parsec            as Parsec
 
 data Meta = Meta
-    { rc :: !String
-    , row :: !Int
-    , col :: !Int
+    { mSrc :: !String
+    , mRow :: !Int
+    , mCol :: !Int
     } deriving (Eq)
 
 instance Show Meta where
@@ -60,16 +61,16 @@ instance Monad Result where
     TypeError    m e >>= _ = TypeError    m e
     CompileError m e >>= _ = CompileError m e
 
-newtype Ident = Ident { ident :: Text }
+newtype Ident = Ident { ident :: [Text] }
     deriving (Show)
 
 instance Buildable Ident where
-    build = build . ident
+    build = build . Text.intercalate "." . ident
 
 data Bind = Bind
-    { bindMeta :: !Meta
-    , bindPrim :: !Ident
-    , bindSec  :: Maybe Ident
+    { bMeta :: !Meta
+    , bPrim :: !Text
+    , bSec  :: Maybe Text
     } deriving (Show)
 
 data AExp = forall a. TExp a ::: TType a
@@ -102,36 +103,34 @@ data Frag
       deriving (Show)
 
 data TExp a where
-    TText  ::          Meta -> Text      -> TExp Text
-    TBool  ::          Meta -> Bool      -> TExp Bool
-    TInt   ::          Meta -> Integer   -> TExp Integer
-    TDbl   ::          Meta -> Double    -> TExp Double
-    TVar   ::          Meta -> Ident     -> TType a   -> TExp a
-    TFrag  ::          Meta -> Frag      -> TExp Frag
-    TCons  ::          Meta -> TExp Frag -> TExp Frag -> TExp Frag
-    TNeg   ::          Meta -> TExp Bool -> TExp Bool
-    TBin   ::          Meta -> BinOp     -> TExp Bool -> TExp Bool -> TExp Bool
-    TRel   :: Ord a => Meta -> RelOp     -> TExp a    -> TExp a    -> TExp Bool
-    TCond  ::          Meta -> TExp Bool -> TExp Frag -> TExp Frag -> TExp Frag
-    TLoop  ::          Meta -> Bind      -> TExp a    -> TExp Frag -> TExp Frag -> TExp Frag
-    TScope ::          Meta -> TExp a    -> TExp Frag -> TExp Frag
+    TText ::          Meta -> Text      -> TExp Text
+    TBool ::          Meta -> Bool      -> TExp Bool
+    TInt  ::          Meta -> Integer   -> TExp Integer
+    TDbl  ::          Meta -> Double    -> TExp Double
+    TVar  ::          Meta -> Ident     -> TType a   -> TExp a
+    TFrag ::          Meta -> Frag      -> TExp Frag
+    TCons ::          Meta -> TExp Frag  -> TExp Frag -> TExp Frag
+    TNeg  ::          Meta -> TExp Bool -> TExp Bool
+    TBin  ::          Meta -> BinOp     -> TExp Bool -> TExp Bool -> TExp Bool
+    TRel  :: Ord a => Meta -> RelOp     -> TExp a    -> TExp a    -> TExp Bool
+    TCond ::          Meta -> TExp Bool -> TExp Frag -> TExp Frag -> TExp Frag
+    TLoop ::          Meta -> Bind      -> TExp a    -> TExp Frag -> TExp Frag -> TExp Frag
 
 deriving instance Show (TExp a)
 
 data UExp
-    = UText  !Meta !Text
-    | UBool  !Meta !Bool
-    | UInt   !Meta !Integer
-    | UDbl   !Meta !Double
-    | UVar   !Meta !Ident
-    | UFrag  !Meta !Frag
-    | UCons  !Meta !UExp  !UExp
-    | UNeg   !Meta !UExp
-    | UBin   !Meta !BinOp !UExp  !UExp
-    | URel   !Meta !RelOp !UExp  !UExp
-    | UCond  !Meta !UExp  !UExp  !UExp
-    | ULoop  !Meta !Bind  !Ident !UExp !UExp
-    | UScope !Meta !Ident !UExp
+    = UText !Meta !Text
+    | UBool !Meta !Bool
+    | UInt  !Meta !Integer
+    | UDbl  !Meta !Double
+    | UVar  !Meta !Ident
+    | UFrag !Meta !Frag
+    | UCons !Meta !UExp  !UExp
+    | UNeg  !Meta !UExp
+    | UBin  !Meta !BinOp !UExp  !UExp
+    | URel  !Meta !RelOp !UExp  !UExp
+    | UCond !Meta !UExp  !UExp  !UExp
+    | ULoop !Meta !Bind  !Ident !UExp !UExp
       deriving (Show)
 
 instance Monoid UExp where
@@ -154,32 +153,30 @@ data RelOp
 
 tmeta :: TExp a -> Meta
 tmeta t = case t of
-    TText  m _       -> m
-    TBool  m _       -> m
-    TInt   m _       -> m
-    TDbl   m _       -> m
-    TVar   m _ _     -> m
-    TFrag  m _       -> m
-    TCons  m _ _     -> m
-    TNeg   m _       -> m
-    TBin   m _ _ _   -> m
-    TRel   m _ _ _   -> m
-    TCond  m _ _ _   -> m
-    TLoop  m _ _ _ _ -> m
-    TScope m _ _     -> m
+    TText m _       -> m
+    TBool m _       -> m
+    TInt  m _       -> m
+    TDbl  m _       -> m
+    TVar  m _ _     -> m
+    TFrag m _       -> m
+    TCons m _ _     -> m
+    TNeg  m _       -> m
+    TBin  m _ _ _   -> m
+    TRel  m _ _ _   -> m
+    TCond m _ _ _   -> m
+    TLoop m _ _ _ _ -> m
 
 umeta :: UExp -> Meta
 umeta u = case u of
-    UText  m _       -> m
-    UBool  m _       -> m
-    UInt   m _       -> m
-    UDbl   m _       -> m
-    UVar   m _       -> m
-    UFrag  m _       -> m
-    UCons  m _ _     -> m
-    UNeg   m _       -> m
-    UBin   m _ _ _   -> m
-    URel   m _ _ _   -> m
-    UCond  m _ _ _   -> m
-    ULoop  m _ _ _ _ -> m
-    UScope m _ _     -> m
+    UText m _       -> m
+    UBool m _       -> m
+    UInt  m _       -> m
+    UDbl  m _       -> m
+    UVar  m _       -> m
+    UFrag m _       -> m
+    UCons m _ _     -> m
+    UNeg  m _       -> m
+    UBin  m _ _ _   -> m
+    URel  m _ _ _   -> m
+    UCond m _ _ _   -> m
+    ULoop m _ _ _ _ -> m

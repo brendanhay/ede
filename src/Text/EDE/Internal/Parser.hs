@@ -36,7 +36,7 @@ template :: Parser UExp
 template = pack $ manyTill expression (try eof)
 
 expression :: Parser UExp
-expression = choice [loop, conditional, scope, fragment]
+expression = choice [loop, conditional, fragment]
 
 fragment :: Parser UExp
 fragment = try variable <|> do
@@ -76,15 +76,6 @@ conditional = UCond
     pre = try operation <|> (UVar <$> meta <*> ident)
     end = keyword "endif"
 
-scope :: Parser UExp
-scope = UScope
-    <$> meta
-    <*> try (section $ reserved "scope" >> ident)
-    <*> consequent end
-     <* end
-  where
-    end = keyword "endscope"
-
 consequent :: Parser () -> Parser UExp
 consequent end = pack . manyTill expression . try . lookAhead $
     try (keyword "else") <|> end
@@ -104,20 +95,22 @@ section p = "section" ??
     between (symbol "{%") (string "%}") p <* optional newline
 
 ident :: Parser Ident
-ident = "ident" ?? Ident . Text.pack <$> identifier
+ident = "ident" ?? Ident . map Text.pack <$> sepBy1 identifier (symbol ".")
 
 binding :: Parser Bind
 binding = "binding" ?? try pattern <|> nominal
   where
     pattern = Bind
         <$> meta
-        <*> (symbol "(" *> ident <* symbol ",")
-        <*> (Just <$> (ident <* symbol ")"))
+        <*> (symbol "(" *> key <* symbol ",")
+        <*> (Just <$> (key <* symbol ")"))
 
     nominal = Bind
         <$> meta
-        <*> ident
+        <*> key
         <*> pure Nothing
+
+    key = Text.pack <$> identifier
 
 literal :: Parser UExp
 literal = "literal" ?? choice
