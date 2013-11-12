@@ -38,7 +38,7 @@ check (UVar m i) = f <$> require m i
     f (Number (D _)) = TVar m i TTDbl  ::: TTDbl
     f (Object _)     = TVar m i TTMap  ::: TTMap
     f (Array  _)     = TVar m i TTList ::: TTList
-    f Null           = TVar m i TTBool ::: TTBool
+    f Null           = TBool m False   ::: TTBool
 
 check (UCons m a b) = do
     a' ::: TTFrag <- check a
