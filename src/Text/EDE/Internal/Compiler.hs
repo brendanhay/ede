@@ -19,6 +19,7 @@ import           Control.Monad                 (liftM2)
 import           Control.Monad.Trans.Reader
 import           Data.Aeson                    (Object, Value(..))
 import           Data.Attoparsec.Number        (Number(..))
+import           Data.Char                     (toLower)
 import           Data.Foldable                 (Foldable, foldrM)
 import qualified Data.HashMap.Strict           as Map
 import           Data.Monoid
@@ -116,7 +117,7 @@ render (FVar m i) = require m i >>= build m
 build :: Meta -> Value -> Env Builder
 build _ (Number (I n)) = return $ Build.build n
 build _ (Number (D d)) = return $ Build.build d
-build _ (Bool   b)     = return $ Build.build b
+build _ (Bool   b)     = return . Build.build . map toLower $ show b
 build _ (String s)     = return $ Build.build s
 build m (Object _)     = buildError m "object"
 build m (Array  _)     = buildError m "array"
