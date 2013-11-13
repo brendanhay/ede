@@ -13,7 +13,7 @@
 
 -- |
 module Text.EDE
-    (
+             (
     -- * Single Pass
       compile
     , eitherCompile
@@ -24,23 +24,17 @@ module Text.EDE
     , render
 
     -- * Results
-    , Result   (..)
-    , Meta     (..)
+    , Result (..)
+    , Meta   (..)
     , eitherResult
     , result
-
-    -- * Data.Aeson
-    , object'
-    , (.=)
 
     -- * Data.Text.Lazy.Builder
     , toLazyText
     ) where
 
-import           Control.Monad
-import           Data.Aeson                 (object, (.=))
-import           Data.Aeson.Types           (Object, Value(..), Pair)
-import qualified Data.Text.Lazy             as LText
+import           Data.Aeson.Types           (Object)
+import           Data.Text.Lazy             (Text)
 import           Data.Text.Lazy.Builder     (Builder, toLazyText)
 import qualified Text.EDE.Internal.Compiler as Compiler
 import qualified Text.EDE.Internal.Parser   as Parser
@@ -53,17 +47,17 @@ import           Text.EDE.Internal.Types
 newtype Template = Template { template :: UExp }
     deriving (Eq, Ord)
 
-compile :: Object -> LText.Text -> Result Builder
-compile o = render o <=< parse
+compile :: Text -> Object -> Result Builder
+compile s o = parse s >>= (`render` o)
 
-eitherCompile :: Object -> LText.Text -> Either String Builder
-eitherCompile o = eitherResult . compile o
+eitherCompile :: Text -> Object -> Either String Builder
+eitherCompile s = eitherResult . compile s
 
-parse :: LText.Text -> Result Template
+parse :: Text -> Result Template
 parse = fmap Template . Parser.runParser
 
-render :: Object -> Template -> Result Builder
-render o = Compiler.render o . template
+render :: Template -> Object -> Result Builder
+render t = Compiler.render (template t)
 
 eitherResult :: Result a -> Either String a
 eitherResult = result f Right
@@ -73,6 +67,3 @@ eitherResult = result f Right
         , "Position: " ++ concat [source, ":(", show row, ",", show column, ")"]
         , "Messages:"
         ] ++ e
-
-object' :: [Pair] -> Object
-object' = (\(Object o) -> o) . object

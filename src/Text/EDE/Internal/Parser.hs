@@ -152,7 +152,7 @@ positionMeta :: SourcePos -> Meta
 positionMeta p = Meta (sourceName p) (sourceLine p) (sourceColumn p)
 
 pack :: Parser [UExp] -> Parser UExp
-pack = fmap (foldr' (\a b -> UApp (metadata a) a b) UNil)
+pack = fmap (foldr' (\a b -> UApp (getMeta a) a b) UNil)
 
 manyTill1 :: Stream s m t
           => ParsecT s u m a

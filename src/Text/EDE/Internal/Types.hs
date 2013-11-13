@@ -12,9 +12,12 @@
 
 module Text.EDE.Internal.Types where
 
-import Data.Text              (Text)
-import Data.Text.Buildable
-import Data.Text.Lazy.Builder
+import           Data.Text               (Text)
+import           Data.Text.Buildable
+import           Data.Text.Format        (Format, format)
+import           Data.Text.Format.Params (Params)
+import qualified Data.Text.Lazy          as LText
+import           Data.Text.Lazy.Builder
 
 data Meta = Meta
     { source :: !String
@@ -70,13 +73,19 @@ data RelOp
     | LessEqual
       deriving (Eq, Ord, Show)
 
+throw :: Params ps => Meta -> Format -> ps -> Result a
+throw m f = Error m . (:[]) . LText.unpack . format f
+
 result :: (Meta -> [String] -> b) -> (a -> b) -> Result a -> b
 result f _ (Error m e) = f m e
 result _ g (Success x) = g x
 
-metadata :: UExp -> Meta
-metadata u = case u of
-    UNil            -> (Meta "metadata" 0 0)
+mkMeta :: String -> Meta
+mkMeta n = Meta n 0 0
+
+getMeta :: UExp -> Meta
+getMeta u = case u of
+    UNil            -> mkMeta "getMeta"
     UText m _       -> m
     UBool m _       -> m
     UInt  m _       -> m

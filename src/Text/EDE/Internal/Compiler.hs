@@ -27,13 +27,14 @@ import           Data.Monoid
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Buildable        as Build
-import           Data.Text.Format           (Format, format)
+import           Data.Text.Format           (Format)
 import           Data.Text.Format.Params    (Params)
-import qualified Data.Text.Lazy             as LText
 import           Data.Text.Lazy.Builder     (Builder)
 import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
 
+-- FIXME:
+-- Prevent rebinding/shadowing of variables
 type Env = ReaderT Object Result
 
 data TType a where
@@ -47,17 +48,6 @@ data TType a where
 
 deriving instance Show (TType a)
 
-class Type a where
-    typeof :: TType a
-
-instance Type Text    where typeof = TText
-instance Type Bool    where typeof = TBool
-instance Type Integer where typeof = TInt
-instance Type Double  where typeof = TDbl
-instance Type Builder where typeof = TBld
-instance Type Object  where typeof = TMap
-instance Type Array   where typeof = TList
-
 data TExp = forall a. a ::: TType a
 
 data Equal a b where
@@ -66,18 +56,10 @@ data Equal a b where
 data Order a where
     Ord :: Ord a => Order a
 
--- FIXME:
--- Prevent rebinding/shadowing of variables
-
-render :: Object -> UExp -> Result Builder
-render o e = flip runReaderT o $ do
-     r <- eval e
-     b <- build (Meta "render" 0 0) r
-     cast TBld b
-
-cast :: TType a -> TExp -> Env a
-cast t (v ::: t') = do
-    Eq <- equal (Meta "src" 0 0) t t'
+render :: UExp -> Object -> Result Builder
+render e o = flip runReaderT o $ do
+    v ::: vt <- eval e >>= build (mkMeta "render")
+    Eq       <- equal (mkMeta "cast") TBld vt
     return v
 
 eval :: UExp -> Env TExp
@@ -97,7 +79,7 @@ eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
   where
     f (o ::: TMap) = bind (const o) e
     f (_ ::: t) =
-        throw m "variable {} :: {} does not supported nested accessors."
+        throwEnv m "variable {} :: {} does not supported nested accessors."
             [Text.unpack i, show t]
 eval (UApp m a b) = do
     a' ::: TBld <- f a
@@ -121,8 +103,8 @@ eval (UBin _ op a b) = do
 eval (URel m op a b) = do
     a' ::: at <- eval a
     b' ::: bt <- eval b
-    Eq  <- equal m at bt
-    Ord <- order m at
+    Eq        <- equal m at bt
+    Ord       <- order m at
     return $ f op a' b' ::: TBool
   where
     f Equal        = (==)
@@ -136,8 +118,7 @@ eval (UCond _ p a b) = do
     p' ::: TBool <- predicate p
     eval $ if p' then a else b
 
-eval e = throw (metadata e) "unable to evaluate unsupported expression {}"
-    [show e]
+eval e = throwEnv (getMeta e) "unable to evaluate unsupported expression {}" [show e]
 
 equal :: Meta -> TType a -> TType b -> Env (Equal a b)
 equal _ TText TText = return Eq
@@ -147,14 +128,14 @@ equal _ TDbl  TDbl  = return Eq
 equal _ TBld  TBld  = return Eq
 equal _ TMap  TMap  = return Eq
 equal _ TList TList = return Eq
-equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
+equal m a b = throwEnv m "type equality check of {} ~ {} failed." [show a, show b]
 
 order :: Meta -> TType a -> Env (Order a)
 order _ TText = return Ord
 order _ TBool = return Ord
 order _ TInt  = return Ord
 order _ TDbl  = return Ord
-order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
+order m t = throwEnv m "constraint check of Ord a => a ~ {} failed." [show t]
 
 bind :: (Object -> Object) -> UExp -> Env TExp
 bind f = withReaderT f . eval
@@ -163,13 +144,13 @@ predicate :: UExp -> Env TExp
 predicate = mapReaderT (return . (::: TBool) . f) . eval
   where
     f (Success (p ::: TBool)) = p
-    f (Success _) = True
-    f _           = False
+    f (Success _)             = True
+    f _                       = False
 
 resolve :: Meta -> Id -> Env TExp
 resolve m (Id i) = do
     mv <- Map.lookup i <$> ask
-    maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
+    maybe (throwEnv m "binding {} doesn't exist." [i]) (return . f) mv
   where
     f (String t)     = t     ::: TText
     f (Bool   b)     = b     ::: TBool
@@ -185,7 +166,7 @@ build _ (b ::: TBool) = return $ Build.build b ::: TBld
 build _ (n ::: TInt)  = return $ Build.build n ::: TBld
 build _ (d ::: TDbl)  = return $ Build.build d ::: TBld
 build _ (b ::: TBld)  = return $ b ::: TBld
-build m (_ ::: t)     = throw m "unable to render variable of type {}" [show t]
+build m (_ ::: t)     = throwEnv m "unable to render variable of type {}" [show t]
 
-throw :: Params ps => Meta -> Format -> ps -> Env a
-throw m f = lift . Error m . (:[]) . LText.unpack . format f
+throwEnv :: Params ps => Meta -> Format -> ps -> Env a
+throwEnv m f = lift . throw m f

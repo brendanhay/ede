@@ -28,6 +28,7 @@ library
 
     exposed-modules:
         Text.EDE
+      , Text.EDE.Aeson
 
     other-modules:
         Text.EDE.Internal.Compiler
@@ -40,7 +41,7 @@ library
     build-depends:
         aeson
       , attoparsec
-      , base                 >= 4.6 && < 5
+      , base                  >= 4.6 && < 5
       , parsec
       , text
       , text-format
