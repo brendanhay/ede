@@ -20,7 +20,7 @@ import qualified Data.Text               as Text
 import           Data.Text.Lazy          (Text)
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
-import           Text.EDE.Internal.Types
+import           Text.EDE.Internal.Types hiding (ident)
 import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (Error, runParser, parse)
 import           Text.Parsec.Error

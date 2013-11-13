@@ -39,7 +39,7 @@ instance Monad Result where
     Error m e >>= _ = Error m e
     Success a >>= k = k a
 
-newtype Id = Id Text
+newtype Id = Id { ident :: Text }
     deriving (Eq, Ord, Show)
 
 instance Buildable Id where
@@ -73,8 +73,8 @@ data RelOp
     | LessEqual
       deriving (Eq, Ord, Show)
 
-throw :: Params ps => Meta -> Format -> ps -> Result a
-throw m f = Error m . (:[]) . LText.unpack . format f
+throwError :: Params ps => Meta -> Format -> ps -> Result a
+throwError m f = Error m . (:[]) . LText.unpack . format f
 
 result :: (Meta -> [String] -> b) -> (a -> b) -> Result a -> b
 result f _ (Error m e) = f m e

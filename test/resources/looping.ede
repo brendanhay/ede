@@ -1,0 +1,12 @@
+{
+  "numbers": [1, 2, 3],
+  "strings": ["foo", "bar"]
+}
+---
+{% for n in numbers %}
+  {{ n }}
+{% endfor %}
+
+{% for var in strings %}
+  {{ var }}
+{% endfor %}

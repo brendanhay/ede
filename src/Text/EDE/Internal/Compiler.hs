@@ -22,6 +22,7 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
 import           Data.Aeson                 (Array, Object, Value(..))
 import           Data.Attoparsec.Number     (Number(..))
+import           Data.Foldable              (Foldable, any, foldlM)
 import qualified Data.HashMap.Strict        as Map
 import           Data.Monoid
 import           Data.Text                  (Text)
@@ -31,6 +32,7 @@ import           Data.Text.Format           (Format)
 import           Data.Text.Format.Params    (Params)
 import           Data.Text.Lazy.Builder     (Builder)
 import qualified Data.Vector                as Vector
+import           Prelude                    hiding (any)
 import           Text.EDE.Internal.Types
 
 -- FIXME:
@@ -79,7 +81,7 @@ eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
   where
     f (o ::: TMap) = bind (const o) e
     f (_ ::: t) =
-        throwEnv m "variable {} :: {} does not supported nested accessors."
+        throw m "variable {} :: {} does not supported nested accessors."
             [Text.unpack i, show t]
 eval (UApp m a b) = do
     a' ::: TBld <- f a
@@ -118,7 +120,30 @@ eval (UCond _ p a b) = do
     p' ::: TBool <- predicate p
     eval $ if p' then a else b
 
-eval e = throwEnv (getMeta e) "unable to evaluate unsupported expression {}" [show e]
+-- Indexed
+-- eval (ULoop m (UApp (UVar _ x) (UVar _ y)) v a b) =
+--     eval v >>= f >>= loop (Map.insert)
+
+-- Non-indexed
+eval (ULoop m (UVar _ i) v a b) =
+    eval v >>= f >>= loop (Map.insert $ ident i) a b
+  where
+    f :: TExp -> Env [Value]
+    f (xs ::: TList) = return $ Vector.toList xs
+    f (xs ::: TMap)  = return $ Map.elems xs
+    f (_  ::: t)     = throw m "invalid loop target {}" [show t]
+
+eval e = throw (getMeta e) "unable to evaluate unsupported expression {}" [show e]
+
+loop :: Foldable t => (a -> Object -> Object) -> UExp -> UExp -> t a -> Env TExp
+loop f a b xs
+    | const True `any` xs = fmap (::: TBld) $ foldlM iteration mempty xs
+    | otherwise           = eval b
+  where
+    iteration bld x = do
+        a' ::: at <- bind (f x) a
+        Eq        <- equal (getMeta a) at TBld
+        return $ bld <> a'
 
 equal :: Meta -> TType a -> TType b -> Env (Equal a b)
 equal _ TText TText = return Eq
@@ -128,14 +153,14 @@ equal _ TDbl  TDbl  = return Eq
 equal _ TBld  TBld  = return Eq
 equal _ TMap  TMap  = return Eq
 equal _ TList TList = return Eq
-equal m a b = throwEnv m "type equality check of {} ~ {} failed." [show a, show b]
+equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
 
 order :: Meta -> TType a -> Env (Order a)
 order _ TText = return Ord
 order _ TBool = return Ord
 order _ TInt  = return Ord
 order _ TDbl  = return Ord
-order m t = throwEnv m "constraint check of Ord a => a ~ {} failed." [show t]
+order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
 bind :: (Object -> Object) -> UExp -> Env TExp
 bind f = withReaderT f . eval
@@ -150,7 +175,7 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
 resolve :: Meta -> Id -> Env TExp
 resolve m (Id i) = do
     mv <- Map.lookup i <$> ask
-    maybe (throwEnv m "binding {} doesn't exist." [i]) (return . f) mv
+    maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
   where
     f (String t)     = t     ::: TText
     f (Bool   b)     = b     ::: TBool
@@ -166,7 +191,7 @@ build _ (b ::: TBool) = return $ Build.build b ::: TBld
 build _ (n ::: TInt)  = return $ Build.build n ::: TBld
 build _ (d ::: TDbl)  = return $ Build.build d ::: TBld
 build _ (b ::: TBld)  = return $ b ::: TBld
-build m (_ ::: t)     = throwEnv m "unable to render variable of type {}" [show t]
+build m (_ ::: t)     = throw m "unable to render variable of type {}" [show t]
 
-throwEnv :: Params ps => Meta -> Format -> ps -> Env a
-throwEnv m f = lift . throw m f
+throw :: Params ps => Meta -> Format -> ps -> Env a
+throw m f = lift . throwError m f

@@ -47,7 +47,7 @@ tests = files >>= mapM (fmap test . load)
         let (js, t) = split txt
             obj     = input js
         in  goldenVsStringDiff name diff (name ++ ".golden") $
-                either error output $ eitherCompile obj t
+                either error output $ eitherCompile t obj
 
     diff r n = ["diff", "-u", r, n]
 

@@ -62,4 +62,5 @@ extract :: ToJSON a => a -> Result Object
 extract x =
     case toJSON x of
         (Object o) -> return o
-        e -> throw (mkMeta "toObject") "invalid JSON top-level object {}" [show e]
+        e          -> throwError (mkMeta "toObject")
+            "invalid JSON top-level object {}" [show e]
