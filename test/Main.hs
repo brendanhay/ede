@@ -47,7 +47,7 @@ tests = files >>= mapM (fmap test . load)
         let (js, ede) = second (LText.drop 4) $ LText.breakOn "---" txt
             Just o    = fromJust . Aeson.decode $ LText.encodeUtf8 js
         in  goldenVsStringDiff name diff (name ++ ".golden") $
-                either error output $ render ede o
+                either error output $ eitherCompile o ede
 
     diff r n = ["diff", "-u", r, n]
 

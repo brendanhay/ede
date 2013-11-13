@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- Module      : Text.EDE
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
@@ -13,33 +14,60 @@
 -- |
 module Text.EDE
     (
-    -- * Rendering
-      render
-    , renderFile
+    -- * Types
+      Result   (..)
+    , Meta     (..)
+    , Template
+
+    -- * Single Pass
+    , compile
+    , eitherCompile
+
+    -- * Separate Passes
+    , parse
+    , render
+
+    -- * Convenience
+    , eitherResult
+    , result
+
+    , toLazyText
+    , object
+    , (.=)
     ) where
 
-import           Control.Monad.IO.Class        (MonadIO, liftIO)
-import           Control.Monad.Trans.Class     (lift)
-import           Data.Aeson                    (Object)
-import           Data.Text.Lazy                (Text)
-import           Data.Text.Lazy.Builder        (Builder)
-import qualified Data.Text.Lazy.IO             as LText
-import           Text.EDE.Internal.Compiler    (compile)
-import           Text.EDE.Internal.Environment (evaluate)
-import           Text.EDE.Internal.Parser      (runParser)
-import           Text.EDE.Internal.TypeChecker (typeCheck)
+import           Control.Monad
+import           Data.Aeson                 (Object, object, (.=))
+import qualified Data.Text.Lazy             as LText
+import           Data.Text.Lazy.Builder     (Builder, toLazyText)
+import qualified Text.EDE.Internal.Compiler as Compiler
+import qualified Text.EDE.Internal.Parser   as Parser
+import           Text.EDE.Internal.Types
 
 -- FIXME:
 -- syntax/semantic test suite
 -- criterion benchmarks
 
-render :: Text -> Object -> Either String Builder
-render tmpl obj = evaluate obj
-      $ lift (runParser "render" tmpl)
-    >>= typeCheck
-    >>= compile
+newtype Template = Template { template :: UExp }
+    deriving (Eq, Ord)
 
-renderFile :: MonadIO m => FilePath -> Object -> m (Either String Builder)
-renderFile path obj = do
-    tmpl <- liftIO $ LText.readFile path
-    return $ render tmpl obj
+compile :: Object -> LText.Text -> Result Builder
+compile o = render o <=< parse
+
+eitherCompile :: Object -> LText.Text -> Either String Builder
+eitherCompile o = eitherResult . compile o
+
+parse :: LText.Text -> Result Template
+parse = fmap Template . Parser.runParser
+
+render :: Object -> Template -> Result Builder
+render o = Compiler.render o . template
+
+eitherResult :: Result a -> Either String a
+eitherResult = result f Right
+  where
+    f Meta{..} e = Left . unlines $
+        [ "ED-E Error"
+        , "Position: " ++ concat [source, ":(", show row, ",", show column, ")"]
+        , "Messages:"
+        ] ++ e

@@ -1,6 +1,9 @@
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTs                     #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE StandaloneDeriving        #-}
 
 -- Module      : Text.EDE.Internal.Compiler
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
@@ -12,116 +15,175 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Compiler (compile) where
+module Text.EDE.Internal.Compiler where
 
 import           Control.Applicative
-import           Control.Monad                 (liftM2)
+import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
-import           Data.Aeson                    (Object, Value(..))
-import           Data.Attoparsec.Number        (Number(..))
-import           Data.Char                     (toLower)
-import           Data.Foldable                 (Foldable, foldrM)
-import qualified Data.HashMap.Strict           as Map
+import           Data.Aeson                 (Array, Object, Value(..))
+import           Data.Attoparsec.Number     (Number(..))
+import qualified Data.HashMap.Strict        as Map
 import           Data.Monoid
-import qualified Data.Text.Buildable           as Build
-import qualified Data.Text.Lazy                as LText
-import           Data.Text.Lazy.Builder        (Builder)
-import qualified Data.Vector                   as Vector
-import           Text.EDE.Internal.Environment
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import qualified Data.Text.Buildable        as Build
+import           Data.Text.Format           (Format, format)
+import           Data.Text.Format.Params    (Params)
+import qualified Data.Text.Lazy             as LText
+import           Data.Text.Lazy.Builder     (Builder)
+import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
+
+data TType a where
+    TText :: TType Text
+    TBool :: TType Bool
+    TInt  :: TType Integer
+    TDbl  :: TType Double
+    TBld  :: TType Builder
+    TMap  :: TType Object
+    TList :: TType Array
+
+deriving instance Show (TType a)
+
+class Type a where
+    typeof :: TType a
+
+instance Type Text    where typeof = TText
+instance Type Bool    where typeof = TBool
+instance Type Integer where typeof = TInt
+instance Type Double  where typeof = TDbl
+instance Type Builder where typeof = TBld
+instance Type Object  where typeof = TMap
+instance Type Array   where typeof = TList
+
+data TExp = forall a. a ::: TType a
+
+type Env = ReaderT Object Result
+
+data Equal a b where
+    Eq :: Equal a a
+
+data Order a where
+    Ord :: Ord a => Order a
 
 -- FIXME:
 -- Prevent rebinding/shadowing of variables
 
-compile :: TExp Frag -> Env Builder
-compile = (render =<<) . eval
+render :: Object -> UExp -> Result Builder
+render o e = flip runReaderT o $ do
+     r <- eval e
+     b <- build (Meta "render" 0 0) r
+     cast TBld b
 
-eval :: TExp a -> Env a
-eval (TFrag _ b) = return b
-eval (TText _ t) = return t
-eval (TBool _ b) = return b
-eval (TInt  _ i) = return i
-eval (TDbl  _ d) = return d
+cast :: TType a -> TExp -> Env a
+cast t (v ::: t') = do
+    Eq <- equal (Meta "src" 0 0) t t'
+    return v
 
-eval (TVar m i TTText) = require m i >>= \(String s)     -> return s
-eval (TVar m i TTBool) = require m i >>= \(Bool   b)     -> return b
-eval (TVar m i TTInt)  = require m i >>= \(Number (I n)) -> return n
-eval (TVar m i TTDbl)  = require m i >>= \(Number (D n)) -> return n
-eval (TVar m i TTMap)  = require m i >>= \(Object o)     -> return o
-eval (TVar m i TTList) = require m i >>= \(Array  a)     -> return a
-eval (TVar m i t) =
-    compileError m "type mistmatch for binding {} :: {}" [show i, show t]
+eval :: UExp -> Env TExp
+eval UNil = return $ mempty ::: TBld
 
-eval (TCons _ a b) = do
-    a' <- eval a
-    b' <- eval b
-    renderM2 a' b'
+eval (UText _ t) = return $ t ::: TText
+eval (UBool _ b) = return $ b ::: TBool
+eval (UInt  _ n) = return $ n ::: TInt
+eval (UDbl  _ d) = return $ d ::: TDbl
+eval (UBld  _ b) = return $ b ::: TBld
 
-eval (TNeg _ e) = not <$> eval e
+eval (UVar m i) = resolve m i
 
-eval (TBin _ And x y) = evalM2 (&&) x y
-eval (TBin _ Or  x y) = evalM2 (||) x y
-
-eval (TRel _ Equal        x y) = evalM2 (==) x y
-eval (TRel _ NotEqual     x y) = evalM2 (/=) x y
-eval (TRel _ Greater      x y) = evalM2 (>)  x y
-eval (TRel _ GreaterEqual x y) = evalM2 (>=) x y
-eval (TRel _ Less         x y) = evalM2 (<)  x y
-eval (TRel _ LessEqual    x y) = evalM2 (<=) x y
-
-eval (TCond _ p l r) = do
-    p' <- eval p
-    eval $ if p' then l else r
-
-eval (TLoop _ Bind{..} i@(TVar _ _ TTList) l r) = eval i >>= f
+eval (UApp _ UNil e) = eval e
+eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
   where
-    f x | Vector.null x   = eval r
-        | Just s' <- bSec = loop (indexed s') . zip indices $ Vector.toList x
-        | otherwise       = loop body x
-
-    indexed s' (v, n) = bind (Map.insert bPrim v . Map.insert s' n) l
-
-    indices = Number . I <$> [1..]
-
-    body v = bind (Map.insert bPrim v) l
-
-eval (TLoop _ Bind{..} i@(TVar _ _ TTMap) l r) = eval i >>= f
+    f (o ::: TMap) = bind (const o) e
+    f (_ ::: t) =
+        throw m "variable {} of type {} does not supported nested accessors."
+            [Text.unpack i, show t]
+eval (UApp m a b) = do
+    a' ::: TBld <- f a
+    b' ::: TBld <- f b
+    return $ (a' <> b') ::: TBld
   where
-    f x | Map.null x      = eval r
-        | Just s' <- bSec = loop (keyed s') $ Map.toList x
-        | otherwise       = loop body $ Map.elems x
+    f x = eval x >>= build m
 
-    keyed s' (k, v) = bind (Map.insert bPrim (String k) . Map.insert s' v) l
+eval (UNeg _ e) = do
+    e' ::: TBool <- predicate e
+    return $ not e' ::: TBool
 
-    body v = bind (Map.insert bPrim v) l
+eval (UBin _ op a b) = do
+    a' ::: TBool <- predicate a
+    b' ::: TBool <- predicate b
+    return $ f op a' b' ::: TBool
+  where
+    f And = (&&)
+    f Or  = (||)
 
-eval (TLoop m _ e _ _) =
-    compileError m "invalid loop expression {}" [show e]
+eval (URel m op a b) = do
+    a' ::: at <- eval a
+    b' ::: bt <- eval b
+    Eq  <- equal m at bt
+    Ord <- order m at
+    return $ f op a' b' ::: TBool
+  where
+    f Equal        = (==)
+    f NotEqual     = (/=)
+    f Greater      = (>)
+    f GreaterEqual = (>=)
+    f Less         = (<)
+    f LessEqual    = (<=)
 
-evalM2 :: (a -> a -> b) -> TExp a -> TExp a -> Env b
-evalM2 f x y = liftM2 f (eval x) (eval y)
+eval (UCond _ p a b) = do
+    p' ::: TBool <- predicate p
+    eval $ if p' then a else b
 
-bind :: (Object -> Object) -> TExp Frag -> Env Frag
+eval e = throw (metadata e) "unable to evaluate unsupported expression {}"
+    [show e]
+
+equal :: Meta -> TType a -> TType b -> Env (Equal a b)
+equal _ TText TText = return Eq
+equal _ TBool TBool = return Eq
+equal _ TInt  TInt  = return Eq
+equal _ TDbl  TDbl  = return Eq
+equal _ TBld  TBld  = return Eq
+equal _ TMap  TMap  = return Eq
+equal _ TList TList = return Eq
+equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
+
+order :: Meta -> TType a -> Env (Order a)
+order _ TText = return Ord
+order _ TBool = return Ord
+order _ TInt  = return Ord
+order _ TDbl  = return Ord
+order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
+
+bind :: (Object -> Object) -> UExp -> Env TExp
 bind f = withReaderT f . eval
 
-loop :: Foldable t => (a -> Env Frag) -> t a -> Env Frag
-loop f = foldrM (\v b -> f v >>= flip renderM2 b) (FBld mempty)
+predicate :: UExp -> Env TExp
+predicate = mapReaderT (return . (::: TBool) . f) . eval
+  where
+    f (Success _) = True
+    f _           = False
 
-renderM2 :: Frag -> Frag -> Env Frag
-renderM2 a b = FBld <$> liftM2 (<>) (render a) (render b)
+resolve :: Meta -> Id -> Env TExp
+resolve m (Id i) = do
+    mv <- Map.lookup i <$> ask
+    maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
+  where
+    f (String t)     = t     ::: TText
+    f (Bool   b)     = b     ::: TBool
+    f (Number (I n)) = n     ::: TInt
+    f (Number (D d)) = d     ::: TDbl
+    f (Object o)     = o     ::: TMap
+    f (Array  a)     = a     ::: TList
+    f Null           = False ::: TBool
 
-render :: Frag -> Env Builder
-render (FBld b)   = return b
-render (FVar m i) = require m i >>= build m
+build :: Meta -> TExp -> Env TExp
+build _ (t ::: TText) = return $ Build.build t ::: TBld
+build _ (b ::: TBool) = return $ Build.build b ::: TBld
+build _ (n ::: TInt)  = return $ Build.build n ::: TBld
+build _ (d ::: TDbl)  = return $ Build.build d ::: TBld
+build _ (b ::: TBld)  = return $ b ::: TBld
+build m (_ ::: t)     = throw m "unable to render variable of type {}" [show t]
 
-build :: Meta -> Value -> Env Builder
-build _ (Number (I n)) = return $ Build.build n
-build _ (Number (D d)) = return $ Build.build d
-build _ (Bool   b)     = return . Build.build . map toLower $ show b
-build _ (String s)     = return $ Build.build s
-build m (Object _)     = buildError m "object"
-build m (Array  _)     = buildError m "array"
-build m Null           = buildError m "null"
-
-buildError :: Meta -> LText.Text -> Env a
-buildError m = compileError m "unable to build {} value." . (:[])
+throw :: Params ps => Meta -> Format -> ps -> Env a
+throw m f = lift . Error m . (:[]) . LText.unpack . format f

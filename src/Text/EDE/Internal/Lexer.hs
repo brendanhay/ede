@@ -32,11 +32,8 @@ reservedOp = Parsec.reservedOp lexer
 stringLiteral :: Parser String
 stringLiteral = Parsec.stringLiteral lexer
 
-integerLiteral :: Parser Integer
-integerLiteral = Parsec.integer lexer
-
-doubleLiteral :: Parser Double
-doubleLiteral = Parsec.float lexer
+numberLiteral :: Parser (Either Integer Double)
+numberLiteral = Parsec.naturalOrFloat lexer
 
 symbol :: String -> Parser String
 symbol = Parsec.symbol lexer

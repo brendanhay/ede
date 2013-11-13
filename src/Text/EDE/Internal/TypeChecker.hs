@@ -17,6 +17,7 @@ import Control.Applicative
 import Control.Monad
 import Data.Aeson                    (Value(..))
 import Data.Attoparsec.Number        (Number(..))
+import System.IO.Unsafe
 import Text.EDE.Internal.Environment
 import Text.EDE.Internal.Types
 
@@ -40,10 +41,10 @@ check (UVar m i) = f <$> require m i
     f (Array  _)     = TVar m i TTList ::: TTList
     f Null           = TBool m False   ::: TTBool
 
-check (UCons m a b) = do
-    a' ::: TTFrag <- check a
-    b' ::: TTFrag <- check b
-    return $ TCons m a' b' ::: TTFrag
+-- check (UCons m a b) = do
+--     a' ::: TBld <- check a
+--     b' ::: TBld <- check b
+--     return $ TCons m a' b' ::: TTFrag
 
 check (UNeg m e) = do
     e' ::: TTBool <- predicate e
@@ -68,9 +69,16 @@ check (UCond m p l r) = do
     return $ TCond m p' l' r' ::: TTFrag
 
 check (ULoop m b i l r) = do
+    b' ::: bt <- get the type of the binding
+
+    -- get the value and type of the binding
+    -- check the consequent branch with the added binding
+
+    -- have the predicate checker verify that the binding exists
+
     c  ::: _      <- collection
-    l' ::: TTFrag <- check l
-    r' ::: TTFrag <- check r
+    l' ::: TTFrag <- withReaderT (Map.insert) $ check l
+    r' ::: TTFrag <- withREaderT $ check r
     return $ TLoop m b c l' r' ::: TTFrag
   where
     collection = do
@@ -80,6 +88,8 @@ check (ULoop m b i l r) = do
             TTList -> return u
             _ -> typeError m "unsupported collection type {} in loop." [show t]
 
+    bind (TVar _ k = withReaderT (Map.insert)
+
 cast :: TType a -> AExp -> Env (TExp a)
 cast t (e ::: t') = do
     Eq <- equal (tmeta e) t t'
@@ -87,7 +97,8 @@ cast t (e ::: t') = do
 
 predicate :: UExp -> Env AExp
 predicate x@(UVar m i) = do
-    p <- bound i
+    p' <- bound i
+    let p = unsafePerformIO (print (p', i, m) >> return p')
     y@(_ ::: ut) <- if p then check x else return $ TBool m False ::: TTBool
     return $ case ut of
         TTBool -> y

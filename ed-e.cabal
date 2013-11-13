@@ -30,11 +30,10 @@ library
         Text.EDE
 
     other-modules:
-        Text.EDE.Internal.Compiler
-      , Text.EDE.Internal.Environment
+        Text.EDE.Internal
+      , Text.EDE.Internal.Compiler
       , Text.EDE.Internal.Lexer
       , Text.EDE.Internal.Parser
-      , Text.EDE.Internal.TypeChecker
       , Text.EDE.Internal.Types
 
     ghc-options:       -Wall
