@@ -44,11 +44,19 @@ tests = files >>= mapM (fmap test . load)
         <*> pure (takeWhile (/= '.') f)
 
     test (txt, name) =
-        let (js, ede) = second (LText.drop 4) $ LText.breakOn "---" txt
-            Just o    = fromJust . Aeson.decode $ LText.encodeUtf8 js
+        let (js, t) = split txt
+            obj     = input js
         in  goldenVsStringDiff name diff (name ++ ".golden") $
-                either error output $ eitherCompile o ede
+                either error output $ eitherCompile obj t
 
     diff r n = ["diff", "-u", r, n]
 
-    output = return . LText.encodeUtf8 . toLazyText
+    split = second (LText.drop 4) . LText.breakOn "---"
+
+    input = fromMaybe (error "Failed parsing JSON")
+        . Aeson.decode
+        . LText.encodeUtf8
+
+    output = return
+        . LText.encodeUtf8
+        . toLazyText

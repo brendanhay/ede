@@ -14,30 +14,32 @@
 -- |
 module Text.EDE
     (
-    -- * Types
-      Result   (..)
-    , Meta     (..)
-    , Template
-
     -- * Single Pass
-    , compile
+      compile
     , eitherCompile
 
     -- * Separate Passes
+    , Template
     , parse
     , render
 
-    -- * Convenience
+    -- * Results
+    , Result   (..)
+    , Meta     (..)
     , eitherResult
     , result
 
-    , toLazyText
-    , object
+    -- * Data.Aeson
+    , object'
     , (.=)
+
+    -- * Data.Text.Lazy.Builder
+    , toLazyText
     ) where
 
 import           Control.Monad
-import           Data.Aeson                 (Object, object, (.=))
+import           Data.Aeson                 (object, (.=))
+import           Data.Aeson.Types           (Object, Value(..), Pair)
 import qualified Data.Text.Lazy             as LText
 import           Data.Text.Lazy.Builder     (Builder, toLazyText)
 import qualified Text.EDE.Internal.Compiler as Compiler
@@ -71,3 +73,6 @@ eitherResult = result f Right
         , "Position: " ++ concat [source, ":(", show row, ",", show column, ")"]
         , "Messages:"
         ] ++ e
+
+object' :: [Pair] -> Object
+object' = (\(Object o) -> o) . object

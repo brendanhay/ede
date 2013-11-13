@@ -34,6 +34,8 @@ import           Data.Text.Lazy.Builder     (Builder)
 import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
 
+type Env = ReaderT Object Result
+
 data TType a where
     TText :: TType Text
     TBool :: TType Bool
@@ -57,8 +59,6 @@ instance Type Object  where typeof = TMap
 instance Type Array   where typeof = TList
 
 data TExp = forall a. a ::: TType a
-
-type Env = ReaderT Object Result
 
 data Equal a b where
     Eq :: Equal a a
@@ -91,12 +91,13 @@ eval (UBld  _ b) = return $ b ::: TBld
 
 eval (UVar m i) = resolve m i
 
+eval (UApp _ e UNil) = eval e
 eval (UApp _ UNil e) = eval e
 eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
   where
     f (o ::: TMap) = bind (const o) e
     f (_ ::: t) =
-        throw m "variable {} of type {} does not supported nested accessors."
+        throw m "variable {} :: {} does not supported nested accessors."
             [Text.unpack i, show t]
 eval (UApp m a b) = do
     a' ::: TBld <- f a
@@ -161,6 +162,7 @@ bind f = withReaderT f . eval
 predicate :: UExp -> Env TExp
 predicate = mapReaderT (return . (::: TBool) . f) . eval
   where
+    f (Success (p ::: TBool)) = p
     f (Success _) = True
     f _           = False
 

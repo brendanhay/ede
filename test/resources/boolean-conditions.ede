@@ -3,6 +3,9 @@
 {% if true %}
 True
 {% endif %}
+{% if True %}
+True
+{% endif %}
 {% if yes %}
 yes
 {% endif %}
@@ -10,5 +13,5 @@ yes
 no
 {% endif %}
 {% if unknown %}
-no
+unknown
 {% endif %}

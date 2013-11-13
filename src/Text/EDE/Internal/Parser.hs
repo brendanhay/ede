@@ -139,8 +139,8 @@ literal = do
         ]
 
 true, false :: Parser Bool
-true  = res "true"  True
-false = res "false" False
+true  = res "True"  True
+false = res "False" False
 
 res :: String -> a -> Parser a
 res s = (reserved s >>) . return
