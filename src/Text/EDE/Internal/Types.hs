@@ -1,4 +1,5 @@
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RecordWildCards    #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
@@ -81,6 +82,15 @@ throwError m f = Error m . (:[]) . LText.unpack . format f
 result :: (Meta -> [String] -> b) -> (a -> b) -> Result a -> b
 result f _ (Error m e) = f m e
 result _ g (Success x) = g x
+
+eitherResult :: Result a -> Either String a
+eitherResult = result f Right
+  where
+    f Meta{..} e = Left . unlines $
+        [ "ED-E Error"
+        , "Position: " ++ concat [_source, ":(", show _row, ",", show _column, ")"]
+        , "Messages:"
+        ] ++ e
 
 mkMeta :: String -> Meta
 mkMeta n = Meta n 0 0

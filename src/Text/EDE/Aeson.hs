@@ -19,12 +19,6 @@ module Text.EDE.Aeson
     , parse
     , render
 
-    -- * Results
-    , Result (..)
-    , Meta   (..)
-    , eitherResult
-    , result
-
     -- * JSON Construction
     , toObject
     , (.=)
@@ -41,14 +35,14 @@ import qualified Text.EDE                as EDE
 import           Text.EDE                hiding (render)
 import           Text.EDE.Internal.Types
 
-render :: ToJSON a => Template -> a -> Result Builder
+render :: ToJSON a => Template -> a -> Either String Builder
 render t = EDE.render t <=< extract
 
 toObject :: [Pair] -> Object
 toObject = (\(Object o) -> o) . object
 
-extract :: ToJSON a => a -> Result Object
-extract x =
+extract :: ToJSON a => a -> Either String Object
+extract x = eitherResult $
     case toJSON x of
         (Object o) -> return o
         e          -> throwError (mkMeta "toObject")
