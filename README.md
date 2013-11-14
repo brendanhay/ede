@@ -25,11 +25,19 @@ type coercion, and unbound variable access are all considered errors.
 
 ## Usage
 
+Here's a contrived example demonstrating some of the expressions ED-E supports:
+
 **template.ede**:
 
 ```HTML+Django
-{# I'm a comment. #}
+{#
+  Conditional expressions test the result of the predicate.
 
+  In this case, because name is a variable it's presence (or absence) is tested.
+
+  The only exception to this is if name resolved to a boolean value in the
+  environment it's value would used as the predicate.
+#}
 {% if name %}
   Hello, {{ name }}!
 {% else %}
@@ -37,6 +45,10 @@ type coercion, and unbound variable access are all considered errors.
 {% endif %}
 
 {% for var in list %}
+  {#
+     The binding <name>.loop.* contains loop metadata which can be found
+     on line 153 of Compiler.hs
+  #}
   {% if var.loop.first %}
   first!
   {% endif %}
@@ -45,7 +57,12 @@ type coercion, and unbound variable access are all considered errors.
   last.
   {% endif %}
 
+  {# The value of a loop binding is access using <name>.value (or <name>.key for a hash key) #}
   {{ var.loop.index0 }} : {{ var.value }}
+{#
+  Specifying an else block within a for loop will cause the block to be evaluated
+  if the variable target of the for loop is absent or empty.
+#}
 {% else %}
   Empty list!
 {% endfor %}
