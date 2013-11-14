@@ -43,8 +43,8 @@ import           Text.EDE.Internal.Types
 newtype Template = Template { template :: UExp }
     deriving (Eq, Ord)
 
-parse :: Text -> Result Template
-parse = fmap Template . Parser.runParser
+parse :: Text -> Either String Template
+parse = eitherResult . fmap Template . Parser.runParser
 
-render :: Template -> Object -> Result Builder
-render t = Compiler.render (template t)
+render :: Object -> Template -> Either String Builder
+render o = eitherResult . (`Compiler.render` o) . template

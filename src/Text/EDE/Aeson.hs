@@ -19,12 +19,6 @@ module Text.EDE.Aeson
     , parse
     , render
 
-    -- * Results
-    , Result (..)
-    , Meta   (..)
-    , eitherResult
-    , result
-
     -- * JSON Construction
     , toObject
     , (.=)
@@ -33,20 +27,21 @@ module Text.EDE.Aeson
     , toLazyText
     ) where
 
-import           Control.Monad
 import           Data.Aeson              hiding (Result)
 import           Data.Aeson.Types        (Pair)
 import           Data.Text.Lazy.Builder  (Builder)
 import           Text.EDE                hiding (render)
 import qualified Text.EDE                as EDE
 
-render :: ToJSON a => Template -> a -> Result Builder
-render t = EDE.render t <=< extract
+render :: ToJSON a => a -> Template -> Either String Builder
+render x t = extract x >>= \o -> EDE.render o t
 
 toObject :: [Pair] -> Object
 toObject = (\(Object o) -> o) . object
 
-extract :: ToJSON a => a -> Result Object
-extract x = case toJSON x of
-    (Object o) -> return o
-    v          -> return $ toObject ["item" .= v]
+extract :: ToJSON a => a -> Either String Object
+extract x = eitherResult $
+    case toJSON x of
+        (Object o) -> return o
+        v          -> return $ toObject ["item" .= v]
+
