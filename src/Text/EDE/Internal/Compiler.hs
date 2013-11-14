@@ -26,13 +26,17 @@ import           Data.Aeson                 hiding (Result, Success)
 import           Data.Attoparsec.Number     (Number(..))
 import           Data.Foldable              (Foldable, foldlM)
 import qualified Data.HashMap.Strict        as Map
+import           Data.HashMap.Strict        (HashMap)
+import           Data.List                  (sortBy)
 import           Data.Monoid
+import           Data.Ord
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Buildable        as Build
 import           Data.Text.Format           (Format)
 import           Data.Text.Format.Params    (Params)
 import           Data.Text.Lazy.Builder     (Builder)
+import           Data.Vector                (Vector)
 import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
 
@@ -126,16 +130,17 @@ eval (UCond _ p a b) = do
 
 eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
   where
-    f :: TExp -> Env Col
     f (x ::: TList) = return $ Col (Vector.length x) (valued x)
     f (x ::: TMap)  = return $ Col (Map.size x) (keyed x)
     f (_  ::: t)    = throw (_meta v) "invalid loop target {}" [show t]
 
     -- vector: {{ var }}.loop, {{ var }}.value
+    valued :: Vector Value -> Vector (Maybe Text, Value)
     valued = Vector.map (Nothing,)
 
     -- hashmap: {{ var }}.loop, {{ var }}.key, {{ var }}.value
-    keyed  = map (first Just) . Map.toList
+    keyed :: HashMap Text Value -> [(Maybe Text, Value)]
+    keyed  = map (first Just) . sortBy (comparing fst) . Map.toList
 
 loop :: Text -> UExp -> UExp -> Col -> Env TExp
 loop _ _ b (Col 0 _)  = eval b
