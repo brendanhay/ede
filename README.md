@@ -1,6 +1,7 @@
 # ED-E
 
 * [Introduction](#introduction)
+* [Usage](#usage)
 * [Contribute](#contribute)
 * [Licence](#licence)
 
@@ -20,6 +21,26 @@ system services to HTML, or formatted emails.
 * Easy to debug. All parsing, type checking, and rendering steps report helpful
 error messages with line/column metadata. Variable shadowing, unprintable expressions,
 type coercion, and unbound variable access are all considered errors.
+
+
+## Usage
+
+```HTML+Django
+Hello, {{ name }}!
+```
+
+```haskell
+import           Control.Applicative ((<$>))
+import           Control.Monad       ((>=>))
+import qualified Data.Text.Lazy.IO   as LText
+import           Text.EDE.Aeson      (parse, render, toObject, (.=))
+
+main :: IO ()
+main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
+  where
+    name = "World" :: String
+    env  = toObject ["name" .= name]
+```
 
 
 ## Contribute
