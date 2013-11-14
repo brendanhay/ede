@@ -128,17 +128,15 @@ eval (UCond _ p a b) = do
 
 eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
   where
-    f (x ::: TList) = return $ Col (Vector.length x) (valued x)
-    f (x ::: TMap)  = return $ Col (Map.size x) (keyed x)
+    f (x ::: TList) = return $ Col (Vector.length x) (vec x)
+    f (x ::: TMap)  = return $ Col (Map.size x) (hmap x)
     f (_  ::: t)    = throw (_meta v) "invalid loop target {}" [show t]
 
-    -- vector: {{ var }}.loop, {{ var }}.value
-    valued :: Vector Value -> Vector (Maybe Text, Value)
-    valued = Vector.map (Nothing,)
+    vec :: Vector Value -> Vector (Maybe Text, Value)
+    vec = Vector.map (Nothing,)
 
-    -- hashmap: {{ var }}.loop, {{ var }}.key, {{ var }}.value
-    keyed :: HashMap Text Value -> [(Maybe Text, Value)]
-    keyed  = map (first Just) . sortBy (comparing fst) . Map.toList
+    hmap :: HashMap Text Value -> [(Maybe Text, Value)]
+    hmap  = map (first Just) . sortBy (comparing fst) . Map.toList
 
 loop :: Text -> UExp -> UExp -> Col -> Env TExp
 loop _ _ b (Col 0 _)  = eval b
