@@ -10,17 +10,17 @@
 }
 ---
 {% for n in numbers %}
-  {{ n }}
+  {{ n.value }}
 {% endfor %}
 
 {% for var in strings %}
-  {{ var }}
+  {{ var.value }}
 {% endfor %}
 
-{% for (idx, val) in indexed %}
-  {{ idx }}:{{ val }}
+{% for var in indexed %}
+  {{ var.loop.index }}:{{ var.value }}
 {% endfor %}
 
-{% for (key, val) in keyed %}
-  {{ key }}:{{ val }}
+{% for var in keyed %}
+  {{ var.key }}:{{ var.value }}
 {% endfor %}

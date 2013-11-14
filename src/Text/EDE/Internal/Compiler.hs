@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE StandaloneDeriving        #-}
+{-# LANGUAGE TupleSections             #-}
 
 -- Module      : Text.EDE.Internal.Compiler
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
@@ -21,9 +22,9 @@ import           Control.Applicative
 import           Control.Arrow              (first)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
-import           Data.Aeson                 (Array, Object, Value(..))
+import           Data.Aeson                 hiding (Result, Success)
 import           Data.Attoparsec.Number     (Number(..))
-import           Data.Foldable              (Foldable, any, foldlM)
+import           Data.Foldable              (Foldable, foldlM)
 import qualified Data.HashMap.Strict        as Map
 import           Data.Monoid
 import           Data.Text                  (Text)
@@ -33,7 +34,6 @@ import           Data.Text.Format           (Format)
 import           Data.Text.Format.Params    (Params)
 import           Data.Text.Lazy.Builder     (Builder)
 import qualified Data.Vector                as Vector
-import           Prelude                    hiding (any)
 import           Text.EDE.Internal.Types
 
 -- FIXME:
@@ -58,6 +58,9 @@ data Equal a b where
 
 data Order a where
     Ord :: Ord a => Order a
+
+data Col where
+    Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col
 
 render :: UExp -> Object -> Result Builder
 render e o = flip runReaderT o $ do
@@ -121,35 +124,43 @@ eval (UCond _ p a b) = do
     p' ::: TBool <- predicate p
     eval $ if p' then a else b
 
-eval (ULoop _ (UApp m (UVar _ x) (UVar _ y)) tgt a b) =
-    eval tgt >>= f >>= loop g a b
+eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
   where
-    f :: TExp -> Env [(Value, Value)]
-    f (xs ::: TList) = return . zip (Number . I <$> [1..]) $ Vector.toList xs
-    f (xs ::: TMap)  = return . map (first String) $ Map.toList xs
-    f (_  ::: t)     = throw m "invalid indexed loop target {}" [show t]
+    f :: TExp -> Env Col
+    f (x ::: TList) = return $ Col (Vector.length x) (valued x)
+    f (x ::: TMap)  = return $ Col (Map.size x) (keyed x)
+    f (_  ::: t)    = throw (_meta v) "invalid loop target {}" [show t]
 
-    g (k, v) = Map.insert (ident x) k . Map.insert (ident y) v
+    -- vector: {{ var }}.loop, {{ var }}.value
+    valued = Vector.map (Nothing,)
 
-eval (ULoop _ (UVar _ i) tgt a b) =
-    eval tgt >>= f >>= loop (Map.insert $ ident i) a b
+    -- hashmap: {{ var }}.loop, {{ var }}.key, {{ var }}.value
+    keyed  = map (first Just) . Map.toList
+
+loop :: Text -> UExp -> UExp -> Col -> Env TExp
+loop _ _ b (Col 0 _)  = eval b
+loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
   where
-    f :: TExp -> Env [Value]
-    f (xs ::: TList) = return $ Vector.toList xs
-    f (xs ::: TMap)  = return $ Map.elems xs
-    f (_  ::: t)     = throw (getMeta tgt) "invalid loop target {}" [show t]
+    iter (n, bld) x = do
+        shadow (_meta a) k
+        a' ::: at <- bind (Map.insert k $ ctx n x) a
+        Eq        <- equal (_meta a) at TBld
+        return (n + 1, bld <> a')
 
-eval e = throw (getMeta e) "unable to evaluate unsupported expression {}" [show e]
-
-loop :: Foldable t => (a -> Object -> Object) -> UExp -> UExp -> t a -> Env TExp
-loop f a b xs
-    | const True `any` xs = fmap (::: TBld) $ foldlM iteration mempty xs
-    | otherwise           = eval b
-  where
-    iteration bld x = do
-        a' ::: at <- bind (f x) a
-        Eq        <- equal (getMeta a) at TBld
-        return $ bld <> a'
+    ctx n (mk, v) = object $
+        [ "value" .= v
+        , "loop"  .= object
+             [ "length"     .= l                -- length of the loop
+             , "index"      .= n                -- index of the iteration
+             , "index0"     .= (n - 1)          -- zero based index of the iteration
+             , "remainder"  .= (l - n)          -- remaining number of iterations
+             , "remainder0" .= (l - n - 1)      -- zero based remaining number of iterations
+             , "first"      .= (n == 1)         -- is this the first iteration?
+             , "last"       .= (n == l)         -- is this the last iteration?
+             , "odd"        .= (n `mod` 2 == 1) -- is this an odd iteration?
+             , "even"       .= (n `mod` 2 == 0) -- is this an even iteration?
+             ]
+         ] ++ maybe [] (\x -> ["key" .= x]) mk
 
 equal :: Meta -> TType a -> TType b -> Env (Equal a b)
 equal _ TText TText = return Eq
@@ -177,6 +188,12 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
     f (Success (p ::: TBool)) = p
     f (Success _)             = True
     f _                       = False
+
+shadow :: Meta -> Text -> Env ()
+shadow m k = ask >>= maybe (return ()) f . Map.lookup k
+  where
+    f x = throw m "binding {} shadows existing variable {}."
+        [Text.unpack k, show x]
 
 resolve :: Meta -> Id -> Env TExp
 resolve m (Id i) = do

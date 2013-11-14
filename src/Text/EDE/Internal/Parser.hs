@@ -12,7 +12,7 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Control.Applicative     ((<$>), (<*>), (<*), (*>))
+import           Control.Applicative     ((<$>), (<*>), (<*))
 import           Control.Monad
 import           Data.Foldable           (foldr')
 import           Data.Monoid
@@ -20,7 +20,7 @@ import qualified Data.Text               as Text
 import           Data.Text.Lazy          (Text)
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
-import           Text.EDE.Internal.Types hiding (ident)
+import           Text.EDE.Internal.Types
 import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (Error, runParser, parse)
 import           Text.Parsec.Error
@@ -57,31 +57,23 @@ fragment = try var <|> bld
     next = void (char '{' >> oneOf "{%#")
 
 variable :: Parser UExp
-variable = pack $ sepBy1 ident (char '.')
+variable = pack $ sepBy1 (UVar <$> meta <*> ident) (char '.')
 
-ident :: Parser UExp
-ident = UVar <$> meta <*> (Id . Text.pack <$> identifier)
+ident :: Parser Id
+ident = Id . Text.pack <$> identifier
 
 loop :: Parser UExp
 loop = do
     m <- meta
-    (b, i) <- try $ section ((,)
-        <$> (reserved "for" >> binding)
-        <*> (reserved "in"  >> variable))
-    c <- consequent end
-    a <- alternative end
-    end
-    return $ ULoop m b i c a
+    uncurry (ULoop m)
+        <$> (try $ section ((,)
+            <$> (reserved "for" >> ident)
+            <*> (reserved "in"  >> variable)))
+        <*> consequent end
+        <*> alternative end
+         <* end
   where
     end = keyword "endfor"
-
-binding :: Parser UExp
-binding = "binding" ?? try pattern <|> ident
-  where
-    pattern = UApp
-        <$> meta
-        <*> (symbol "(" *> ident <* symbol ",")
-        <*> (ident <* symbol ")")
 
 conditional :: Parser UExp
 conditional = UCond
@@ -152,7 +144,7 @@ positionMeta :: SourcePos -> Meta
 positionMeta p = Meta (sourceName p) (sourceLine p) (sourceColumn p)
 
 pack :: Parser [UExp] -> Parser UExp
-pack = fmap (foldr' (\a b -> UApp (getMeta a) a b) UNil)
+pack = fmap (foldr' (\a b -> UApp (_meta a) a b) UNil)
 
 manyTill1 :: Stream s m t
           => ParsecT s u m a

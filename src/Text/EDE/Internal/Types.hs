@@ -20,9 +20,9 @@ import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 
 data Meta = Meta
-    { source :: !String
-    , row    :: !Int
-    , column :: !Int
+    { _source :: !String
+    , _row    :: !Int
+    , _column :: !Int
     } deriving (Eq, Ord, Show)
 
 data Result a
@@ -39,7 +39,7 @@ instance Monad Result where
     Error m e >>= _ = Error m e
     Success a >>= k = k a
 
-newtype Id = Id { ident :: Text }
+newtype Id = Id Text
     deriving (Eq, Ord, Show)
 
 instance Buildable Id where
@@ -58,8 +58,10 @@ data UExp
     | UBin  !Meta !BinOp !UExp !UExp
     | URel  !Meta !RelOp !UExp !UExp
     | UCond !Meta !UExp  !UExp !UExp
-    | ULoop !Meta !UExp  !UExp !UExp !UExp
+    | ULoop !Meta !Id    !UExp !UExp !UExp
       deriving (Eq, Ord, Show)
+
+-- FIXME: Case
 
 data BinOp = And | Or
     deriving (Eq, Ord, Show)
@@ -83,9 +85,9 @@ result _ g (Success x) = g x
 mkMeta :: String -> Meta
 mkMeta n = Meta n 0 0
 
-getMeta :: UExp -> Meta
-getMeta u = case u of
-    UNil            -> mkMeta "getMeta"
+_meta :: UExp -> Meta
+_meta u = case u of
+    UNil            -> mkMeta "_meta"
     UText m _       -> m
     UBool m _       -> m
     UInt  m _       -> m

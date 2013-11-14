@@ -64,6 +64,6 @@ eitherResult = result f Right
   where
     f Meta{..} e = Left . unlines $
         [ "ED-E Error"
-        , "Position: " ++ concat [source, ":(", show row, ",", show column, ")"]
+        , "Position: " ++ concat [_source, ":(", show _row, ",", show _column, ")"]
         , "Messages:"
         ] ++ e
