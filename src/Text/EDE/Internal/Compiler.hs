@@ -143,11 +143,11 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
   where
     iter (n, bld) x = do
         shadow (_meta a) k
-        a' ::: at <- bind (Map.insert k $ ctx n x) a
+        a' ::: at <- bind (Map.insert k $ context n x) a
         Eq        <- equal (_meta a) at TBld
         return (n + 1, bld <> a')
 
-    ctx n (mk, v) = object $
+    context n (mk, v) = object $
         [ "value" .= v
         , "loop"  .= object
              [ "length"     .= l                -- length of the loop
