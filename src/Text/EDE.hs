@@ -1,3 +1,6 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+
 -- Module      : Text.EDE
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -15,6 +18,12 @@ module Text.EDE
       Template
     , parse
     , render
+
+    -- * Results
+    , Result (..)
+    , Meta   (..)
+    , eitherResult
+    , result
 
     -- * Data.Text.Lazy.Builder
     , toLazyText
@@ -34,8 +43,8 @@ import           Text.EDE.Internal.Types
 newtype Template = Template { template :: UExp }
     deriving (Eq, Ord)
 
-parse :: Text -> Either String Template
-parse = eitherResult . fmap Template . Parser.runParser
+parse :: Text -> Result Template
+parse = fmap Template . Parser.runParser
 
-render :: Template -> Object -> Either String Builder
-render t = eitherResult . Compiler.render (template t)
+render :: Template -> Object -> Result Builder
+render t = Compiler.render (template t)
