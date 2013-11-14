@@ -18,6 +18,7 @@
 module Text.EDE.Internal.Compiler where
 
 import           Control.Applicative
+import           Control.Arrow              (first)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
 import           Data.Aeson                 (Array, Object, Value(..))
@@ -120,18 +121,23 @@ eval (UCond _ p a b) = do
     p' ::: TBool <- predicate p
     eval $ if p' then a else b
 
--- Indexed
--- eval (ULoop m (UApp (UVar _ x) (UVar _ y)) v a b) =
---     eval v >>= f >>= loop (Map.insert)
+eval (ULoop _ (UApp m (UVar _ x) (UVar _ y)) tgt a b) =
+    eval tgt >>= f >>= loop g a b
+  where
+    f :: TExp -> Env [(Value, Value)]
+    f (xs ::: TList) = return . zip (Number . I <$> [1..]) $ Vector.toList xs
+    f (xs ::: TMap)  = return . map (first String) $ Map.toList xs
+    f (_  ::: t)     = throw m "invalid indexed loop target {}" [show t]
 
--- Non-indexed
-eval (ULoop m (UVar _ i) v a b) =
-    eval v >>= f >>= loop (Map.insert $ ident i) a b
+    g (k, v) = Map.insert (ident x) k . Map.insert (ident y) v
+
+eval (ULoop _ (UVar _ i) tgt a b) =
+    eval tgt >>= f >>= loop (Map.insert $ ident i) a b
   where
     f :: TExp -> Env [Value]
     f (xs ::: TList) = return $ Vector.toList xs
     f (xs ::: TMap)  = return $ Map.elems xs
-    f (_  ::: t)     = throw m "invalid loop target {}" [show t]
+    f (_  ::: t)     = throw (getMeta tgt) "invalid loop target {}" [show t]
 
 eval e = throw (getMeta e) "unable to evaluate unsupported expression {}" [show e]
 
