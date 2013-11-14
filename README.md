@@ -25,9 +25,13 @@ type coercion, and unbound variable access are all considered errors.
 
 ## Usage
 
+`template.ede`
+
 ```HTML+Django
 Hello, {{ name }}!
 ```
+
+`Main.hs`
 
 ```haskell
 import           Control.Applicative ((<$>))
