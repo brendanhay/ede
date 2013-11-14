@@ -39,7 +39,6 @@ import           Data.Aeson.Types        (Pair)
 import           Data.Text.Lazy.Builder  (Builder)
 import           Text.EDE                hiding (render)
 import qualified Text.EDE                as EDE
-import           Text.EDE.Internal.Types
 
 render :: ToJSON a => Template -> a -> Result Builder
 render t = EDE.render t <=< extract
@@ -48,8 +47,6 @@ toObject :: [Pair] -> Object
 toObject = (\(Object o) -> o) . object
 
 extract :: ToJSON a => a -> Result Object
-extract x =
-    case toJSON x of
-        (Object o) -> return o
-        e          -> throwError (mkMeta "toObject")
-            "invalid JSON top-level object {}" [show e]
+extract x = case toJSON x of
+    (Object o) -> return o
+    v          -> return $ toObject ["item" .= v]
