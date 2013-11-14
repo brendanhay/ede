@@ -40,8 +40,6 @@ import           Data.Vector                (Vector)
 import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
 
--- FIXME:
--- Prevent rebinding/shadowing of variables
 type Env = ReaderT Object Result
 
 data TType a where
