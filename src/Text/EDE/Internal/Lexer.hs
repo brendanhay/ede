@@ -65,9 +65,9 @@ rules = Parsec.LanguageDef
     , Parsec.commentLine     = ""
     , Parsec.nestedComments  = False
     , Parsec.identStart      = letter <|> char '_'
-    , Parsec.identLetter     = alphaNum <|> oneOf "_'"
+    , Parsec.identLetter     = alphaNum <|> oneOf "_'-"
     , Parsec.opStart         = Parsec.opLetter rules
-    , Parsec.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
+    , Parsec.opLetter        = oneOf "!>=</|&"
     , Parsec.caseSensitive   = False
     , Parsec.reservedNames   = names
     , Parsec.reservedOpNames = operators

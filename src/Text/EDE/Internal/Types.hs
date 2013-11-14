@@ -13,6 +13,7 @@
 
 module Text.EDE.Internal.Types where
 
+import           Data.List               (intercalate)
 import           Data.Text               (Text)
 import           Data.Text.Buildable
 import           Data.Text.Format        (Format, format)
@@ -86,11 +87,11 @@ result _ g (Success x) = g x
 eitherResult :: Result a -> Either String a
 eitherResult = result f Right
   where
-    f Meta{..} e = Left . unlines $
-        [ "ED-E Error"
-        , "Position: " ++ concat [_source, ":(", show _row, ",", show _column, ")"]
-        , "Messages:"
-        ] ++ e
+    f Meta{..} e = Left . concat $
+        [ "ED-E error position: "
+        , concat [_source, ":(", show _row, ",", show _column, ")"]
+        , ", messages: " ++ intercalate ", " e
+        ]
 
 mkMeta :: String -> Meta
 mkMeta n = Meta n 0 0

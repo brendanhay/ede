@@ -30,8 +30,9 @@ module Text.EDE.Aeson
 import           Data.Aeson              hiding (Result)
 import           Data.Aeson.Types        (Pair)
 import           Data.Text.Lazy.Builder  (Builder)
-import           Text.EDE                hiding (render)
 import qualified Text.EDE                as EDE
+import           Text.EDE                hiding (render)
+import           Text.EDE.Internal.Types
 
 render :: ToJSON a => a -> Template -> Either String Builder
 render x t = extract x >>= \o -> EDE.render o t
@@ -43,5 +44,5 @@ extract :: ToJSON a => a -> Either String Object
 extract x = eitherResult $
     case toJSON x of
         (Object o) -> return o
-        v          -> return $ toObject ["item" .= v]
-
+        e          -> throwError (mkMeta "toObject")
+            "invalid JSON top-level object {}" [show e]
