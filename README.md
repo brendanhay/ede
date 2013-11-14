@@ -86,7 +86,6 @@ main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
 **Result**:
 
 ```
-
   Hello, World!
 
   first!
@@ -96,8 +95,7 @@ main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
   2 : 3
 ```
 
-
-A set of syntatic/semnatic fragments for all expressions can be found in the [tests](test/resources).
+A set of syntatic/semnatic fragments for all supported expressions can be found in the [tests](test/resources).
 
 
 ## Contribute
