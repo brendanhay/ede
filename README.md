@@ -46,6 +46,8 @@ main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
     env  = toObject ["name" .= name]
 ```
 
+A set of syntatic/semnatic fragments for all expressions can be found in the [tests](test/resources).
+
 
 ## Contribute
 
