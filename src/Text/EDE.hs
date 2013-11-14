@@ -19,12 +19,6 @@ module Text.EDE
     , parse
     , render
 
-    -- * Results
-    , Result (..)
-    , Meta   (..)
-    , eitherResult
-    , result
-
     -- * Data.Text.Lazy.Builder
     , toLazyText
     ) where
