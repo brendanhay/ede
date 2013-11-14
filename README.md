@@ -28,7 +28,27 @@ type coercion, and unbound variable access are all considered errors.
 **template.ede**:
 
 ```HTML+Django
-Hello, {{ name }}!
+{# I'm a comment. #}
+
+{% if name %}
+  Hello, {{ name }}!
+{% else %}
+  :(
+{% endif %}
+
+{% for var in list %}
+  {% if var.loop.first %}
+  first!
+  {% endif %}
+
+  {% if var.loop.last %}
+  last.
+  {% endif %}
+
+  {{ var.loop.index0 }} : {{ var.value }}
+{% else %}
+  Empty list!
+{% endfor %}
 ```
 
 **Main.hs**:
@@ -45,6 +65,20 @@ main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
     name = "World" :: String
     env  = toObject ["name" .= name]
 ```
+
+**Result**:
+
+```
+
+  Hello, World!
+
+  first!
+  0 : 1
+  1 : 2
+  last.
+  2 : 3
+```
+
 
 A set of syntatic/semnatic fragments for all expressions can be found in the [tests](test/resources).
 
