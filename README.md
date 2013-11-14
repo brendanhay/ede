@@ -79,8 +79,11 @@ import           Text.EDE.Aeson      (parse, render, toObject, (.=))
 main :: IO ()
 main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
   where
-    name = "World" :: String
-    env  = toObject ["name" .= name]
+    env = toObject
+        [ "name" .= "World"
+        , "list" .= [1, 2, 3]
+        , ""
+        ]
 ```
 
 **Result**:
