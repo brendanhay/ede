@@ -13,13 +13,9 @@
 
 -- |
 module Text.EDE
-             (
-    -- * Single Pass
-      compile
-    , eitherCompile
-
-    -- * Separate Passes
-    , Template
+    (
+    -- * Parsing and rendering
+      Template
     , parse
     , render
 
@@ -46,12 +42,6 @@ import           Text.EDE.Internal.Types
 
 newtype Template = Template { template :: UExp }
     deriving (Eq, Ord)
-
-compile :: Text -> Object -> Result Builder
-compile s o = parse s >>= (`render` o)
-
-eitherCompile :: Text -> Object -> Either String Builder
-eitherCompile s = eitherResult . compile s
 
 parse :: Text -> Result Template
 parse = fmap Template . Parser.runParser

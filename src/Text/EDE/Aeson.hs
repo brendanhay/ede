@@ -14,12 +14,8 @@
 -- |
 module Text.EDE.Aeson
     (
-    -- * Single Pass
-      compile
-    , eitherCompile
-
-    -- * Separate Passes
-    , Template
+    -- * Parsing and rendering
+      Template
     , parse
     , render
 
@@ -40,17 +36,10 @@ module Text.EDE.Aeson
 import           Control.Monad
 import           Data.Aeson              hiding (Result)
 import           Data.Aeson.Types        (Pair)
-import           Data.Text.Lazy          (Text)
 import           Data.Text.Lazy.Builder  (Builder)
-import           Text.EDE                hiding (compile, eitherCompile, render)
 import qualified Text.EDE                as EDE
+import           Text.EDE                hiding (render)
 import           Text.EDE.Internal.Types
-
-compile :: ToJSON a => Text -> a -> Result Builder
-compile s = EDE.compile s <=< extract
-
-eitherCompile :: ToJSON a => Text -> a -> Either String Builder
-eitherCompile s = eitherResult . compile s
 
 render :: ToJSON a => Template -> a -> Result Builder
 render t = EDE.render t <=< extract
