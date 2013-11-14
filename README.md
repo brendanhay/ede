@@ -82,7 +82,6 @@ main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
     env = toObject
         [ "name" .= "World"
         , "list" .= [1, 2, 3]
-        , ""
         ]
 ```
 
