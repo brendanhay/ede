@@ -28,7 +28,7 @@ for more information.
 ## Syntax
 
 A set of syntatic/semantic fragments for all supported expressions can be
-found in the [tests](test/resources) or the [documentation](http://brendanhay.github.io/ed-e/ed-e/Text-EDE.html).
+found in the [tests](test/resources) or the [documentation](http://brendanhay.github.io/ed-e/ed-e/Text-EDE.html#syntax).
 
 
 ## Contribute
