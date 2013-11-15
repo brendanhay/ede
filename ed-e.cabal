@@ -21,8 +21,8 @@ description:
     * Secure. No arbitrary code evaluation, with input data required to be fully specified
     at render time.
     .
-    * Stateless. Parsing and rendering are separate steps so that loading/parsing/embedding
-    of the template can optionally be done ahead of time.
+    * Stateless. Parsing and rendering are separate steps so that loading, parsing,
+    and embedding of the template can optionally be done ahead of time.
     .
     * Markup agnostic. ED-E is used to write out everything from configuration files for
     system services to HTML, or formatted emails.

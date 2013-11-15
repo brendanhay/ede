@@ -253,29 +253,29 @@ fromPairs = (\(Object o) -> o) . object
 -- The resulting binding within the iteration expression (in this case, @{{ var }}@) is
 -- an 'Object' containing the following keys:
 --
--- * @key :: Text@: They key if the loop target is an 'Object'
+-- * @key             :: Text@: They key if the loop target is an 'Object'
 --
--- * @value :: a@: The value of the loop target
+-- * @value           :: a@: The value of the loop target
 --
--- * @loop :: Object@: Loop metadata.
+-- * @loop            :: Object@: Loop metadata.
 --
--- * @loop.length :: Int@: Length of the loop
+-- * @loop.length     :: Int@: Length of the loop
 --
--- * @loop.index :: Int@: Index of the iteration
+-- * @loop.index      :: Int@: Index of the iteration
 --
--- * @loop.index0 :: Int@: Zero based index of the iteration
+-- * @loop.index0     :: Int@: Zero based index of the iteration
 --
--- * @loop.remainder :: Int@: Remaining number of iterations
+-- * @loop.remainder  :: Int@: Remaining number of iterations
 --
 -- * @loop.remainder0 :: Int@: Zero based remaining number of iterations
 --
--- * @loop.first :: Bool@: Is this the first iteration?
+-- * @loop.first      :: Bool@: Is this the first iteration?
 --
--- * @loop.last :: Bool@: Is this the last iteration?
+-- * @loop.last       :: Bool@: Is this the last iteration?
 --
--- * @loop.odd :: Bool@: Is this an odd iteration?
+-- * @loop.odd        :: Bool@: Is this an odd iteration?
 --
--- * @loop.even :: Bool@: Is this an even iteration?
+-- * @loop.even       :: Bool@: Is this an even iteration?
 --
 -- For example:
 --
