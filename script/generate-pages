@@ -7,7 +7,8 @@ set -o errexit
 cabal configure --disable-tests
 
 DOCDIR=`mktemp -d -t pages.XXXXXX`
-standalone-haddock -o $DOCDIR --package-db .cabal-sandbox/x86_64-osx-ghc-7.6.3-packages.conf.d/ .
+#standalone-haddock -o $DOCDIR --package-db .cabal-sandbox/x86_64-osx-ghc-7.6.3-packages.conf.d/ .
+cabal haddock --haddock-option=-o$DOCDIR
 
 HEAD=`git rev-parse HEAD`
 
