@@ -1,17 +1,25 @@
 { "yes": "graugh", "no": false }
 ---
 {% if true %}
-True
+true
 {% endif %}
+
 {% if True %}
 True
 {% endif %}
+
 {% if yes %}
-yes
+{{ yes }}
 {% endif %}
+
 {% if no %}
 no
 {% endif %}
+
 {% if unknown %}
 unknown
+{% endif %}
+
+{% if no || True %}
+{{ no }} || True
 {% endif %}
