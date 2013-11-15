@@ -13,7 +13,6 @@ cabal haddock --haddock-option=-o$DOCDIR
 HEAD=`git rev-parse HEAD`
 
 git checkout gh-pages
-git rm -rf --ignore-unmatch .
 
 mv $DOCDIR/* .
 
