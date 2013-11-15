@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -e
 set -x
 set -o errexit
 
@@ -14,6 +15,8 @@ git checkout gh-pages
 git rm -rf --ignore-unmatch .
 
 mv $DOCDIR/* .
-git add ed-e *.html *.js *.css *.gif *.png
 
+git add ed-e *.html *.js *.css *.gif *.png
 git commit -m "Generated documentation from $HEAD"
+git push origin gh-pages
+git checkout master
