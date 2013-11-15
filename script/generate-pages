@@ -14,7 +14,6 @@ git checkout gh-pages
 git rm -rf --ignore-unmatch .
 
 mv $DOCDIR/* .
-rm -rf dist/
 git add ed-e *.html *.js *.css *.gif *.png
 
 git commit -m "Generated documentation from $HEAD"
