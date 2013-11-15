@@ -11,13 +11,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </a><ul><li><a href="#g:8">Comments
 </a></li><li><a href="#g:9">Variables
 </a></li><li><a href="#g:10">Conditionals
-</a><ul><li><a href="#g:11">Boolean Logic
-</a></li><li><a href="#g:12">Relational Logic
-</a></li><li><a href="#g:13">Negation
-</a></li></ul></li><li><a href="#g:14">Case Statements
-</a></li><li><a href="#g:15">Loops
-</a><ul><li><a href="#g:16">Context
-</a></li></ul></li><li><a href="#g:17">Debugging
+</a></li><li><a href="#g:11">Loops
+</a></li><li><a href="#g:12">Debugging
 </a></li></ul></li></ul></div><div id="description"><p class="caption">Description</p><div class="doc"><p>A (mostly logicless) textual templating language in the same
  vein as <a href="https://github.com/Shopify/liquid">Liquid</a> or <a href="http://jinja.pocoo.org/docs/">Jinja2</a>.
 </p><p>(ED-E is a character from Fallout New Vegas, pronounced i&#720;-di&#720;-i&#720;, or Eddie.)
@@ -25,16 +20,17 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </h1><div class="doc"><p>A simple example of parsing and rendering <code>Text</code> containing a basic conditional
  expression and variable interpolation follows.
 </p><p>First the <code><a href="Text-EDE.html#t:Template">Template</a></code> is defined:
-</p><pre> &gt;&gt;&gt; let tmpl = parse &quot;{% if var %}Hello, {{ var }}!{% else %}negative!{% endif %}&quot; :: Result Template
-</pre><p>Then an <code>Object</code> is defined containing the environment which will be
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let tmpl = parse &quot;{% if var %}Hello, {{ var }}!{% else %}negative!{% endif %}&quot; :: Result Template
+</code></strong></pre><p>Then an <code>Object</code> is defined containing the environment which will be
  available to the <code><a href="Text-EDE.html#t:Template">Template</a></code> during rendering:
-</p><pre> &gt;&gt;&gt; let env = render $ fromPairs [ &quot;var&quot; .= &quot;World&quot; ] :: Template -&gt; Result Builder
-</pre><p>Finally the environment is applied to the <code><a href="Text-EDE.html#t:Template">Template</a></code>:
-</p><pre> &gt;&gt;&gt; tmpl &gt;&gt;= env :: Result Builder
- Success &quot;Hello, World!&quot;
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let env = render $ fromPairs [ &quot;var&quot; .= &quot;World&quot; ] :: Template -&gt; Result Builder
+</code></strong></pre><p>Finally the environment is applied to the <code><a href="Text-EDE.html#t:Template">Template</a></code>:
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>tmpl &gt;&gt;= env :: Result Builder
+</code></strong>&gt; Success &quot;Hello, World!&quot;
 </pre><p>In this manner, <code><a href="Text-EDE.html#t:Template">Template</a></code>s can be pre-compiled to the internal AST and
  the cost of parsing can be amortised if the same <code><a href="Text-EDE.html#t:Template">Template</a></code> is rendered multiple times.
-</p><p>Please see the <a href="#syntax">syntax</a> section for more information.
+</p><p>Please see the <a href="#syntax">syntax</a> section for more information about available
+ statements and expressions.
 </p></div><h1 id="g:2">Parsing and rendering
 </h1><div class="doc"><p>Parsing and rendering require two separate steps intentionally so that the
  more expensive result of parsing can be embedded, and/or reused.
@@ -52,12 +48,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </p></div></div><h1 id="g:3">Results and errors
 </h1><div class="doc"><p>Unsuccessful <code><a href="Text-EDE.html#v:parse">parse</a></code> or <code><a href="Text-EDE.html#v:render">render</a></code> steps can be inspected or analysed using
  <code><a href="Text-EDE.html#v:result">result</a></code>.
-</p><pre> &gt;&gt;&gt; result failure success $ parse tmpl &gt;&gt;= render env
-</pre><p>If you're only interested in dealing with errors as strings, and the positional
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>result failure success $ parse tmpl &gt;&gt;= render env
+</code></strong></pre><p>If you're only interested in dealing with errors as strings, and the positional
  information contained in <code><a href="Text-EDE.html#t:Meta">Meta</a></code> is not of use you can use the convenience functions
  <code><a href="Text-EDE.html#v:eitherParse">eitherParse</a></code>, <code><a href="Text-EDE.html#v:eitherRender">eitherRender</a></code>, or convert a <code><a href="Text-EDE.html#t:Result">Result</a></code> to <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Either.html#t:Either">Either</a></code> using <code><a href="Text-EDE.html#v:eitherResult">eitherResult</a></code>.
-</p><pre> &gt;&gt;&gt; either failure success $ eitherParse tmpl &gt;&gt;= eitherRender env
-</pre></div><div class="top"><p class="src"><span class="keyword">data</span>  <a name="t:Meta" class="def">Meta</a>  </p><div class="doc"><p>Meta information describing the source position of an expression or error.
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>either failure success $ eitherParse tmpl &gt;&gt;= eitherRender env
+</code></strong></pre></div><div class="top"><p class="src"><span class="keyword">data</span>  <a name="t:Meta" class="def">Meta</a>  </p><div class="doc"><p>Meta information describing the source position of an expression or error.
 </p></div><div class="subs constructors"><p class="caption">Constructors</p><table><tr><td class="src"><a name="v:Meta" class="def">Meta</a></td><td class="doc empty">&nbsp;</td></tr><tr><td colspan="2"><div class="subs fields"><p class="caption">Fields</p><dl><dt class="src"><a name="v:_source" class="def">_source</a> :: !<a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-String.html#t:String">String</a></dt><dd class="doc empty">&nbsp;</dd><dt class="src"><a name="v:_row" class="def">_row</a> :: !<a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Int.html#t:Int">Int</a></dt><dd class="doc empty">&nbsp;</dd><dt class="src"><a name="v:_column" class="def">_column</a> :: !<a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Int.html#t:Int">Int</a></dt><dd class="doc empty">&nbsp;</dd></dl><div class="clear"></div></div></td></tr></table></div><div class="subs instances"><p id="control.i:Meta" class="caption collapser" onclick="toggleSection('i:Meta')">Instances</p><div id="section.i:Meta" class="show"><table><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Eq.html#t:Eq">Eq</a> <a href="Text-EDE.html#t:Meta">Meta</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Ord.html#t:Ord">Ord</a> <a href="Text-EDE.html#t:Meta">Meta</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Text-Show.html#t:Show">Show</a> <a href="Text-EDE.html#t:Meta">Meta</a></td><td class="doc empty">&nbsp;</td></tr></table></div></div></div><div class="top"><p class="src"><span class="keyword">data</span>  <a name="t:Result" class="def">Result</a> a </p><div class="doc"><p>The result of running parsing or rendering steps.
 </p></div><div class="subs constructors"><p class="caption">Constructors</p><table><tr><td class="src"><a name="v:Error" class="def">Error</a> <a href="Text-EDE.html#t:Meta">Meta</a> [<a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-String.html#t:String">String</a>]</td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a name="v:Success" class="def">Success</a> a</td><td class="doc empty">&nbsp;</td></tr></table></div><div class="subs instances"><p id="control.i:Result" class="caption collapser" onclick="toggleSection('i:Result')">Instances</p><div id="section.i:Result" class="show"><table><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Control-Monad.html#t:Monad">Monad</a> <a href="Text-EDE.html#t:Result">Result</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Control-Monad.html#t:Functor">Functor</a> <a href="Text-EDE.html#t:Result">Result</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Eq.html#t:Eq">Eq</a> a =&gt; <a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Eq.html#t:Eq">Eq</a> (<a href="Text-EDE.html#t:Result">Result</a> a)</td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Ord.html#t:Ord">Ord</a> a =&gt; <a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Ord.html#t:Ord">Ord</a> (<a href="Text-EDE.html#t:Result">Result</a> a)</td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Text-Show.html#t:Show">Show</a> a =&gt; <a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Text-Show.html#t:Show">Show</a> (<a href="Text-EDE.html#t:Result">Result</a> a)</td><td class="doc empty">&nbsp;</td></tr></table></div></div></div><div class="top"><p class="src"><a name="v:eitherResult" class="def">eitherResult</a> ::  <a href="Text-EDE.html#t:Result">Result</a> a -&gt; <a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Either.html#t:Either">Either</a> <a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-String.html#t:String">String</a> a</p><div class="doc"><p>Convert a <code><a href="Text-EDE.html#t:Result">Result</a></code> to an <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Either.html#t:Either">Either</a></code> with the <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Either.html#v:Left">Left</a></code> case holding a formatted
  error message, and <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Either.html#v:Right">Right</a></code> being the successful result over which <code><a href="Text-EDE.html#t:Result">Result</a></code> is paramterised.
@@ -70,8 +66,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </h2><div class="doc"><p><code><a href="Text-EDE.html#v:fromPairs">fromPairs</a></code> is a wrapper around Aeson's <code>object</code> function which safely strips the outer
  <code>Value</code> constructor, providing the correct type signature for input into <code><a href="Text-EDE.html#v:render">render</a></code>.
 </p><p>It is used in combination with the re-exported <code><a href="Text-EDE.html#v:.-61-">.=</a></code> as follows:
-</p><pre> &gt;&gt;&gt; render (fromPairs [ &quot;foo&quot; .= &quot;value&quot;, &quot;bar&quot; .= 1 ]) :: Template -&gt; Result Builder
-</pre></div><div class="top"><p class="src"><a name="v:fromPairs" class="def">fromPairs</a> :: [Pair] -&gt; Object</p><div class="doc"><p>Create an <code>Object</code> from a list of name/value <code>Pair</code>s.
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>render (fromPairs [ &quot;foo&quot; .= &quot;value&quot;, &quot;bar&quot; .= 1 ]) :: Template -&gt; Result Builder
+</code></strong></pre></div><div class="top"><p class="src"><a name="v:fromPairs" class="def">fromPairs</a> :: [Pair] -&gt; Object</p><div class="doc"><p>Create an <code>Object</code> from a list of name/value <code>Pair</code>s.
  See <code>Aeson'</code>s documentation for more details.
 </p></div></div><div class="top"><p class="src"><a name="v:.-61-" class="def">(.=)</a> :: ToJSON a =&gt; Text -&gt; a -&gt; Pair</p></div><h2 id="g:6">Data.Text.Lazy.Builder
 </h2><div class="doc"><p>The successful result of rendering an <code>Object</code> environment and <code><a href="Text-EDE.html#t:Template">Template</a></code> is
@@ -88,7 +84,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </pre></div><h2 id="g:9">Variables
 </h2><div class="doc"><p>Variables are substituted directly for their <code>Buildable</code> representation.
  An error is raised if the varaible being substituted is not a literal type
- (ie. an <code>Array</code> or <code>Object</code>).
+ (ie. an <code>Array</code> or <code>Object</code>) or doesn't exist in the supplied environment.
 </p><pre> {{ var }}
 </pre><p>Nested variable access is also supported for variables which resolve to an <code>Object</code>.
  Dot delimiters are used to chain access through multiple nested <code>Object</code>s.
@@ -96,11 +92,66 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  non-nested variable access.
 </p><pre> {{ nested.var.access }}
 </pre></div><h2 id="g:10">Conditionals
-</h2><div class="doc empty">&nbsp;</div><h3 id="g:11">Boolean Logic
-</h3><div class="doc empty">&nbsp;</div><h3 id="g:12">Relational Logic
-</h3><div class="doc empty">&nbsp;</div><h3 id="g:13">Negation
-</h3><div class="doc empty">&nbsp;</div><h2 id="g:14">Case Statements
-</h2><div class="doc empty">&nbsp;</div><h2 id="g:15">Loops
-</h2><div class="doc empty">&nbsp;</div><h3 id="g:16">Context
-</h3><div class="doc empty">&nbsp;</div><h2 id="g:17">Debugging
+</h2><div class="doc"><p>A conditional is introduced and completed with the section syntax:
+</p><pre> {% if var %}
+    ... consequent expressions
+ {% else %}
+    ... alternate expressions
+ {% endif %}
+</pre><p>The value of <code>{{ var }}</code> determines the branch that is rendered by the template with
+ the else branch being optional.
+</p><p>In the case of a literal it conforms directly to the supported boolean or relation logical
+ operators from Haskell.
+ If a variable is singuarly used it's existence determines the result of the predicate,
+ the exception to this rule is boolean values which will be substituted into the
+ expression if they exist in the supplied environment.
+</p><p>The following logical expressions are supported as predicates in conditional statements
+ with parameters being type checked and an error is raised if the left and right
+ hand sides are not type equivalent.
+</p><ul><li> <code>And</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Bool.html#v:-38--38-">&amp;&amp;</a></code>
+</li><li> <code>Or</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Bool.html#v:-124--124-">||</a></code>
+</li><li> <code>Equal</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Eq.html#v:-61--61-">==</a></code>
+</li><li> <code>Not Equal</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Eq.html#v:-47--61-">/=</a></code>
+</li><li> <code>Greater</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Ord.html#v:-62-">&gt;</a></code>
+</li><li> <code>Greater Or Equal</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Ord.html#v:-62--61-">&gt;=</a></code>
+</li><li> <code>Less</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Ord.html#v:-60-">&lt;</a></code>
+</li><li> <code>Less Or Equal</code>: <code><a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Ord.html#v:-60--61-">&lt;=</a></code>
+</li><li> <code>Negation</code>: <code>!</code>
+</li></ul></div><h2 id="g:11">Loops
+</h2><div class="doc"><p>Iterating over an <code>Array</code> or <code>Object</code> can be acheived using the 'for ... in' section syntax.
+ Attempting to iterate over any other type will raise an error.
+</p><p>Example:
+</p><pre> {% for var in list %}
+     ... iteration expression
+ {% else %}
+     ... alternate expression
+ {% endfor %}
+</pre><p>The iteration branch is rendering per item with the else branch being (which is optional)
+ being rendered if the <code>{{ list }}</code> variable is empty.
+</p><p>When iterating over an <code>Object</code>, a stable sort using key equivalence is applied, <code>Array</code>s
+ are unmodified.
+</p><p>The resulting binding within the iteration expression (in this case, <code>{{ var }}</code>) is
+ an <code>Object</code> containing the following keys:
+</p><ul><li> <code>key :: Text</code>: They key if the loop target is an <code>Object</code>
+</li><li> <code>value :: a</code>: The value of the loop target
+</li><li> <code>loop :: Object</code>: Loop metadata.
+</li><li> <code>loop.length :: Int</code>: Length of the loop
+</li><li> <code>loop.index :: Int</code>: Index of the iteration
+</li><li> <code>loop.index0 :: Int</code>: Zero based index of the iteration
+</li><li> <code>loop.remainder :: Int</code>: Remaining number of iterations
+</li><li> <code>loop.remainder0 :: Int</code>: Zero based remaining number of iterations
+</li><li> <code>loop.first :: Bool</code>: Is this the first iteration?
+</li><li> <code>loop.last :: Bool</code>: Is this the last iteration?
+</li><li> <code>loop.odd :: Bool</code>: Is this an odd iteration?
+</li><li> <code>loop.even :: Bool</code>: Is this an even iteration?
+</li></ul><p>For example:
+</p><pre> {% for item in items %}
+     {{ item.index }}:{{ item.value }}
+     {% if item.last %}
+       the end.
+     {% endif %}
+ {% endfor %}
+</pre><p>Will render each item with it's (1-based) loop index as a prefix and the
+ text literal 'the end.' only once after then rest of the loop items have been rendered.
+</p></div><h2 id="g:12">Debugging
 </h2><div class="doc empty">&nbsp;</div></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2.1</p></div></body></html>
