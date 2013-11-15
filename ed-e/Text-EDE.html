@@ -2,12 +2,22 @@
 window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 //]]>
 </script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><a href="index.html">Contents</a></li><li><a href="doc-index.html">Index</a></li></ul><p class="caption">ed-e-0.1.0: Textual Templating Language</p></div><div id="content"><div id="module-header"><table class="info"><tr><th>Portability</th><td>non-portable (GHC extensions)</td></tr><tr><th>Stability</th><td>experimental</td></tr><tr><th>Maintainer</th><td>Brendan Hay &lt;brendan.g.hay@gmail.com&gt;</td></tr><tr><th>Safe Haskell</th><td>None</td></tr></table><p class="caption">Text.EDE</p></div><div id="table-of-contents"><p class="caption">Contents</p><ul><li><a href="#g:1">How to use this library
-</a><ul><li><a href="#g:2">Syntax
-</a></li></ul></li><li><a href="#g:3">Parsing and rendering
-</a></li><li><a href="#g:4">Results and errors
-</a></li><li><a href="#g:5">Convenience
-</a><ul><li><a href="#g:6">Data.Aeson
-</a></li><li><a href="#g:7">Data.Text.Lazy.Builder
+</a></li><li><a href="#g:2">Parsing and rendering
+</a></li><li><a href="#g:3">Results and errors
+</a></li><li><a href="#g:4">Convenience
+</a><ul><li><a href="#g:5">Data.Aeson
+</a></li><li><a href="#g:6">Data.Text.Lazy.Builder
+</a></li></ul></li><li><a href="#g:7">Syntax
+</a><ul><li><a href="#g:8">Comments
+</a></li><li><a href="#g:9">Variables
+</a></li><li><a href="#g:10">Conditionals
+</a><ul><li><a href="#g:11">Boolean Logic
+</a></li><li><a href="#g:12">Relational Logic
+</a></li><li><a href="#g:13">Negation
+</a></li></ul></li><li><a href="#g:14">Case Statements
+</a></li><li><a href="#g:15">Loops
+</a><ul><li><a href="#g:16">Context
+</a></li></ul></li><li><a href="#g:17">Debugging
 </a></li></ul></li></ul></div><div id="description"><p class="caption">Description</p><div class="doc"><p>A (mostly logicless) textual templating language in the same
  vein as <a href="https://github.com/Shopify/liquid">Liquid</a> or <a href="http://jinja.pocoo.org/docs/">Jinja2</a>.
 </p><p>(ED-E is a character from Fallout New Vegas, pronounced i&#720;-di&#720;-i&#720;, or Eddie.)
@@ -24,8 +34,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  Success &quot;Hello, World!&quot;
 </pre><p>In this manner, <code><a href="Text-EDE.html#t:Template">Template</a></code>s can be pre-compiled to the internal AST and
  the cost of parsing can be amortised if the same <code><a href="Text-EDE.html#t:Template">Template</a></code> is rendered multiple times.
-</p></div><h2 id="g:2">Syntax
-</h2><div class="doc empty">&nbsp;</div><h1 id="g:3">Parsing and rendering
+</p></div><h1 id="g:2">Parsing and rendering
 </h1><div class="doc"><p>Parsing and rendering require two separate steps intentionally so that the
  more expensive result of parsing can be embedded, and/or reused.
 </p><ul><li> Parsing tokenises the input and converts it to an internal AST representation,
@@ -39,7 +48,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  and convert the <code><a href="Text-EDE.html#t:Result">Result</a></code> using <code><a href="Text-EDE.html#v:eitherResult">eitherResult</a></code>.
 </p></div></div><div class="top"><p class="src"><a name="v:eitherRender" class="def">eitherRender</a> :: Object -&gt; <a href="Text-EDE.html#t:Template">Template</a> -&gt; <a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-Either.html#t:Either">Either</a> <a href="http://hackage.haskell.org/packages/archive/base/4.6.0.1/doc/html/Data-String.html#t:String">String</a> Builder</p><div class="doc"><p>Render an <code>Object</code> using the supplied <code><a href="Text-EDE.html#t:Template">Template</a></code>,
  and convert the <code><a href="Text-EDE.html#t:Result">Result</a></code> using <code><a href="Text-EDE.html#v:eitherResult">eitherResult</a></code>.
-</p></div></div><h1 id="g:4">Results and errors
+</p></div></div><h1 id="g:3">Results and errors
 </h1><div class="doc"><p>Unsuccessful <code><a href="Text-EDE.html#v:parse">parse</a></code> or <code><a href="Text-EDE.html#v:render">render</a></code> steps can be inspected or analysed using
  <code><a href="Text-EDE.html#v:result">result</a></code>.
 </p><pre> &gt;&gt;&gt; result failure success $ parse tmpl &gt;&gt;= render env
@@ -55,15 +64,41 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </p></td></tr><tr><td class="src">-&gt; (a -&gt; b)</td><td class="doc"><p>Function to apply to the <code><a href="Text-EDE.html#v:Success">Success</a></code> case.
 </p></td></tr><tr><td class="src">-&gt; <a href="Text-EDE.html#t:Result">Result</a> a</td><td class="doc"><p>The <code><a href="Text-EDE.html#t:Result">Result</a></code> to map over.
 </p></td></tr><tr><td class="src">-&gt; b</td><td class="doc empty">&nbsp;</td></tr></table></div><div class="doc"><p>Perform a case analysis on a <code><a href="Text-EDE.html#t:Result">Result</a></code>.
-</p></div></div><h1 id="g:5">Convenience
-</h1><h2 id="g:6">Data.Aeson
+</p></div></div><h1 id="g:4">Convenience
+</h1><h2 id="g:5">Data.Aeson
 </h2><div class="doc"><p><code><a href="Text-EDE.html#v:fromPairs">fromPairs</a></code> is a wrapper around Aeson's <code>object</code> function which safely strips the outer
  <code>Value</code> constructor, providing the correct type signature for input into <code><a href="Text-EDE.html#v:render">render</a></code>.
 </p><p>It is used in combination with the re-exported <code><a href="Text-EDE.html#v:.-61-">.=</a></code> as follows:
 </p><pre> &gt;&gt;&gt; render (fromPairs [ &quot;foo&quot; .= &quot;value&quot;, &quot;bar&quot; .= 1 ]) :: Template -&gt; Result Builder
 </pre></div><div class="top"><p class="src"><a name="v:fromPairs" class="def">fromPairs</a> :: [Pair] -&gt; Object</p><div class="doc"><p>Create an <code>Object</code> from a list of name/value <code>Pair</code>s.
  See <code>Aeson'</code>s documentation for more details.
-</p></div></div><div class="top"><p class="src"><a name="v:.-61-" class="def">(.=)</a> :: ToJSON a =&gt; Text -&gt; a -&gt; Pair</p></div><h2 id="g:7">Data.Text.Lazy.Builder
+</p></div></div><div class="top"><p class="src"><a name="v:.-61-" class="def">(.=)</a> :: ToJSON a =&gt; Text -&gt; a -&gt; Pair</p></div><h2 id="g:6">Data.Text.Lazy.Builder
 </h2><div class="doc"><p>The successful result of rendering an <code>Object</code> environment and <code><a href="Text-EDE.html#t:Template">Template</a></code> is
  a lazy <code>Builder</code> which can be converted to <code>Text</code> using the re-exported <code><a href="Text-EDE.html#v:toLazyText">toLazyText</a></code>.
-</p></div><div class="top"><p class="src"><a name="v:toLazyText" class="def">toLazyText</a> :: Builder -&gt; Text</p></div></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2.1</p></div></body></html>
+</p></div><div class="top"><p class="src"><a name="v:toLazyText" class="def">toLazyText</a> :: Builder -&gt; Text</p></div><h1 id="g:7">Syntax
+</h1><h2 id="g:8">Comments
+</h2><div class="doc"><p>Comments are ignored by the parser and omitted from the rendered output.
+</p><pre> {# singleline comment #}
+</pre><pre> {#
+    multiline
+    comment
+ #}
+</pre></div><h2 id="g:9">Variables
+</h2><div class="doc"><p>Variables are substituted directly for their <code>Buildable</code> representation.
+ An error is raised if the varaible being substituted is not a literal type
+ (ie. an <code>Array</code> or <code>Object</code>).
+</p><pre> {{ var }}
+</pre><p>Nested variable access is also supported for variables which resolve to an <code>Object</code>.
+ Dot delimiters are used to chain access through multiple nested <code>Object</code>s.
+ The right-most accessor must resolve to a <code>Buildable</code> type as with the previous
+ non-nested variable access.
+</p><pre> {{ nested.var.access }}
+</pre></div><h2 id="g:10">Conditionals
+</h2><div class="doc empty">&nbsp;</div><h3 id="g:11">Boolean Logic
+</h3><div class="doc empty">&nbsp;</div><h3 id="g:12">Relational Logic
+</h3><div class="doc empty">&nbsp;</div><h3 id="g:13">Negation
+</h3><div class="doc empty">&nbsp;</div><h2 id="g:14">Case Statements
+</h2><div class="doc empty">&nbsp;</div><h2 id="g:15">Loops
+</h2><div class="doc empty">&nbsp;</div><h3 id="g:16">Context
+</h3><div class="doc empty">&nbsp;</div><h2 id="g:17">Debugging
+</h2><div class="doc empty">&nbsp;</div></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2.1</p></div></body></html>
