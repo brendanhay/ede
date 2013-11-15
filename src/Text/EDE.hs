@@ -22,6 +22,9 @@ module Text.EDE
     -- * How to use this library
     -- $usage
 
+    -- ** Syntax
+    -- $syntax
+
     -- * Parsing and rendering
     -- $parsing_and_rendering
       Template
@@ -43,7 +46,7 @@ module Text.EDE
     , fromPairs
     , (.=)
 
-    -- ** 'Builder'
+    -- ** Data.Text.Lazy.Builder
     -- $output
     , toLazyText
     ) where
@@ -103,7 +106,7 @@ fromPairs = (\(Object o) -> o) . object
 -- > Success "Hello, World!"
 --
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
--- the cost of parsing can be amortised if the same 'Template' rendered multiple times.
+-- the cost of parsing can be amortised if the same 'Template' is rendered multiple times.
 
 -- $parsing_and_rendering
 --
@@ -142,3 +145,6 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- The successful result of rendering an 'Object' environment and 'Template' is
 -- a lazy 'Builder' which can be converted to 'Text' using the re-exported 'toLazyText'.
+
+-- $syntax
+--
