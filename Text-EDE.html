@@ -132,26 +132,26 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  are unmodified.
 </p><p>The resulting binding within the iteration expression (in this case, <code>{{ var }}</code>) is
  an <code>Object</code> containing the following keys:
-</p><ul><li> <code>key :: Text</code>: They key if the loop target is an <code>Object</code>
-</li><li> <code>value :: a</code>: The value of the loop target
-</li><li> <code>loop :: Object</code>: Loop metadata.
-</li><li> <code>loop.length :: Int</code>: Length of the loop
-</li><li> <code>loop.index :: Int</code>: Index of the iteration
-</li><li> <code>loop.index0 :: Int</code>: Zero based index of the iteration
-</li><li> <code>loop.remainder :: Int</code>: Remaining number of iterations
-</li><li> <code>loop.remainder0 :: Int</code>: Zero based remaining number of iterations
-</li><li> <code>loop.first :: Bool</code>: Is this the first iteration?
-</li><li> <code>loop.last :: Bool</code>: Is this the last iteration?
-</li><li> <code>loop.odd :: Bool</code>: Is this an odd iteration?
-</li><li> <code>loop.even :: Bool</code>: Is this an even iteration?
+</p><ul><li> <code>key        :: Text</code>: They key if the loop target is an <code>Object</code>
+</li><li> <code>value      :: a</code>: The value of the loop target
+</li><li> <code>loop       :: Object</code>: Loop metadata.
+</li><li> <code>length     :: Int</code>: Length of the loop
+</li><li> <code>index      :: Int</code>: Index of the iteration
+</li><li> <code>index0     :: Int</code>: Zero based index of the iteration
+</li><li> <code>remainder  :: Int</code>: Remaining number of iterations
+</li><li> <code>remainder0 :: Int</code>: Zero based remaining number of iterations
+</li><li> <code>first      :: Bool</code>: Is this the first iteration?
+</li><li> <code>last       :: Bool</code>: Is this the last iteration?
+</li><li> <code>odd        :: Bool</code>: Is this an odd iteration?
+</li><li> <code>even       :: Bool</code>: Is this an even iteration?
 </li></ul><p>For example:
 </p><pre> {% for item in items %}
      {{ item.index }}:{{ item.value }}
-     {% if item.last %}
-       the end.
+     {% if !item.last %}
+
      {% endif %}
  {% endfor %}
-</pre><p>Will render each item with it's (1-based) loop index as a prefix and the
- text literal 'the end.' only once after then rest of the loop items have been rendered.
+</pre><p>Will render each item with it's (1-based) loop index as a prefix, separated
+ by a blank newline, without a trailing at the end of the document.
 </p></div><h2 id="g:12">Debugging
 </h2><div class="doc empty">&nbsp;</div></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2.1</p></div></body></html>
