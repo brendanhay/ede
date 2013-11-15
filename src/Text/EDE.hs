@@ -137,7 +137,7 @@ fromPairs = (\(Object o) -> o) . object
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
 -- the cost of parsing can be amortised if the same 'Template' is rendered multiple times.
 --
--- Please see "Text.EDE#syntax" for more information.
+-- Please see the <#syntax syntax> section for more information.
 
 -- $parsing_and_rendering
 --
