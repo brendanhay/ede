@@ -22,11 +22,13 @@ system services to HTML, or formatted emails.
 error messages with line/column metadata. Variable shadowing, unprintable expressions,
 type coercion, and unbound variable access are all considered errors.
 
-Please see the [Hackage documentation](http://brendanhay.github.io/ed-e/ed-e/Text-EDE.html) for more information.
+Please see the [Hackage documentation](http://brendanhay.github.io/ed-e/ed-e/Text-EDE.html)
+for more information.
 
 ## Syntax
 
-A set of syntatic/semnatic fragments for all supported expressions can be found in the [tests](test/resources).
+A set of syntatic/semantic fragments for all supported expressions can be
+found in the [tests](test/resources) or the [Hackage documentation](http://brendanhay.github.io/ed-e/ed-e/Text-EDE.html).
 
 
 ## Contribute

@@ -22,9 +22,6 @@ module Text.EDE
     -- * How to use this library
     -- $usage
 
-    -- ** Syntax
-    -- $syntax
-
     -- * Parsing and rendering
     -- $parsing_and_rendering
       Template
@@ -49,10 +46,42 @@ module Text.EDE
     -- ** Data.Text.Lazy.Builder
     -- $output
     , toLazyText
+
+    -- * Syntax
+    -- ** Comments
+    -- $comments
+
+    -- ** Variables
+    -- $variables
+
+    -- ** Conditionals
+    -- $conditionals
+
+    -- *** Boolean Logic
+    -- $boolean_logic
+
+    -- *** Relational Logic
+    -- $relational_logic
+
+    -- *** Negation
+    -- $negation
+
+    -- ** Case Statements
+    -- $case_statements
+
+    -- ** Loops
+    -- $loops
+
+    -- *** Context
+    -- $context
+
+    -- ** Debugging
+    -- $debugging
     ) where
 
 import           Data.Aeson                 (object, (.=))
-import           Data.Aeson.Types           (Object, Pair, Value(..))
+import           Data.Aeson.Types           (Array, Object, Pair, Value(..))
+import           Data.Text.Buildable        (Buildable)
 import           Data.Text.Lazy             (Text)
 import           Data.Text.Lazy.Builder     (Builder, toLazyText)
 import qualified Text.EDE.Internal.Compiler as Compiler
@@ -146,5 +175,53 @@ fromPairs = (\(Object o) -> o) . object
 -- The successful result of rendering an 'Object' environment and 'Template' is
 -- a lazy 'Builder' which can be converted to 'Text' using the re-exported 'toLazyText'.
 
--- $syntax
+-- $comments
+--
+-- Comments are ignored by the parser and omitted from the rendered output.
+--
+-- > {# singleline comment #}
+--
+-- > {#
+-- >    multiline
+-- >    comment
+-- > #}
+--
+
+-- $variables
+--
+-- Variables are substituted directly for their 'Buildable' representation.
+-- An error is raised if the varaible being substituted is not a literal type
+-- (ie. an 'Array' or 'Object').
+--
+-- > {{ var }}
+--
+-- Nested variable access is also supported for variables which resolve to an 'Object'.
+-- Dot delimiters are used to chain access through multiple nested 'Object's.
+-- The right-most accessor must resolve to a 'Buildable' type as with the previous
+-- non-nested variable access.
+--
+-- > {{ nested.var.access }}
+
+-- $conditionals
+--
+
+-- $boolean_logic
+--
+
+-- $relational_logic
+--
+
+-- $negation
+--
+
+-- $case_statements
+--
+
+-- $loops
+--
+
+-- $context
+--
+
+-- $debugging
 --
