@@ -34,6 +34,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  Success &quot;Hello, World!&quot;
 </pre><p>In this manner, <code><a href="Text-EDE.html#t:Template">Template</a></code>s can be pre-compiled to the internal AST and
  the cost of parsing can be amortised if the same <code><a href="Text-EDE.html#t:Template">Template</a></code> is rendered multiple times.
+</p><p>Please see the <a href="#syntax">syntax</a> section for more information.
 </p></div><h1 id="g:2">Parsing and rendering
 </h1><div class="doc"><p>Parsing and rendering require two separate steps intentionally so that the
  more expensive result of parsing can be embedded, and/or reused.
@@ -77,7 +78,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  a lazy <code>Builder</code> which can be converted to <code>Text</code> using the re-exported <code><a href="Text-EDE.html#v:toLazyText">toLazyText</a></code>.
 </p></div><div class="top"><p class="src"><a name="v:toLazyText" class="def">toLazyText</a> :: Builder -&gt; Text</p></div><h1 id="g:7">Syntax
 </h1><h2 id="g:8">Comments
-</h2><div class="doc"><p>Comments are ignored by the parser and omitted from the rendered output.
+</h2><div class="doc"><p><a name="syntax"></a>
+</p><p>Comments are ignored by the parser and omitted from the rendered output.
 </p><pre> {# singleline comment #}
 </pre><pre> {#
     multiline
