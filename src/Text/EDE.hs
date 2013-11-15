@@ -57,14 +57,8 @@ module Text.EDE
     -- ** Conditionals
     -- $conditionals
 
-    -- *** Logic
-    -- $logic
-
     -- ** Loops
     -- $loops
-
-    -- *** Context
-    -- $context
 
     -- ** Debugging
     -- $debugging
@@ -128,7 +122,8 @@ fromPairs = (\(Object o) -> o) . object
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
 -- the cost of parsing can be amortised if the same 'Template' is rendered multiple times.
 --
--- Please see the <#syntax syntax> section for more information.
+-- Please see the <#syntax syntax> section for more information about available
+-- statements and expressions.
 
 -- $parsing_and_rendering
 --
@@ -205,16 +200,14 @@ fromPairs = (\(Object o) -> o) . object
 -- >    ... alternate expressions
 -- > {% endif %}
 --
--- The value of @{{ var }}@ determines the branch that is rendered by the template.
+-- The value of @{{ var }}@ determines the branch that is rendered by the template with
+-- the else branch being optional.
 --
 -- In the case of a literal it conforms directly to the supported boolean or relation logical
 -- operators from Haskell.
 -- If a variable is singuarly used it's existence determines the result of the predicate,
 -- the exception to this rule is boolean values which will be substituted into the
 -- expression if they exist in the supplied environment.
---
-
--- $logic
 --
 -- The following logical expressions are supported as predicates in conditional statements
 -- with parameters being type checked and an error is raised if the left and right
@@ -240,34 +233,53 @@ fromPairs = (\(Object o) -> o) . object
 
 -- $loops
 --
-
--- $context
+-- Iterating over an 'Array' or 'Object' can be acheived using the 'for ... in' section syntax.
+-- Attempting to iterate over any other type will raise an error.
 --
--- The following variables are available inside a loop expression by applying an
--- accessor to the bound variable:
+-- Example:
 --
--- * @length :: Int@: length of the loop
+-- > {% for var in list %}
+-- >     ... iteration expression
+-- > {% else %}
+-- >     ... alternate expression
+-- > {% endfor %}
 --
--- * @index :: Int@: index of the iteration
+-- The iteration branch is rendering per item with the else branch being (which is optional)
+-- being rendered if the @{{ list }}@ variable is empty.
 --
--- * @index0 :: Int@: zero based index of the iteration
+-- When iterating over an 'Object', a stable sort using key equivalence is applied, 'Array's
+-- are unmodified.
 --
--- * @remainder :: Int@: remaining number of iterations
+-- The resulting binding within the iteration expression (in this case, @{{ var }}@) is
+-- an 'Object' containing the following keys:
 --
--- * @remainder0 :: Int@: zero based remaining number of iterations
+-- * @key :: Text@: They key if the loop target is an 'Object'
 --
--- * @first :: Bool@: is this the first iteration?
+-- * @value :: a@: The value of the loop target
 --
--- * @last :: Bool@: is this the last iteration?
+-- * @loop :: Object@: Loop metadata.
 --
--- * @odd :: Bool@: is this an odd iteration?
+-- * @loop.length :: Int@: Length of the loop
 --
--- * @even :: Bool@: is this an even iteration?
+-- * @loop.index :: Int@: Index of the iteration
+--
+-- * @loop.index0 :: Int@: Zero based index of the iteration
+--
+-- * @loop.remainder :: Int@: Remaining number of iterations
+--
+-- * @loop.remainder0 :: Int@: Zero based remaining number of iterations
+--
+-- * @loop.first :: Bool@: Is this the first iteration?
+--
+-- * @loop.last :: Bool@: Is this the last iteration?
+--
+-- * @loop.odd :: Bool@: Is this an odd iteration?
+--
+-- * @loop.even :: Bool@: Is this an even iteration?
 --
 -- For example:
 --
 -- > {% for item in items %}
--- >     {# render the value of the binding #}
 -- >     {{ item.index }}:{{ item.value }}
 -- >     {% if item.last %}
 -- >       the end.
