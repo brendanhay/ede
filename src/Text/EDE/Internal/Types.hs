@@ -21,12 +21,14 @@ import           Data.Text.Format.Params (Params)
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 
+-- | Meta information describing the source position of an expression or error.
 data Meta = Meta
     { _source :: !String
     , _row    :: !Int
     , _column :: !Int
     } deriving (Eq, Ord, Show)
 
+-- | The result of running parsing or rendering steps.
 data Result a
     = Error Meta [String]
     | Success a
@@ -40,6 +42,25 @@ instance Monad Result where
     return          = Success
     Error m e >>= _ = Error m e
     Success a >>= k = k a
+
+-- | Perform a case analysis on a 'Result'.
+result :: (Meta -> [String] -> b) -- ^ Function to apply to the 'Error' parameters.
+       -> (a -> b)                -- ^ Function to apply to the 'Success' case.
+       -> Result a                -- ^ The 'Result' to map over.
+       -> b
+result f _ (Error m e) = f m e
+result _ g (Success x) = g x
+
+-- | Convert a 'Result' to an 'Either' with the 'Left' case holding a formatted
+-- error message, and 'Right' being the successful result over which 'Result' is paramterised.
+eitherResult :: Result a -> Either String a
+eitherResult = result f Right
+  where
+    f Meta{..} e = Left . concat $
+        [ "ED-E error position: "
+        , concat [_source, ":(", show _row, ",", show _column, ")"]
+        , ", messages: " ++ intercalate ", " e
+        ]
 
 newtype Id = Id Text
     deriving (Eq, Ord, Show)
@@ -79,19 +100,6 @@ data RelOp
 
 throwError :: Params ps => Meta -> Format -> ps -> Result a
 throwError m f = Error m . (:[]) . LText.unpack . format f
-
-result :: (Meta -> [String] -> b) -> (a -> b) -> Result a -> b
-result f _ (Error m e) = f m e
-result _ g (Success x) = g x
-
-eitherResult :: Result a -> Either String a
-eitherResult = result f Right
-  where
-    f Meta{..} e = Left . concat $
-        [ "ED-E error position: "
-        , concat [_source, ":(", show _row, ",", show _column, ")"]
-        , ", messages: " ++ intercalate ", " e
-        ]
 
 mkMeta :: String -> Meta
 mkMeta n = Meta n 0 0
