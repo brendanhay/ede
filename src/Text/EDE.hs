@@ -57,17 +57,8 @@ module Text.EDE
     -- ** Conditionals
     -- $conditionals
 
-    -- *** Boolean Logic
-    -- $boolean_logic
-
-    -- *** Relational Logic
-    -- $relational_logic
-
-    -- *** Negation
-    -- $negation
-
-    -- ** Case Statements
-    -- $case_statements
+    -- *** Logic
+    -- $logic
 
     -- ** Loops
     -- $loops
@@ -122,16 +113,16 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- First the 'Template' is defined:
 --
--- > >>> let tmpl = parse "{% if var %}Hello, {{ var }}!{% else %}negative!{% endif %}" :: Result Template
+-- >>> let tmpl = parse "{% if var %}Hello, {{ var }}!{% else %}negative!{% endif %}" :: Result Template
 --
 -- Then an 'Object' is defined containing the environment which will be
 -- available to the 'Template' during rendering:
 --
--- > >>> let env = render $ fromPairs [ "var" .= "World" ] :: Template -> Result Builder
+-- >>> let env = render $ fromPairs [ "var" .= "World" ] :: Template -> Result Builder
 --
 -- Finally the environment is applied to the 'Template':
 --
--- > >>> tmpl >>= env :: Result Builder
+-- >>> tmpl >>= env :: Result Builder
 -- > Success "Hello, World!"
 --
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
@@ -155,13 +146,13 @@ fromPairs = (\(Object o) -> o) . object
 -- Unsuccessful 'parse' or 'render' steps can be inspected or analysed using
 -- 'result'.
 --
--- > >>> result failure success $ parse tmpl >>= render env
+-- >>> result failure success $ parse tmpl >>= render env
 --
 -- If you're only interested in dealing with errors as strings, and the positional
 -- information contained in 'Meta' is not of use you can use the convenience functions
 -- 'eitherParse', 'eitherRender', or convert a 'Result' to 'Either' using 'eitherResult'.
 --
--- > >>> either failure success $ eitherParse tmpl >>= eitherRender env
+-- >>> either failure success $ eitherParse tmpl >>= eitherRender env
 
 -- $input
 --
@@ -170,7 +161,7 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- It is used in combination with the re-exported '.=' as follows:
 --
--- > >>> render (fromPairs [ "foo" .= "value", "bar" .= 1 ]) :: Template -> Result Builder
+-- >>> render (fromPairs [ "foo" .= "value", "bar" .= 1 ]) :: Template -> Result Builder
 
 -- $output
 --
@@ -193,7 +184,7 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- Variables are substituted directly for their 'Buildable' representation.
 -- An error is raised if the varaible being substituted is not a literal type
--- (ie. an 'Array' or 'Object').
+-- (ie. an 'Array' or 'Object') or doesn't exist in the supplied environment.
 --
 -- > {{ var }}
 --
@@ -206,24 +197,85 @@ fromPairs = (\(Object o) -> o) . object
 
 -- $conditionals
 --
-
--- $boolean_logic
+-- A conditional is introduced and completed with the section syntax:
+--
+-- > {% if var %}
+-- >    ... consequent expressions
+-- > {% else %}
+-- >    ... alternate expressions
+-- > {% endif %}
+--
+-- The value of @{{ var }}@ determines the branch that is rendered by the template.
+--
+-- In the case of a literal it conforms directly to the supported boolean or relation logical
+-- operators from Haskell.
+-- If a variable is singuarly used it's existence determines the result of the predicate,
+-- the exception to this rule is boolean values which will be substituted into the
+-- expression if they exist in the supplied environment.
 --
 
--- $relational_logic
+-- $logic
 --
-
--- $negation
+-- The following logical expressions are supported as predicates in conditional statements
+-- with parameters being type checked and an error is raised if the left and right
+-- hand sides are not type equivalent.
 --
-
--- $case_statements
+-- * @And@: '&&'
 --
+-- * @Or@: '||'
+--
+-- * @Equal@: '=='
+--
+-- * @Not Equal@: '/='
+--
+-- * @Greater@: '>'
+--
+-- * @Greater Or Equal@: '>='
+--
+-- * @Less@: '<'
+--
+-- * @Less Or Equal@: '<='
+--
+-- * @Negation@: '!'
 
 -- $loops
 --
 
 -- $context
 --
+-- The following variables are available inside a loop expression by applying an
+-- accessor to the bound variable:
+--
+-- * @length :: Int@: length of the loop
+--
+-- * @index :: Int@: index of the iteration
+--
+-- * @index0 :: Int@: zero based index of the iteration
+--
+-- * @remainder :: Int@: remaining number of iterations
+--
+-- * @remainder0 :: Int@: zero based remaining number of iterations
+--
+-- * @first :: Bool@: is this the first iteration?
+--
+-- * @last :: Bool@: is this the last iteration?
+--
+-- * @odd :: Bool@: is this an odd iteration?
+--
+-- * @even :: Bool@: is this an even iteration?
+--
+-- For example:
+--
+-- > {% for item in items %}
+-- >     {# render the value of the binding #}
+-- >     {{ item.index }}:{{ item.value }}
+-- >     {% if item.last %}
+-- >       the end.
+-- >     {% endif %}
+-- > {% endfor %}
+--
+-- Will render each item with it's (1-based) loop index as a prefix and the
+-- text literal 'the end.' only once after then rest of the loop items have been rendered.
 
 -- $debugging
 --
