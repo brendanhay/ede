@@ -136,6 +136,8 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
 -- the cost of parsing can be amortised if the same 'Template' is rendered multiple times.
+--
+-- Please see "Text.EDE#syntax" for more information.
 
 -- $parsing_and_rendering
 --
@@ -175,7 +177,7 @@ fromPairs = (\(Object o) -> o) . object
 -- The successful result of rendering an 'Object' environment and 'Template' is
 -- a lazy 'Builder' which can be converted to 'Text' using the re-exported 'toLazyText'.
 
--- $comments
+-- $comments #syntax#
 --
 -- Comments are ignored by the parser and omitted from the rendered output.
 --
