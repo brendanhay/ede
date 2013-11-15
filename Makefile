@@ -1,5 +1,5 @@
 SHELL := /usr/bin/env bash
-FLAGS := -j --disable-documentation --disable-library-coverage
+FLAGS := --disable-documentation --disable-library-coverage
 
 .PHONY: test bench lint doc
 
