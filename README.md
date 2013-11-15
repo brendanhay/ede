@@ -1,7 +1,7 @@
 # ED-E
 
 * [Introduction](#introduction)
-* [Usage](#usage)
+* [Syntax](#syntax)
 * [Contribute](#contribute)
 * [Licence](#licence)
 
@@ -22,80 +22,9 @@ system services to HTML, or formatted emails.
 error messages with line/column metadata. Variable shadowing, unprintable expressions,
 type coercion, and unbound variable access are all considered errors.
 
+Please see the [Hackage documentation](http://brendanhay.github.io/ed-e/ed-e/Text-EDE.html) for more information.
 
-## Usage
-
-Here's a contrived example demonstrating some of the expressions ED-E supports:
-
-**template.ede**:
-
-```HTML+Django
-{#
-  Conditional expressions test the result of the predicate.
-
-  In this case, because name is a variable it's presence (or absence) is tested.
-
-  The only exception to this is if name resolved to a boolean value in the
-  environment it's value would used as the predicate.
-#}
-{% if name %}
-  Hello, {{ name }}!
-{% else %}
-  :(
-{% endif %}
-
-{% for var in list %}
-  {#
-     The binding <name>.loop.* contains loop metadata which can be found
-     on line 153 of Compiler.hs
-  #}
-  {% if var.loop.first %}
-  first!
-  {% endif %}
-
-  {% if var.loop.last %}
-  last.
-  {% endif %}
-
-  {# The value of a loop binding is access using <name>.value (or <name>.key for a hash key) #}
-  {{ var.loop.index0 }} : {{ var.value }}
-{#
-  Specifying an else block within a for loop will cause the block to be evaluated
-  if the variable target of the for loop is absent or empty.
-#}
-{% else %}
-  Empty list!
-{% endfor %}
-```
-
-**Main.hs**:
-
-```haskell
-import           Control.Applicative ((<$>))
-import           Control.Monad       ((>=>))
-import qualified Data.Text.Lazy.IO   as LText
-import           Text.EDE.Aeson      (parse, render, toObject, (.=))
-
-main :: IO ()
-main = (parse >=> flip render env) <$> LText.readFile "template.ede" >>= print
-  where
-    env = toObject
-        [ "name" .= "World"
-        , "list" .= [1, 2, 3]
-        ]
-```
-
-**Result**:
-
-```
-  Hello, World!
-
-  first!
-  0 : 1
-  1 : 2
-  last.
-  2 : 3
-```
+## Syntax
 
 A set of syntatic/semnatic fragments for all supported expressions can be found in the [tests](test/resources).
 

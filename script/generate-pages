@@ -15,6 +15,6 @@ git rm -rf --ignore-unmatch .
 
 mv $DOCDIR/* .
 rm -rf dist/
-git add *.html *.js *.css *.gif *.png
+git add ed-e *.html *.js *.css *.gif *.png
 
 git commit -m "Generated documentation from $HEAD"
