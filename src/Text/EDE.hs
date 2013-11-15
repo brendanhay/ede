@@ -281,13 +281,13 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- > {% for item in items %}
 -- >     {{ item.index }}:{{ item.value }}
--- >     {% if item.last %}
--- >       the end.
+-- >     {% if !item.last %}
+-- >
 -- >     {% endif %}
 -- > {% endfor %}
 --
--- Will render each item with it's (1-based) loop index as a prefix and the
--- text literal 'the end.' only once after then rest of the loop items have been rendered.
+-- Will render each item with it's (1-based) loop index as a prefix, separated
+-- by a blank newline, without a trailing at the end of the document.
 
 -- $debugging
 --
