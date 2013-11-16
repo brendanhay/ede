@@ -1,7 +1,8 @@
 { "var": null }
 ---
 {% if var %}
-Predicate/existence check should be false
+  Predicate/existence check should be false
 {% endif %}
+
 {# Resolution should succeed but rendering should be empty text #}
 {{ var }}
