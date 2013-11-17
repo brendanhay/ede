@@ -150,15 +150,15 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
 
     context n (mk, v) = object $
         [ "value" .= v
-        , "length"     .= l                -- length of the loop
-        , "index"      .= n                -- index of the iteration
-        , "index0"     .= (n - 1)          -- zero based index of the iteration
-        , "remainder"  .= (l - n)          -- remaining number of iterations
-        , "remainder0" .= (l - n - 1)      -- zero based remaining number of iterations
-        , "first"      .= (n == 1)         -- is this the first iteration?
-        , "last"       .= (n == l)         -- is this the last iteration?
-        , "odd"        .= (n `mod` 2 == 1) -- is this an odd iteration?
-        , "even"       .= (n `mod` 2 == 0) -- is this an even iteration?
+        , "length"     .= l
+        , "index"      .= n
+        , "index0"     .= (n - 1)
+        , "remainder"  .= (l - n)
+        , "remainder0" .= (l - n - 1)
+        , "first"      .= (n == 1)
+        , "last"       .= (n == l)
+        , "odd"        .= (n `mod` 2 == 1)
+        , "even"       .= (n `mod` 2 == 0)
         ] ++ maybe [] (\x -> ["key" .= x]) mk
 
 equal :: Meta -> TType a -> TType b -> Env (Equal a b)
