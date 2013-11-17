@@ -40,27 +40,29 @@ runParser = either failure Success . Parsec.runParser template () "ede"
         (map messageString $ errorMessages e)
 
 template :: Parser UExp
-template = pack $ manyTill expression (try eof)
+template = pack $ manyTill expression eof
 
 expression :: Parser UExp
-expression = choice [loop, conditional, fragment]
+expression = choice [fragment, substitution, conditional, loop]
 
 fragment :: Parser UExp
-fragment = try var <|> bld
+fragment = start >> UBld <$> meta <*> (fromString <$> manyTill1 anyChar stop)
   where
-    var = between (symbol "{{") (string "}}") variable
-    bld = do
-        skipMany $ comments <* optional newline
-        UBld <$> meta <*> (fromString <$> manyTill1 anyChar stop)
+    start = try $ lookAhead (next >> fail "") <|> return ()
+    stop  = try . lookAhead $ next <|> eof
+    next  = void $ char '{' >> oneOf "{%#"
 
-    stop = try . lookAhead $ next <|> eof
-    next = void (char '{' >> oneOf "{%#")
+substitution :: Parser UExp
+substitution = "variable" ?? try (between (symbol "{{") (string "}}") variable)
 
 variable :: Parser UExp
-variable = pack $ sepBy1 (UVar <$> meta <*> ident) (char '.')
+variable = "variable" ?? pack (sepBy1 (UVar <$> meta <*> ident) (char '.'))
 
 ident :: Parser Id
 ident = Id . Text.pack <$> identifier
+
+comment :: Parser ()
+comment = "comment" ?? skipMany (comments <* optional newline)
 
 loop :: Parser UExp
 loop = do
@@ -78,7 +80,7 @@ loop = do
 conditional :: Parser UExp
 conditional = UCond
     <$> meta
-    <*> try (section $ reserved "if" >> try (operation <|> variable))
+    <*> try (section $ reserved "if" >> try (operator <|> variable))
     <*> consequent end
     <*> alternative end
      <* end
@@ -100,8 +102,8 @@ section :: Parser a -> Parser a
 section p = "section" ??
     between (symbol "{%") (string "%}") p <* optional newline
 
-operation :: Parser UExp
-operation = buildExpressionParser ops term <?> "operation"
+operator :: Parser UExp
+operator = buildExpressionParser ops term <?> "operator"
   where
     term = try variable <|> literal
 

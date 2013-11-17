@@ -26,7 +26,10 @@ data Meta = Meta
     { _source :: !String
     , _row    :: !Int
     , _column :: !Int
-    } deriving (Eq, Ord, Show)
+    } deriving (Eq, Ord)
+
+instance Show Meta where
+    show _ = ""
 
 -- | The result of running parsing or rendering steps.
 data Result a

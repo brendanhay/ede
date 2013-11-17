@@ -7,7 +7,7 @@
 ---
 {% for item in list %}
   {{ item.value.key }}
-  {% if item.value.map %}
+{% if item.value.map %}
     {{ item.value.map.nest }}
-  {% endif %}
+{% endif %}
 {% endfor %}
