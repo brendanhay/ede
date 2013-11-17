@@ -44,11 +44,13 @@ expression :: Parser UExp
 expression = choice [fragment, substitution, conditional, loop]
 
 fragment :: Parser UExp
-fragment = start >> UBld <$> meta <*> (fromString <$> manyTill1 anyChar stop)
+fragment = do
+    "comment" ?? skipMany (comments <* optional newline)
+    try $ lookAhead (next >> fail "") <|> return ()
+    UBld <$> meta <*> (fromString <$> manyTill1 anyChar stop)
   where
-    start = try $ lookAhead (next >> fail "") <|> return ()
-    stop  = try . lookAhead $ next <|> eof
-    next  = void $ char '{' >> oneOf "{%#"
+    stop = try . lookAhead $ next <|> eof
+    next = void $ char '{' >> oneOf "{%#"
 
 substitution :: Parser UExp
 substitution = "variable" ?? try (between (symbol "{{") (string "}}") variable)
@@ -58,9 +60,6 @@ variable = "variable" ?? pack (sepBy1 (UVar <$> meta <*> ident) (char '.'))
 
 ident :: Parser Id
 ident = Id . Text.pack <$> identifier
-
-comment :: Parser ()
-comment = "comment" ?? skipMany (comments <* optional newline)
 
 loop :: Parser UExp
 loop = do
