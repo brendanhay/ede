@@ -43,6 +43,7 @@ import           Text.EDE.Internal.Types
 type Env = ReaderT Object Result
 
 data TType a where
+    TNil  :: TType ()
     TText :: TType Text
     TBool :: TType Bool
     TInt  :: TType Integer
@@ -71,13 +72,12 @@ render e o = flip runReaderT o $ do
     return v
 
 eval :: UExp -> Env TExp
-eval UNil = return $ mempty ::: TBld
-
-eval (UText _ t) = return $ t ::: TText
-eval (UBool _ b) = return $ b ::: TBool
-eval (UInt  _ n) = return $ n ::: TInt
-eval (UDbl  _ d) = return $ d ::: TDbl
-eval (UBld  _ b) = return $ b ::: TBld
+eval UNil        = return $ () ::: TNil
+eval (UText _ t) = return $ t  ::: TText
+eval (UBool _ b) = return $ b  ::: TBool
+eval (UInt  _ n) = return $ n  ::: TInt
+eval (UDbl  _ d) = return $ d  ::: TDbl
+eval (UBld  _ b) = return $ b  ::: TBld
 
 eval (UVar m i) = resolve m i
 
@@ -130,7 +130,7 @@ eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
   where
     f (x ::: TList) = return $ Col (Vector.length x) (vec x)
     f (x ::: TMap)  = return $ Col (Map.size x) (hmap x)
-    f (_  ::: t)    = throw (_meta v) "invalid loop target {}" [show t]
+    f (_ ::: t)     = throw (_meta v) "invalid loop target {}" [show t]
 
     vec :: Vector Value -> Vector (Maybe Text, Value)
     vec = Vector.map (Nothing,)
@@ -162,6 +162,7 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
         ] ++ maybe [] (\x -> ["key" .= x]) mk
 
 equal :: Meta -> TType a -> TType b -> Env (Equal a b)
+equal _ TNil  TNil  = return Eq
 equal _ TText TText = return Eq
 equal _ TBool TBool = return Eq
 equal _ TInt  TInt  = return Eq
@@ -172,6 +173,7 @@ equal _ TList TList = return Eq
 equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
 
 order :: Meta -> TType a -> Env (Order a)
+order _ TNil  = return Ord
 order _ TText = return Ord
 order _ TBool = return Ord
 order _ TInt  = return Ord
@@ -184,6 +186,7 @@ bind f = withReaderT f . eval
 predicate :: UExp -> Env TExp
 predicate = mapReaderT (return . (::: TBool) . f) . eval
   where
+    f (Success (_ ::: TNil))  = False
     f (Success (p ::: TBool)) = p
     f (Success _)             = True
     f _                       = False
@@ -199,15 +202,16 @@ resolve m (Id i) = do
     mv <- Map.lookup i <$> ask
     maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
   where
-    f (String t)     = t     ::: TText
-    f (Bool   b)     = b     ::: TBool
-    f (Number (I n)) = n     ::: TInt
-    f (Number (D d)) = d     ::: TDbl
-    f (Object o)     = o     ::: TMap
-    f (Array  a)     = a     ::: TList
-    f Null           = False ::: TBool
+    f Null           = () ::: TNil
+    f (String t)     = t  ::: TText
+    f (Bool   b)     = b  ::: TBool
+    f (Number (I n)) = n  ::: TInt
+    f (Number (D d)) = d  ::: TDbl
+    f (Object o)     = o  ::: TMap
+    f (Array  a)     = a  ::: TList
 
 build :: Meta -> TExp -> Env TExp
+build _ (_ ::: TNil)  = return $ mempty ::: TBld
 build _ (t ::: TText) = return $ Build.build t ::: TBld
 build _ (b ::: TBool) = return $ Build.build b ::: TBld
 build _ (n ::: TInt)  = return $ Build.build n ::: TBld

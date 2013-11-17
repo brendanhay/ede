@@ -1,8 +1,7 @@
-{ "var": null }
+{ "redacted": null }
 ---
-{% if var %}
+{% if redacted %}
   Predicate/existence check should be false
 {% endif %}
 
-{# Resolution should succeed but rendering should be empty text #}
-{{ var }}
+nothing to {{ redacted }} see here
