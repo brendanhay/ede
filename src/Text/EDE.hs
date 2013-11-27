@@ -65,16 +65,17 @@ module Text.EDE
     ) where
 
 import           Data.Aeson                 (object, (.=))
-import           Data.Aeson.Types           (Array, Object, Pair, Value(..))
-import           Data.Text.Buildable        (Buildable)
+import           Data.Aeson.Types           (Object, Pair, Value(..))
+import qualified Data.HashMap.Strict        as Map
 import           Data.Text.Lazy             (Text)
 import           Data.Text.Lazy.Builder     (Builder, toLazyText)
 import qualified Text.EDE.Internal.Compiler as Compiler
+import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
 
 -- | A valid parsed and compiled template.
-newtype Template = Template { template :: UExp }
+newtype Template = Template UExp
     deriving (Eq, Ord)
 
 -- | Parse 'Text' into a compiled template.
@@ -88,7 +89,7 @@ eitherParse = eitherResult . parse
 
 -- | Render an 'Object' using the supplied 'Template'.
 render :: Object -> Template -> Result Builder
-render o = (`Compiler.render` o) . template
+render o (Template e) = Compiler.render e o Filters.defaults
 
 -- | Render an 'Object' using the supplied 'Template',
 -- and convert the 'Result' using 'eitherResult'.

@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE OverloadedStrings         #-}
-{-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TupleSections             #-}
 
@@ -40,22 +39,6 @@ import           Data.Vector                (Vector)
 import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
 
-type Env = ReaderT Object Result
-
-data TType a where
-    TNil  :: TType ()
-    TText :: TType Text
-    TBool :: TType Bool
-    TInt  :: TType Integer
-    TDbl  :: TType Double
-    TBld  :: TType Builder
-    TMap  :: TType Object
-    TList :: TType Array
-
-deriving instance Show (TType a)
-
-data TExp = forall a. a ::: TType a
-
 data Equal a b where
     Eq :: Equal a a
 
@@ -65,8 +48,12 @@ data Order a where
 data Col where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col
 
-render :: UExp -> Object -> Result Builder
-render e o = flip runReaderT o $ do
+data TExp = forall a. a ::: TType a
+
+type Env = ReaderT (Object, HashMap Text Filter) Result
+
+render :: UExp -> Object -> HashMap Text Filter -> Result Builder
+render e o fs = flip runReaderT (o, fs) $ do
     v ::: vt <- eval e >>= build (mkMeta "render")
     Eq       <- equal (mkMeta "cast") TBld vt
     return v
@@ -79,7 +66,13 @@ eval (UInt  _ n) = return $ n  ::: TInt
 eval (UDbl  _ d) = return $ d  ::: TDbl
 eval (UBld  _ b) = return $ b  ::: TBld
 
-eval (UVar m i) = resolve m i
+eval (UVar m i) = binding m i
+
+eval (UFil m e f) = do
+    e' ::: et <- eval e
+    f' :|: ft <- filter' m f
+    Eq        <- equal m et ft
+    return $ f' e' ::: et
 
 eval (UApp _ e UNil) = eval e
 eval (UApp _ UNil e) = eval e
@@ -143,7 +136,7 @@ loop _ _ b (Col 0 _)  = eval b
 loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
   where
     iter (n, bld) x = do
-        shadow (_meta a) k
+        shadowed (_meta a) k
         a' ::: at <- bind (Map.insert k $ context n x) a
         Eq        <- equal (_meta a) at TBld
         return (n + 1, bld <> a')
@@ -181,7 +174,7 @@ order _ TDbl  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
 bind :: (Object -> Object) -> UExp -> Env TExp
-bind f = withReaderT f . eval
+bind f = withReaderT (first f) . eval
 
 predicate :: UExp -> Env TExp
 predicate = mapReaderT (return . (::: TBool) . f) . eval
@@ -191,15 +184,15 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
     f (Success _)             = True
     f _                       = False
 
-shadow :: Meta -> Text -> Env ()
-shadow m k = ask >>= maybe (return ()) f . Map.lookup k
+shadowed :: Meta -> Text -> Env ()
+shadowed m k = ask >>= maybe (return ()) f . Map.lookup k . fst
   where
     f x = throw m "binding {} shadows existing variable {}."
         [Text.unpack k, show x]
 
-resolve :: Meta -> Id -> Env TExp
-resolve m (Id i) = do
-    mv <- Map.lookup i <$> ask
+binding :: Meta -> Id -> Env TExp
+binding m (Id i) = do
+    mv <- Map.lookup i . fst <$> ask
     maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
   where
     f Null           = () ::: TNil
@@ -209,6 +202,11 @@ resolve m (Id i) = do
     f (Number (D d)) = d  ::: TDbl
     f (Object o)     = o  ::: TMap
     f (Array  a)     = a  ::: TList
+
+filter' :: Meta -> Text -> Env Filter
+filter' m k = do
+    fs <- snd <$> ask
+    maybe (throw m "filter {} doesn't exist." [k]) return $ Map.lookup k fs
 
 build :: Meta -> TExp -> Env TExp
 build _ (_ ::: TNil)  = return $ mempty ::: TBld

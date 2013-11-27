@@ -92,6 +92,9 @@ alternative :: Parser () -> Parser UExp
 alternative end = pack . option mempty $
     try (keyword "else") >> manyTill expression (try $ lookAhead end)
 
+filter' :: Parser UExp
+filter' = 
+
 keyword :: String -> Parser ()
 keyword = ("keyword" ??) . section . reserved
 

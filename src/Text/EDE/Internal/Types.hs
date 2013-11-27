@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs              #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RecordWildCards    #-}
 
@@ -13,6 +14,7 @@
 
 module Text.EDE.Internal.Types where
 
+import           Data.Aeson              hiding (Result, Success, Error)
 import           Data.List               (intercalate)
 import           Data.Text               (Text)
 import           Data.Text.Buildable
@@ -71,6 +73,21 @@ newtype Id = Id Text
 instance Buildable Id where
     build (Id i) = build i
 
+data Filter where
+    (:|:) :: (a -> a) -> TType a -> Filter
+
+data TType a where
+    TNil  :: TType ()
+    TText :: TType Text
+    TBool :: TType Bool
+    TInt  :: TType Integer
+    TDbl  :: TType Double
+    TBld  :: TType Builder
+    TMap  :: TType Object
+    TList :: TType Array
+
+deriving instance Show (TType a)
+
 data UExp
     = UNil
     | UText !Meta !Text
@@ -79,6 +96,7 @@ data UExp
     | UDbl  !Meta !Double
     | UBld  !Meta !Builder
     | UVar  !Meta !Id
+    | UFil  !Meta !UExp  !Text
     | UApp  !Meta !UExp  !UExp
     | UNeg  !Meta !UExp
     | UBin  !Meta !BinOp !UExp !UExp
@@ -87,7 +105,13 @@ data UExp
     | ULoop !Meta !Id    !UExp !UExp !UExp
       deriving (Eq, Ord, Show)
 
--- FIXME: Case
+-- FIXME:
+-- {% raw %} {% endraw %}
+-- {% case <value> %}
+-- {% when <value> %}
+-- {% else %}
+-- {% endcase %}
+-- {% let <name> = <value> %}
 
 data BinOp = And | Or
     deriving (Eq, Ord, Show)
@@ -114,8 +138,9 @@ _meta u = case u of
     UBool m _       -> m
     UInt  m _       -> m
     UDbl  m _       -> m
-    UVar  m _       -> m
     UBld  m _       -> m
+    UVar  m _       -> m
+    UFil  m _ _     -> m
     UApp  m _ _     -> m
     UNeg  m _       -> m
     UBin  m _ _ _   -> m
