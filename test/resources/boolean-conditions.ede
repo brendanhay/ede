@@ -23,3 +23,7 @@ unknown
 {% if no || True %}
 {{ no }} || True
 {% endif %}
+
+{% if yes == "graugh" %}
+yes == "graugh"
+{% endif %}

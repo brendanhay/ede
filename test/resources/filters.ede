@@ -7,3 +7,7 @@
 {{ text | lower | upper }}
 {{ bool | show | lower }}
 {{ bool | show | upper }}
+
+{% if text | lower == "lorem ipsum" %}
+text | lower == "lorem ipsum"
+{% endif %}
