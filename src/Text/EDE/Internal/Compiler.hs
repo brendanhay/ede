@@ -45,14 +45,17 @@ data Equal a b where
 data Order a where
     Ord :: Ord a => Order a
 
+data Shw a where
+    Shw :: Show a => Shw a
+
 data Col where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col
 
 data TExp = forall a. a ::: TType a
 
-type Env = ReaderT (Object, HashMap Text Filter) Result
+type Env = ReaderT (Object, HashMap Text Fun) Result
 
-render :: UExp -> Object -> HashMap Text Filter -> Result Builder
+render :: UExp -> Object -> HashMap Text Fun -> Result Builder
 render e o fs = flip runReaderT (o, fs) $ do
     v ::: vt <- eval e >>= build (mkMeta "render")
     Eq       <- equal (mkMeta "cast") TBld vt
@@ -78,12 +81,17 @@ eval (UVar m (Id i)) = do
     f (Object o)     = o  ::: TMap
     f (Array  a)     = a  ::: TList
 
-eval (UFil m f) = (::: TFil) <$> filter' m f
+eval (UFun m f) = (::: TFun) <$> function m f
 
-eval (UApp m (UFil fm f) e) = do
-    e' ::: et   <- eval e
-    Fn xt yt f' <- filter' fm f
-    Eq          <- equal m et xt
+eval (UApp m (UFun _ (Id "show")) e) = do
+    e' ::: et <- eval e
+    Shw       <- shw m et
+    return $ Text.pack (show e') ::: TText
+
+eval (UApp m (UFun fm f) e) = do
+    e' ::: et    <- eval e
+    Fun xt yt f' <- function fm f
+    Eq           <- equal m et xt
     return $ f' e' ::: yt
 
 eval (UApp _ e UNil) = eval e
@@ -150,7 +158,7 @@ loop _ _ b (Col 0 _)  = eval b
 loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
   where
     iter (n, bld) x = do
-        shadowed (_meta a) k
+        shadowed
         a' ::: at <- bind (Map.insert k $ context n x) a
         Eq        <- equal (_meta a) at TBld
         return (n + 1, bld <> a')
@@ -168,9 +176,9 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
         , "even"       .= (n `mod` 2 == 0)
         ] ++ maybe [] (\x -> ["key" .= x]) mk
 
-    shadowed m k =
+    shadowed =
         let f x = [Text.unpack k, show x]
-            g   = throw m "binding {} shadows existing variable {}." . f
+            g   = throw  (_meta a) "binding {} shadows existing variable {}." . f
         in ask >>= maybe (return ()) g . Map.lookup k . fst
 
 equal :: Meta -> TType a -> TType b -> Env (Equal a b)
@@ -192,6 +200,17 @@ order _ TInt  = return Ord
 order _ TDbl  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
+shw :: Meta -> TType a -> Env (Shw a)
+shw _ TNil  = return Shw
+shw _ TText = return Shw
+shw _ TBool = return Shw
+shw _ TInt  = return Shw
+shw _ TDbl  = return Shw
+shw _ TBld  = return Shw
+shw _ TMap  = return Shw
+shw _ TList = return Shw
+shw m t = throw m "constraint check of Show a => a ~ {} failed." [show t]
+
 bind :: (Object -> Object) -> UExp -> Env TExp
 bind f = withReaderT (first f) . eval
 
@@ -203,8 +222,8 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
     f (Success _)             = True
     f _                       = False
 
-filter' :: Meta -> Id -> Env Filter
-filter' m (Id k) = do
+function :: Meta -> Id -> Env Fun
+function m (Id k) = do
     fs <- snd <$> ask
     maybe (throw m "filter {} doesn't exist." [k]) return $ Map.lookup k fs
 

@@ -27,9 +27,8 @@ import           Text.EDE.Internal.Types
 -- Expression tree should utilise UApp for this.
 
 -- FIXME: Create polymorphic filters
-defaults :: HashMap Text Filter
+defaults :: HashMap Text Fun
 defaults = Map.fromList
-    [ -- ("show",  Fn TShow TText $ (Text.pack . show))
-      ("lower", Fn TText TText $ Text.map toLower)
-    , ("upper", Fn TText TText $ Text.map toUpper)
+    [ ("lower", Fun TText TText $ Text.map toLower)
+    , ("upper", Fun TText TText $ Text.map toUpper)
     ]

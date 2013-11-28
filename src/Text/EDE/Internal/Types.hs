@@ -73,8 +73,8 @@ newtype Id = Id Text
 instance Buildable Id where
     build (Id i) = build i
 
-data Filter where
-    Fn :: TType a -> TType b -> (a -> b) -> Filter
+data Fun where
+    Fun :: TType a -> TType b -> (a -> b) -> Fun
 
 data TType a where
     TNil  :: TType ()
@@ -85,7 +85,7 @@ data TType a where
     TBld  :: TType Builder
     TMap  :: TType Object
     TList :: TType Array
-    TFil  :: TType Filter
+    TFun  :: TType Fun
 
 deriving instance Show (TType a)
 
@@ -97,7 +97,7 @@ data UExp
     | UDbl  !Meta !Double
     | UBld  !Meta !Builder
     | UVar  !Meta !Id
-    | UFil  !Meta !Id
+    | UFun  !Meta !Id
     | UApp  !Meta !UExp  !UExp
     | UNeg  !Meta !UExp
     | UBin  !Meta !BinOp !UExp !UExp
@@ -141,7 +141,7 @@ _meta u = case u of
     UDbl  m _       -> m
     UBld  m _       -> m
     UVar  m _       -> m
-    UFil  m _       -> m
+    UFun  m _       -> m
     UApp  m _ _     -> m
     UNeg  m _       -> m
     UBin  m _ _ _   -> m

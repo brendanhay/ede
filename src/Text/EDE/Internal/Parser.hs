@@ -28,6 +28,7 @@ import           Text.Parsec.Text.Lazy   (Parser)
 
 -- FIXME:
 -- add support for whitespace removal/preservation via -/+
+-- add support for quoted literals using '' or ""
 
 runParser :: Text -> Result UExp
 runParser = either failure Success . Parsec.runParser template () "ede"
@@ -64,7 +65,7 @@ filtered p = try f <|> p
   where
     f = do
         p' <- p
-        f' <- try (symbol "|") *> sepBy1 (UFil <$> meta <*> ident) (symbol "|")
+        f' <- try (symbol "|") *> sepBy1 (UFun <$> meta <*> ident) (symbol "|")
         pack . return . reverse $ p' : f'
 
 ident :: Parser Id
