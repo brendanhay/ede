@@ -66,7 +66,17 @@ eval (UInt  _ n) = return $ n  ::: TInt
 eval (UDbl  _ d) = return $ d  ::: TDbl
 eval (UBld  _ b) = return $ b  ::: TBld
 
-eval (UVar m i) = binding m i
+eval (UVar m (Id i)) = do
+    mv <- Map.lookup i . fst <$> ask
+    maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
+  where
+    f Null           = () ::: TNil
+    f (String t)     = t  ::: TText
+    f (Bool   b)     = b  ::: TBool
+    f (Number (I n)) = n  ::: TInt
+    f (Number (D d)) = d  ::: TDbl
+    f (Object o)     = o  ::: TMap
+    f (Array  a)     = a  ::: TList
 
 eval (UFil m f) = (::: TFil) <$> filter' m f
 
@@ -158,6 +168,11 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
         , "even"       .= (n `mod` 2 == 0)
         ] ++ maybe [] (\x -> ["key" .= x]) mk
 
+    shadowed m k =
+        let f x = [Text.unpack k, show x]
+            g   = throw m "binding {} shadows existing variable {}." . f
+        in ask >>= maybe (return ()) g . Map.lookup k . fst
+
 equal :: Meta -> TType a -> TType b -> Env (Equal a b)
 equal _ TNil  TNil  = return Eq
 equal _ TText TText = return Eq
@@ -187,25 +202,6 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
     f (Success (p ::: TBool)) = p
     f (Success _)             = True
     f _                       = False
-
-shadowed :: Meta -> Text -> Env ()
-shadowed m k = ask >>= maybe (return ()) f . Map.lookup k . fst
-  where
-    f x = throw m "binding {} shadows existing variable {}."
-        [Text.unpack k, show x]
-
-binding :: Meta -> Id -> Env TExp
-binding m (Id i) = do
-    mv <- Map.lookup i . fst <$> ask
-    maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
-  where
-    f Null           = () ::: TNil
-    f (String t)     = t  ::: TText
-    f (Bool   b)     = b  ::: TBool
-    f (Number (I n)) = n  ::: TInt
-    f (Number (D d)) = d  ::: TDbl
-    f (Object o)     = o  ::: TMap
-    f (Array  a)     = a  ::: TList
 
 filter' :: Meta -> Id -> Env Filter
 filter' m (Id k) = do

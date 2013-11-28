@@ -1,4 +1,9 @@
-{ "text": "Lorem Ipsum" }
+{
+  "text": "Lorem Ipsum",
+  "bool": true
+}
 ---
 {{ text | lower }}
 {{ text | lower | upper }}
+{{ bool | show | lower }}
+{{ bool | show | upper }}
