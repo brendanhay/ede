@@ -66,7 +66,6 @@ module Text.EDE
 
 import           Data.Aeson                 (object, (.=))
 import           Data.Aeson.Types           (Object, Pair, Value(..))
-import qualified Data.HashMap.Strict        as Map
 import           Data.Text.Lazy             (Text)
 import           Data.Text.Lazy.Builder     (Builder, toLazyText)
 import qualified Text.EDE.Internal.Compiler as Compiler

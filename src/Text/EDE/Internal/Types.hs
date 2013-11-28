@@ -74,7 +74,7 @@ instance Buildable Id where
     build (Id i) = build i
 
 data Filter where
-    (:|:) :: (a -> a) -> TType a -> Filter
+    Fn :: TType a -> TType b -> (a -> b) -> Filter
 
 data TType a where
     TNil  :: TType ()
@@ -85,6 +85,7 @@ data TType a where
     TBld  :: TType Builder
     TMap  :: TType Object
     TList :: TType Array
+    TFil  :: TType Filter
 
 deriving instance Show (TType a)
 
@@ -96,7 +97,7 @@ data UExp
     | UDbl  !Meta !Double
     | UBld  !Meta !Builder
     | UVar  !Meta !Id
-    | UFil  !Meta !UExp  !Text
+    | UFil  !Meta !Id
     | UApp  !Meta !UExp  !UExp
     | UNeg  !Meta !UExp
     | UBin  !Meta !BinOp !UExp !UExp
@@ -140,7 +141,7 @@ _meta u = case u of
     UDbl  m _       -> m
     UBld  m _       -> m
     UVar  m _       -> m
-    UFil  m _ _     -> m
+    UFil  m _       -> m
     UApp  m _ _     -> m
     UNeg  m _       -> m
     UBin  m _ _ _   -> m

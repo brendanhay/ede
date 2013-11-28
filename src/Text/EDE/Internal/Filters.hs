@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- Module      : Text.EDE.Internal.Filters
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
@@ -25,9 +26,10 @@ import           Text.EDE.Internal.Types
 -- making a 'show' filter feasible.
 -- Expression tree should utilise UApp for this.
 
+-- FIXME: Create polymorphic filters
 defaults :: HashMap Text Filter
 defaults = Map.fromList
-    [ ("show",  (Text.pack . show) :|: TText) -- ^ Only show's text, how to make this single filter polymorphic?
-    , ("lower", Text.map toLower   :|: TText)
-    , ("upper", Text.map toUpper   :|: TText)
+    [ -- ("show",  Fn TShow TText $ (Text.pack . show))
+      ("lower", Fn TText TText $ Text.map toLower)
+    , ("upper", Fn TText TText $ Text.map toUpper)
     ]

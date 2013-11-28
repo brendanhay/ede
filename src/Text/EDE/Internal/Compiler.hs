@@ -68,20 +68,24 @@ eval (UBld  _ b) = return $ b  ::: TBld
 
 eval (UVar m i) = binding m i
 
-eval (UFil m e f) = do
-    e' ::: et <- eval e
-    f' :|: ft <- filter' m f
-    Eq        <- equal m et ft
-    return $ f' e' ::: et
+eval (UFil m f) = (::: TFil) <$> filter' m f
+
+eval (UApp m (UFil fm f) e) = do
+    e' ::: et   <- eval e
+    Fn xt yt f' <- filter' fm f
+    Eq          <- equal m et xt
+    return $ f' e' ::: yt
 
 eval (UApp _ e UNil) = eval e
 eval (UApp _ UNil e) = eval e
+
 eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
   where
     f (o ::: TMap) = bind (const o) e
     f (_ ::: t) =
         throw m "variable {} :: {} does not supported nested accessors."
             [Text.unpack i, show t]
+
 eval (UApp m a b) = do
     a' ::: TBld <- f a
     b' ::: TBld <- f b
@@ -203,8 +207,8 @@ binding m (Id i) = do
     f (Object o)     = o  ::: TMap
     f (Array  a)     = a  ::: TList
 
-filter' :: Meta -> Text -> Env Filter
-filter' m k = do
+filter' :: Meta -> Id -> Env Filter
+filter' m (Id k) = do
     fs <- snd <$> ask
     maybe (throw m "filter {} doesn't exist." [k]) return $ Map.lookup k fs
 

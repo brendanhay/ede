@@ -12,7 +12,7 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Control.Applicative     ((<$>), (<*>), (<*))
+import           Control.Applicative     ((<$>), (<*>), (<*), (*>))
 import           Control.Monad
 import           Data.Foldable           (foldr')
 import           Data.Monoid
@@ -23,7 +23,6 @@ import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
 import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (Error, runParser, parse)
-import           Text.Parsec.Error
 import           Text.Parsec.Expr
 import           Text.Parsec.Text.Lazy   (Parser)
 
@@ -35,10 +34,10 @@ runParser = either failure Success . Parsec.runParser template () "ede"
   where
     failure e = Error
         (positionMeta $ errorPos e)
-        (map messageString $ errorMessages e)
+        [show e]
 
 template :: Parser UExp
-template = pack $ manyTill expression eof
+template = pack . manyTill expression $ try eof
 
 expression :: Parser UExp
 expression = choice [fragment, substitution, conditional, loop]
@@ -53,10 +52,20 @@ fragment = do
     next = void $ char '{' >> oneOf "{%#"
 
 substitution :: Parser UExp
-substitution = "variable" ?? try (between (symbol "{{") (string "}}") variable)
+substitution = "substitution" ??
+    try (between (symbol "{{") (string "}}") variable)
 
 variable :: Parser UExp
-variable = "variable" ?? pack (sepBy1 (UVar <$> meta <*> ident) (char '.'))
+variable = "variable" ??
+    filtered (pack $ sepBy1 (UVar <$> meta <*> ident) (char '.'))
+
+filtered :: Parser UExp -> Parser UExp
+filtered p = try f <|> p
+  where
+    f = do
+        p' <- p
+        f' <- try (symbol "|") *> sepBy1 (UFil <$> meta <*> ident) (symbol "|")
+        pack . return . reverse $ p' : f'
 
 ident :: Parser Id
 ident = Id . Text.pack <$> identifier
@@ -92,9 +101,6 @@ alternative :: Parser () -> Parser UExp
 alternative end = pack . option mempty $
     try (keyword "else") >> manyTill expression (try $ lookAhead end)
 
--- filter' :: Parser UExp
--- filter' = 
-
 keyword :: String -> Parser ()
 keyword = ("keyword" ??) . section . reserved
 
@@ -124,7 +130,7 @@ operator = buildExpressionParser ops term <?> "operator"
     op o f = f <$> (reservedOp o >> meta)
 
 literal :: Parser UExp
-literal = do
+literal = filtered $ do
     m <- meta
     "literal" ?? choice
         [ try $ UBool m <$> (try true <|> false)

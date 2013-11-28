@@ -1,0 +1,4 @@
+{ "text": "Lorem Ipsum" }
+---
+{{ text | lower }}
+{{ text | lower | upper }}
