@@ -164,7 +164,7 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
         return (n + 1, bld <> a')
 
     context n (mk, v) = object $
-        [ "value" .= v
+        [ "value"      .= v
         , "length"     .= l
         , "index"      .= n
         , "index0"     .= (n - 1)
