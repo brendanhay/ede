@@ -112,7 +112,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  the else branch being optional.
 </p><p>In the case of a literal it conforms directly to the supported boolean or relation logical
  operators from Haskell.
- If a variable is singuarly used it's existence determines the result of the predicate,
+ If a variable is singuarly used its existence determines the result of the predicate,
  the exception to this rule is boolean values which will be substituted into the
  expression if they exist in the supplied environment.
 </p><p>The following logical expressions are supported as predicates in conditional statements
@@ -171,7 +171,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 
      {% endif %}
  {% endfor %}
-</pre><p>Will render each item with it's (1-based) loop index as a prefix, separated
+</pre><p>Will render each item with its (1-based) loop index as a prefix, separated
  by a blank newline, without a trailing at the end of the document.
 </p></div><h2 id="g:14">Filters
 </h2><div class="doc"><p>Filters are typed functions which can be applied to variables and literals.
@@ -180,7 +180,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </pre><p>The input is on the LHS and chained filters (delimited by '|') are on the RHS,
  with filters being applied left associatively.
 </p><p>Available filters:
-</p><ul><li> <code>show :: a -&gt; Text</code>: Convert a value to <code>Text</code> using it's <code><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Text-Show.html#t:Show">Show</a></code> instance.
+</p><ul><li> <code>show :: a -&gt; Text</code>: Convert a value to <code>Text</code> using its <code><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Text-Show.html#t:Show">Show</a></code> instance.
 </li><li> <code>lower :: Text -&gt; Text</code>: Lower case a textual value.
 </li><li> <code>upper :: Text -&gt; Text</code>: Upper case a textual value.
 </li></ul></div><h2 id="g:15">Debugging
