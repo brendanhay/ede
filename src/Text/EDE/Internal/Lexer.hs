@@ -69,12 +69,26 @@ rules = Parsec.LanguageDef
     , Parsec.opStart         = Parsec.opLetter rules
     , Parsec.opLetter        = oneOf "!>=</|&"
     , Parsec.caseSensitive   = False
-    , Parsec.reservedNames   = names
     , Parsec.reservedOpNames = operators
+    , Parsec.reservedNames   = names
     }
-
-names :: [String]
-names = ["if", "endif", "for", "in", "endfor", "else", "true", "false", "with", "endwith"]
 
 operators :: [String]
 operators = [">", ">=", "<", "<=", "==", "/=", "!", "||", "&&"]
+
+names :: [String]
+names =
+    [ "if"
+    , "endif"
+    , "for"
+    , "in"
+    , "endfor"
+    , "else"
+    , "true"
+    , "false"
+    , "case"
+    , "when"
+    , "endcase"
+    , "raw"
+    , "endraw"
+    ]

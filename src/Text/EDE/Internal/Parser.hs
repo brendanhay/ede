@@ -12,7 +12,7 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Control.Applicative     ((<$>), (<*>), (<*), (*>), pure)
+import           Control.Applicative     ((<$>), (<*>), (<*), (*>))
 import           Control.Monad
 import           Data.Foldable           (foldr')
 import           Data.Monoid
@@ -28,7 +28,6 @@ import           Text.Parsec.Text.Lazy   (Parser)
 
 -- FIXME:
 -- add support for whitespace removal/preservation via -/+
--- add support for quoted literals using '' or ""
 
 runParser :: Text -> Result UExp
 runParser = either failure Success . Parsec.runParser template () "ede"
@@ -41,20 +40,29 @@ template :: Parser UExp
 template = pack . manyTill expression $ try eof
 
 expression :: Parser UExp
-expression = choice [fragment, substitution, conditional, loop, case']
+expression = choice [raw, fragment, substitution, conditional, loop, case']
+
+raw :: Parser UExp
+raw = do
+    try $ keyword "raw"
+    UBld <$> meta
+         <*> (fromString <$> manyTill1 anyChar (try $ lookAhead end <|> eof))
+          <* end
+  where
+    end = keyword "endraw"
 
 fragment :: Parser UExp
 fragment = do
     "comment" ?? skipMany (comments <* optional newline)
     try $ lookAhead (next >> fail "") <|> return ()
-    UBld <$> meta <*> (fromString <$> manyTill1 anyChar stop)
+    UBld <$> meta
+         <*> (fromString <$> manyTill1 anyChar end)
   where
-    stop = try . lookAhead $ next <|> eof
+    end  = try . lookAhead $ next <|> eof
     next = void $ char '{' >> oneOf "{%#"
 
 substitution :: Parser UExp
-substitution = "substitution" ??
-    try (between (symbol "{{") (string "}}") variable)
+substitution = "substitution" ?? try (between (symbol "{{") (string "}}") term)
 
 variable :: Parser UExp
 variable = "variable" ??
@@ -91,7 +99,7 @@ case' = UCase
     <*> alternative end
      <* end
   where
-    control n = section $ reserved n >> (try literal <|> variable)
+    control n = section $ reserved n >> term
 
     end = keyword "endcase"
 
@@ -126,7 +134,6 @@ section p = "section" ??
 operator :: Parser UExp
 operator = buildExpressionParser ops term <?> "operator"
   where
-    term = try variable <|> literal
 
     ops = [ [Prefix $ op "!" UNeg]
           , [Infix (bin "&&" And)          AssocLeft]
@@ -143,6 +150,9 @@ operator = buildExpressionParser ops term <?> "operator"
     rel o = op o . flip URel
 
     op o f = f <$> (reservedOp o >> meta)
+
+term :: Parser UExp
+term = try literal <|> variable
 
 literal :: Parser UExp
 literal = filtered $ do
