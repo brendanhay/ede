@@ -14,7 +14,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </a></li><li><a href="#g:11">Conditionals
 </a></li><li><a href="#g:12">Case Analysis
 </a></li><li><a href="#g:13">Loops
-</a></li><li><a href="#g:14">Debugging
+</a></li><li><a href="#g:14">Filters
+</a></li><li><a href="#g:15">Debugging
 </a></li></ul></li></ul></div><div id="description"><p class="caption">Description</p><div class="doc"><p>A (mostly logicless) textual templating language in the same
  vein as <a href="https://github.com/Shopify/liquid">Liquid</a> or <a href="http://jinja.pocoo.org/docs/">Jinja2</a>.
 </p><p>(ED-E is a character from Fallout New Vegas, pronounced i&#720;-di&#720;-i&#720;, or Eddie.)
@@ -172,5 +173,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  {% endfor %}
 </pre><p>Will render each item with it's (1-based) loop index as a prefix, separated
  by a blank newline, without a trailing at the end of the document.
-</p></div><h2 id="g:14">Debugging
-</h2><div class="doc empty">&nbsp;</div></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2.1</p></div></body></html>
+</p></div><h2 id="g:14">Filters
+</h2><div class="doc"><p>Filters are typed functions which can be applied to variables and literals.
+ An example of rendering a lower cased boolean would be:
+</p><pre> {{ True | show | lower }}
+</pre><p>The input is on the LHS and chained filters (delimited by '|') are on the RHS,
+ with filters being applied left associatively.
+</p><p>Available filters:
+</p><ul><li> <code>show :: a -&gt; Text</code>: Convert a value to <code>Text</code> using it's <code><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Text-Show.html#t:Show">Show</a></code> instance.
+</li><li> <code>lower :: Text -&gt; Text</code>: Lower case a textual value.
+</li><li> <code>upper :: Text -&gt; Text</code>: Upper case a textual value.
+</li></ul></div><h2 id="g:15">Debugging
+</h2></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2.1</p></div></body></html>
