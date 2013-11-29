@@ -1,13 +1,13 @@
 { "var": "BiNGo!" }
 ---
-{% case var %}
-{% when "other" %}
-"other"
-{% when "BiNGo!" %}
-"BiNGo!"
-{% when "test" %}
-"test"
-{% endcase %}
+    {% case var %}
+    {% when "other" %}
+      "other"
+    {% when "BiNGo!" %}
+      "BiNGo!"
+    {% when "test" %}
+      "test"
+    {% endcase %}
 
 {% case 2 %}
 {% when 3 %}

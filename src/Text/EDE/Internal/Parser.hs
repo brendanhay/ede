@@ -84,8 +84,8 @@ conditional = UCond
 case' :: Parser UExp
 case' = UCase
     <$> meta
-    <*> try (control "case")
-    <*> many ((,)
+    <*> try (control "case" <* manyTill anyChar (try . lookAhead $ symbol "{%"))
+    <*> many1 ((,)
         <$> try (control "when")
         <*> consequent (try (control "when" >> return ()) <|> end))
     <*> alternative end
