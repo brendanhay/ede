@@ -57,6 +57,9 @@ module Text.EDE
     -- ** Conditionals
     -- $conditionals
 
+    -- ** Case Analysis
+    -- $case
+
     -- ** Loops
     -- $loops
 
@@ -230,6 +233,19 @@ fromPairs = (\(Object o) -> o) . object
 -- * @Less Or Equal@: '<='
 --
 -- * @Negation@: '!'
+
+-- $case
+--
+-- To pattern match a literal or variable, you can use the `case` statement:
+--
+-- > {% case var %}
+-- > {% when "a" %}
+-- >    .. matched expressions
+-- > {% when "b" %}
+-- >    .. matched expressions
+-- > {% else %}
+-- >    .. alternate expressions
+-- > {% endcase %}
 
 -- $loops
 --
