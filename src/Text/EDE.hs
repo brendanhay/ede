@@ -225,7 +225,7 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- In the case of a literal it conforms directly to the supported boolean or relation logical
 -- operators from Haskell.
--- If a variable is singuarly used it's existence determines the result of the predicate,
+-- If a variable is singuarly used its existence determines the result of the predicate,
 -- the exception to this rule is boolean values which will be substituted into the
 -- expression if they exist in the supplied environment.
 --
@@ -319,7 +319,7 @@ fromPairs = (\(Object o) -> o) . object
 -- >     {% endif %}
 -- > {% endfor %}
 --
--- Will render each item with it's (1-based) loop index as a prefix, separated
+-- Will render each item with its (1-based) loop index as a prefix, separated
 -- by a blank newline, without a trailing at the end of the document.
 
 -- $filters
@@ -334,7 +334,7 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- Available filters:
 --
--- * @show :: a -> Text@: Convert a value to 'Text' using it's 'Show' instance.
+-- * @show :: a -> Text@: Convert a value to 'Text' using its 'Show' instance.
 --
 -- * @lower :: Text -> Text@: Lower case a textual value.
 --
