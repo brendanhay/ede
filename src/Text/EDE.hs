@@ -66,6 +66,9 @@ module Text.EDE
     -- ** Loops
     -- $loops
 
+    -- ** Filters
+    -- $filters
+
     -- ** Debugging
     -- $debugging
     ) where
@@ -319,5 +322,24 @@ fromPairs = (\(Object o) -> o) . object
 -- Will render each item with it's (1-based) loop index as a prefix, separated
 -- by a blank newline, without a trailing at the end of the document.
 
--- $debugging
+-- $filters
+--
+-- Filters are simply typed functions that can be applied to variables and literals.
+-- An example of rendering a lower cased boolean would be:
+--
+-- > {{ True | show | lower }}
+--
+-- The input is on the LHS and chained filters (delimited by '|') are on the RHS,
+-- with filters being applied left associatively.
+--
+-- Available filters:
+--
+-- * @show :: a -> Text@: Convert any value to it's 'Show'able representation.
+--
+-- * @lower :: Text -> Text@: Lower case a textual value.
+--
+-- * @upper :: Text -> Text@: Upper case a textual value.
+--
+
+-- $Debugging
 --

@@ -22,11 +22,8 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Text.EDE.Internal.Types
 
--- FIXME: should be able to chain filters indefinitely using | operator
--- making a 'show' filter feasible.
--- Expression tree should utilise UApp for this.
-
 -- FIXME: Create polymorphic filters
+
 defaults :: HashMap Text Fun
 defaults = Map.fromList
     [ ("lower", Fun TText TText $ Text.map toLower)
