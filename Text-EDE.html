@@ -32,7 +32,21 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </code></strong>&gt; Success &quot;Hello, World!&quot;
 </pre><p>In this manner, <code><a href="Text-EDE.html#t:Template">Template</a></code>s can be pre-compiled to the internal AST and
  the cost of parsing can be amortised if the same <code><a href="Text-EDE.html#t:Template">Template</a></code> is rendered multiple times.
-</p><p>Please see the <a href="#syntax">syntax</a> section for more information about available
+</p><p>Another example, this time rendering a <code><a href="Text-EDE.html#t:Template">Template</a></code> from a file:
+</p><pre> import qualified Data.Text.Lazy as LText
+ import           Text.EDE
+
+ main :: IO ()
+ main = do
+     tmpl &lt;- LText.readFile &quot;template.ede&quot;
+     either error print $ eitherParse tmpl &gt;&gt;= eitherRender env
+   where
+     env = fromPairs
+         [ &quot;text&quot; .= &quot;Some Text.&quot;
+         , &quot;int&quot;  .= 1
+         , &quot;list&quot; .= [5..10]
+         ]
+</pre><p>Please see the <a href="#syntax">syntax</a> section for more information about available
  statements and expressions.
 </p></div><h1 id="g:2">Parsing and rendering
 </h1><div class="doc"><p>Parsing and rendering require two separate steps intentionally so that the
