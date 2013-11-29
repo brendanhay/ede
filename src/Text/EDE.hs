@@ -324,7 +324,7 @@ fromPairs = (\(Object o) -> o) . object
 
 -- $filters
 --
--- Filters are simply typed functions that can be applied to variables and literals.
+-- Filters are typed functions which can be applied to variables and literals.
 -- An example of rendering a lower cased boolean would be:
 --
 -- > {{ True | show | lower }}
@@ -334,7 +334,7 @@ fromPairs = (\(Object o) -> o) . object
 --
 -- Available filters:
 --
--- * @show :: a -> Text@: Convert any value to it's 'Show'able representation.
+-- * @show :: a -> Text@: Convert a value to 'Text' using it's 'Show' instance.
 --
 -- * @lower :: Text -> Text@: Lower case a textual value.
 --
