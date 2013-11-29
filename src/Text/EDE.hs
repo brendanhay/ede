@@ -131,6 +131,22 @@ fromPairs = (\(Object o) -> o) . object
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
 -- the cost of parsing can be amortised if the same 'Template' is rendered multiple times.
 --
+-- Another example, this time rendering a 'Template' from a file:
+--
+-- > import qualified Data.Text.Lazy as LText
+-- > import           Text.EDE
+-- >
+-- > main :: IO ()
+-- > main = do
+-- >     tmpl <- LText.readFile "template.ede"
+-- >     either error print $ eitherParse tmpl >>= eitherRender env
+-- >   where
+-- >     env = fromPairs
+-- >         [ "text" .= "Some Text."
+-- >         , "int"  .= 1
+-- >         , "list" .= [5..10]
+-- >         ]
+--
 -- Please see the <#syntax syntax> section for more information about available
 -- statements and expressions.
 
