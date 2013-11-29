@@ -51,6 +51,9 @@ module Text.EDE
     -- ** Comments
     -- $comments
 
+    -- ** Raw
+    -- $raw
+
     -- ** Variables
     -- $variables
 
@@ -178,6 +181,17 @@ fromPairs = (\(Object o) -> o) . object
 -- > #}
 --
 
+-- $raw
+--
+-- You can disable template processing for blocks of text using the 'raw' section:
+--
+-- > {% raw %}
+-- > Some {{{ handlebars }}} and {{ mustache }} and {{ jinja2 }} output tags etc.
+-- > {% endraw %}
+--
+-- This can be used to avoid parsed expressions which would otherwise be considered
+-- valid 'ED-E' syntax.
+
 -- $variables
 --
 -- Variables are substituted directly for their 'Buildable' representation.
@@ -236,7 +250,7 @@ fromPairs = (\(Object o) -> o) . object
 
 -- $case
 --
--- To pattern match a literal or variable, you can use the `case` statement:
+-- To pattern match a literal or variable, you can use the 'case' statement:
 --
 -- > {% case var %}
 -- > {% when "a" %}
