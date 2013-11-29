@@ -186,7 +186,7 @@ fromPairs = (\(Object o) -> o) . object
 -- You can disable template processing for blocks of text using the @raw@ section:
 --
 -- > {% raw %}
--- > Some {{{ handlebars }}} and {{ mustache }} and {{ jinja2 }} output tags etc.
+-- > Some {{{ handlebars }}} or {{ mustache }} or {{ jinja2 }} output tags etc.
 -- > {% endraw %}
 --
 -- This can be used to avoid parsing expressions which would otherwise be considered
