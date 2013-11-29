@@ -189,7 +189,7 @@ fromPairs = (\(Object o) -> o) . object
 -- > Some {{{ handlebars }}} and {{ mustache }} and {{ jinja2 }} output tags etc.
 -- > {% endraw %}
 --
--- This can be used to avoid parsed expressions which would otherwise be considered
+-- This can be used to avoid parsing expressions which would otherwise be considered
 -- valid @ED-E@ syntax.
 
 -- $variables
