@@ -9,11 +9,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </a></li><li><a href="#g:6">Data.Text.Lazy.Builder
 </a></li></ul></li><li><a href="#g:7">Syntax
 </a><ul><li><a href="#g:8">Comments
-</a></li><li><a href="#g:9">Variables
-</a></li><li><a href="#g:10">Conditionals
-</a></li><li><a href="#g:11">Case Analysis
-</a></li><li><a href="#g:12">Loops
-</a></li><li><a href="#g:13">Debugging
+</a></li><li><a href="#g:9">Raw
+</a></li><li><a href="#g:10">Variables
+</a></li><li><a href="#g:11">Conditionals
+</a></li><li><a href="#g:12">Case Analysis
+</a></li><li><a href="#g:13">Loops
+</a></li><li><a href="#g:14">Debugging
 </a></li></ul></li></ul></div><div id="description"><p class="caption">Description</p><div class="doc"><p>A (mostly logicless) textual templating language in the same
  vein as <a href="https://github.com/Shopify/liquid">Liquid</a> or <a href="http://jinja.pocoo.org/docs/">Jinja2</a>.
 </p><p>(ED-E is a character from Fallout New Vegas, pronounced i&#720;-di&#720;-i&#720;, or Eddie.)
@@ -82,7 +83,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
     multiline
     comment
  #}
-</pre></div><h2 id="g:9">Variables
+</pre></div><h2 id="g:9">Raw
+</h2><div class="doc"><p>You can disable template processing for blocks of text using the <code>raw</code> section:
+</p><pre> {% raw %}
+ Some {{{ handlebars }}} and {{ mustache }} and {{ jinja2 }} output tags etc.
+ {% endraw %}
+</pre><p>This can be used to avoid parsed expressions which would otherwise be considered
+ valid 'ED-E' syntax.
+</p></div><h2 id="g:10">Variables
 </h2><div class="doc"><p>Variables are substituted directly for their <code>Buildable</code> representation.
  An error is raised if the varaible being substituted is not a literal type
  (ie. an <code>Array</code> or <code>Object</code>) or doesn't exist in the supplied environment.
@@ -92,7 +100,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  The right-most accessor must resolve to a <code>Buildable</code> type as with the previous
  non-nested variable access.
 </p><pre> {{ nested.var.access }}
-</pre></div><h2 id="g:10">Conditionals
+</pre></div><h2 id="g:11">Conditionals
 </h2><div class="doc"><p>A conditional is introduced and completed with the section syntax:
 </p><pre> {% if var %}
     ... consequent expressions
@@ -118,8 +126,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </li><li> <code>Less</code>: <code><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Ord.html#v:-60-">&lt;</a></code>
 </li><li> <code>Less Or Equal</code>: <code><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Ord.html#v:-60--61-">&lt;=</a></code>
 </li><li> <code>Negation</code>: <code>!</code>
-</li></ul></div><h2 id="g:11">Case Analysis
-</h2><div class="doc"><p>To pattern match a literal or variable, you can use the `case` statement:
+</li></ul></div><h2 id="g:12">Case Analysis
+</h2><div class="doc"><p>To pattern match a literal or variable, you can use the 'case' statement:
 </p><pre> {% case var %}
  {% when &quot;a&quot; %}
     .. matched expressions
@@ -128,7 +136,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  {% else %}
     .. alternate expressions
  {% endcase %}
-</pre></div><h2 id="g:12">Loops
+</pre></div><h2 id="g:13">Loops
 </h2><div class="doc"><p>Iterating over an <code>Array</code> or <code>Object</code> can be acheived using the 'for ... in' section syntax.
  Attempting to iterate over any other type will raise an error.
 </p><p>Example:
@@ -164,5 +172,5 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  {% endfor %}
 </pre><p>Will render each item with it's (1-based) loop index as a prefix, separated
  by a blank newline, without a trailing at the end of the document.
-</p></div><h2 id="g:13">Debugging
+</p></div><h2 id="g:14">Debugging
 </h2><div class="doc empty">&nbsp;</div></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2.1</p></div></body></html>
