@@ -24,9 +24,10 @@ import           Control.Monad.Trans.Reader
 import           Data.Aeson                 hiding (Result, Success)
 import           Data.Attoparsec.Number     (Number(..))
 import           Data.Foldable              (Foldable, foldlM)
-import qualified Data.HashMap.Strict        as Map
 import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as Map
 import           Data.List                  (sortBy)
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
 import           Data.Text                  (Text)
@@ -51,7 +52,7 @@ data Shw a where
 data Col where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col
 
-data TExp = forall a. a ::: TType a
+data TExp = forall a. Eq a => a ::: TType a
 
 type Env = ReaderT (Object, HashMap Text Fun) Result
 
@@ -140,6 +141,19 @@ eval (URel m op a b) = do
 eval (UCond _ p a b) = do
     p' ::: TBool <- predicate p
     eval $ if p' then a else b
+
+eval (UCase _ c as b) = do
+    c' <- eval c
+    ma <- anyM c' as
+    eval $ fromMaybe b ma
+  where
+    anyM _ [] = return Nothing
+    anyM p@(c' ::: ct) ((x, e) : xs) = do
+       x' ::: xt <- eval x
+       Eq        <- equal (_meta x) ct xt
+       if c' == x'
+           then return $ Just e
+           else anyM p xs
 
 eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
   where

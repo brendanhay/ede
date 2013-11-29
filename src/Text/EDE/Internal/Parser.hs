@@ -12,7 +12,7 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Control.Applicative     ((<$>), (<*>), (<*), (*>))
+import           Control.Applicative     ((<$>), (<*>), (<*), (*>), pure)
 import           Control.Monad
 import           Data.Foldable           (foldr')
 import           Data.Monoid
@@ -41,7 +41,7 @@ template :: Parser UExp
 template = pack . manyTill expression $ try eof
 
 expression :: Parser UExp
-expression = choice [fragment, substitution, conditional, loop]
+expression = choice [fragment, substitution, conditional, loop, case']
 
 fragment :: Parser UExp
 fragment = do
@@ -71,6 +71,30 @@ filtered p = try f <|> p
 ident :: Parser Id
 ident = Id . Text.pack <$> identifier
 
+conditional :: Parser UExp
+conditional = UCond
+    <$> meta
+    <*> try (section $ reserved "if" >> (try operator <|> variable))
+    <*> consequent end
+    <*> alternative end
+     <* end
+  where
+    end = keyword "endif"
+
+case' :: Parser UExp
+case' = UCase
+    <$> meta
+    <*> try (control "case")
+    <*> many ((,)
+        <$> try (control "when")
+        <*> consequent (try (control "when" >> return ()) <|> end))
+    <*> alternative end
+     <* end
+  where
+    control n = section $ reserved n >> (try literal <|> variable)
+
+    end = keyword "endcase"
+
 loop :: Parser UExp
 loop = do
     m <- meta
@@ -83,16 +107,6 @@ loop = do
          <* end
   where
     end = keyword "endfor"
-
-conditional :: Parser UExp
-conditional = UCond
-    <$> meta
-    <*> try (section $ reserved "if" >> try (operator <|> variable))
-    <*> consequent end
-    <*> alternative end
-     <* end
-  where
-    end = keyword "endif"
 
 consequent :: Parser () -> Parser UExp
 consequent end = pack . manyTill expression . try . lookAhead $

@@ -74,7 +74,10 @@ instance Buildable Id where
     build (Id i) = build i
 
 data Fun where
-    Fun :: TType a -> TType b -> (a -> b) -> Fun
+    Fun :: (Eq a, Eq b) => TType a -> TType b -> (a -> b) -> Fun
+
+instance Eq Fun where
+    _ == _ = False
 
 data TType a where
     TNil  :: TType ()
@@ -103,16 +106,14 @@ data UExp
     | UBin  !Meta !BinOp !UExp !UExp
     | URel  !Meta !RelOp !UExp !UExp
     | UCond !Meta !UExp  !UExp !UExp
+    | UCase !Meta !UExp  [(UExp, UExp)] !UExp
     | ULoop !Meta !Id    !UExp !UExp !UExp
       deriving (Eq, Ord, Show)
 
 -- FIXME:
 -- {% raw %} {% endraw %}
--- {% case <value> %}
--- {% when <value> %}
--- {% else %}
--- {% endcase %}
--- {% let <name> = <value> %}
+-- {% assign ... %}
+-- {% capture ... %}
 
 data BinOp = And | Or
     deriving (Eq, Ord, Show)
@@ -147,4 +148,5 @@ _meta u = case u of
     UBin  m _ _ _   -> m
     URel  m _ _ _   -> m
     UCond m _ _ _   -> m
+    UCase m _ _ _   -> m
     ULoop m _ _ _ _ -> m
