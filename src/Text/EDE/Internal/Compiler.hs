@@ -63,7 +63,7 @@ render e o fs = flip runReaderT (o, fs) $ do
     return v
 
 eval :: UExp -> Env TExp
-eval UNil        = return $ () ::: TNil
+eval UNil        = return $ "" ::: TBld
 eval (UText _ t) = return $ t  ::: TText
 eval (UBool _ b) = return $ b  ::: TBool
 eval (UInt  _ n) = return $ n  ::: TInt
@@ -74,7 +74,7 @@ eval (UVar m (Id i)) = do
     mv <- Map.lookup i . fst <$> ask
     maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
   where
-    f Null           = () ::: TNil
+    f Null           = "" ::: TBld
     f (String t)     = t  ::: TText
     f (Bool   b)     = b  ::: TBool
     f (Number (I n)) = n  ::: TInt
