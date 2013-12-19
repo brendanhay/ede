@@ -82,6 +82,9 @@ import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
 
+-- Add render from file
+-- Add template includes
+
 -- | A valid parsed and compiled template.
 newtype Template = Template UExp
     deriving (Eq, Ord)

@@ -1,4 +1,5 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections    #-}
 
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
@@ -22,7 +23,7 @@ import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
 import qualified Text.Parsec             as Parsec
-import           Text.Parsec             hiding (Error, runParser, parse)
+import           Text.Parsec             hiding (Error, runParser, parse, spaces)
 import           Text.Parsec.Expr
 import           Text.Parsec.Text.Lazy   (Parser)
 
@@ -37,10 +38,22 @@ runParser = either failure Success . Parsec.runParser template () "ede"
         [show e]
 
 template :: Parser UExp
-template = pack . manyTill expression $ try eof
+template = pack $ manyTill expression eof
 
 expression :: Parser UExp
-expression = choice [raw, fragment, substitution, conditional, loop, case']
+expression = choice [fragment, substitution, raw, conditional, loop, case']
+
+fragment :: Parser UExp
+fragment = ("fragment" ??) $ do
+    "comment" ?? skipMany (comments <* optional newline)
+    notFollowedBy next
+    UBld <$> meta
+         <*> (fromString <$> manyTill1 anyChar (try . lookAhead $ next <|> eof))
+  where
+    next = try (void $ string "{{") <|> void (spaces >> char '{' >> oneOf "%#")
+
+substitution :: Parser UExp
+substitution = "substitution" ?? try (between (symbol "{{") (string "}}") term)
 
 raw :: Parser UExp
 raw = do
@@ -51,34 +64,6 @@ raw = do
   where
     end = keyword "endraw"
 
-fragment :: Parser UExp
-fragment = do
-    "comment" ?? skipMany (comments <* optional newline)
-    try $ lookAhead (next >> fail "") <|> return ()
-    UBld <$> meta
-         <*> (fromString <$> manyTill1 anyChar end)
-  where
-    end  = try . lookAhead $ next <|> eof
-    next = void $ char '{' >> oneOf "{%#"
-
-substitution :: Parser UExp
-substitution = "substitution" ?? try (between (symbol "{{") (string "}}") term)
-
-variable :: Parser UExp
-variable = "variable" ??
-    filtered (pack $ sepBy1 (UVar <$> meta <*> ident) (char '.'))
-
-filtered :: Parser UExp -> Parser UExp
-filtered p = try f <|> p
-  where
-    f = do
-        p' <- p
-        f' <- try (symbol "|") *> sepBy1 (UFun <$> meta <*> ident) (symbol "|")
-        pack . return . reverse $ p' : f'
-
-ident :: Parser Id
-ident = Id . Text.pack <$> identifier
-
 conditional :: Parser UExp
 conditional = UCond
     <$> meta
@@ -88,6 +73,19 @@ conditional = UCond
      <* end
   where
     end = keyword "endif"
+
+loop :: Parser UExp
+loop = do
+    m <- meta
+    uncurry (ULoop m)
+        <$> (try $ section ((,)
+            <$> (reserved "for" >> ident)
+            <*> (reserved "in"  >> variable)))
+        <*> consequent end
+        <*> alternative end
+         <* end
+  where
+    end = keyword "endfor"
 
 case' :: Parser UExp
 case' = UCase
@@ -103,18 +101,26 @@ case' = UCase
 
     end = keyword "endcase"
 
-loop :: Parser UExp
-loop = do
-    m <- meta
-    uncurry (ULoop m)
-        <$> (try $ section ((,)
-            <$> (reserved "for" >> ident)
-            <*> (reserved "in"  >> variable)))
-        <*> consequent end
-        <*> alternative end
-         <* end
+variable :: Parser UExp
+variable = "variable" ??
+    filtered (pack $ sepBy1 (UVar <$> meta <*> ident) (char '.'))
+
+section :: Parser a -> Parser a
+section p = "section" ?? try (between start end p)
   where
-    end = keyword "endfor"
+    start = try (string "{%-") <|> (spaces >> symbol "{%")
+    end   = try (void $ string "-%}") <|> (string "%}" >> spaces >> void newline)
+
+filtered :: Parser UExp -> Parser UExp
+filtered p = try f <|> p
+  where
+    f = do
+        p' <- p
+        f' <- try (symbol "|") *> sepBy1 (UFun <$> meta <*> ident) (symbol "|")
+        pack . return . reverse $ p' : f'
+
+ident :: Parser Id
+ident = Id . Text.pack <$> identifier
 
 consequent :: Parser () -> Parser UExp
 consequent end = pack . manyTill expression . try . lookAhead $
@@ -126,10 +132,6 @@ alternative end = pack . option mempty $
 
 keyword :: String -> Parser ()
 keyword = ("keyword" ??) . section . reserved
-
-section :: Parser a -> Parser a
-section p = "section" ??
-    between (symbol "{%") (string "%}") p <* optional newline
 
 operator :: Parser UExp
 operator = buildExpressionParser ops term <?> "operator"
@@ -184,6 +186,9 @@ manyTill1 :: Stream s m t
           -> ParsecT s u m b
           -> ParsecT s u m [a]
 manyTill1 p end = liftM2 (:) p (manyTill p end)
+
+spaces :: (Stream s m Char) => ParsecT s u m ()
+spaces = skipMany $ satisfy (== ' ')
 
 infix 0 ??
 
