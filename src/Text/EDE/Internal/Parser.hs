@@ -101,15 +101,15 @@ case' = UCase
 
     end = keyword "endcase"
 
-variable :: Parser UExp
-variable = "variable" ??
-    filtered (pack $ sepBy1 (UVar <$> meta <*> ident) (char '.'))
-
 section :: Parser a -> Parser a
 section p = "section" ?? try (between start end p)
   where
-    start = try (string "{%-") <|> (spaces >> symbol "{%")
+    start = spaces >> symbol "{%"
     end   = try (void $ string "-%}") <|> (string "%}" >> spaces >> void newline)
+
+variable :: Parser UExp
+variable = "variable" ??
+    filtered (pack $ sepBy1 (UVar <$> meta <*> ident) (char '.'))
 
 filtered :: Parser UExp -> Parser UExp
 filtered p = try f <|> p
