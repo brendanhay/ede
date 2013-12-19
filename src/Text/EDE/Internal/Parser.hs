@@ -16,6 +16,7 @@ module Text.EDE.Internal.Parser where
 import           Control.Applicative     ((<$>), (<*>), (<*), (*>))
 import           Control.Monad
 import           Data.Foldable           (foldr')
+import qualified Data.HashMap.Strict     as Map
 import           Data.Monoid
 import qualified Data.Text               as Text
 import           Data.Text.Lazy          (Text)
@@ -25,23 +26,28 @@ import           Text.EDE.Internal.Types
 import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (Error, runParser, parse, spaces)
 import           Text.Parsec.Expr
-import           Text.Parsec.Text.Lazy   (Parser)
 
--- FIXME:
--- add support for whitespace removal/preservation via -/+
-
-runParser :: Text -> Result UExp
-runParser = either failure Success . Parsec.runParser template () "ede"
+runParser :: Text -> Result (UExp, Includes)
+runParser = either failure Success . Parsec.runParser template mempty "ede"
   where
     failure e = Error
         (positionMeta $ errorPos e)
         [show e]
 
-template :: Parser UExp
-template = pack $ manyTill expression eof
+    template = (,)
+        <$> pack (manyTill expression eof)
+        <*> getState
 
 expression :: Parser UExp
-expression = choice [fragment, substitution, raw, conditional, loop, case']
+expression = choice
+    [ fragment
+    , substitution
+    , raw
+    , conditional
+    , case'
+    , loop
+    , include
+    ]
 
 fragment :: Parser UExp
 fragment = ("fragment" ??) $ do
@@ -74,19 +80,6 @@ conditional = UCond
   where
     end = keyword "endif"
 
-loop :: Parser UExp
-loop = do
-    m <- meta
-    uncurry (ULoop m)
-        <$> (try $ section ((,)
-            <$> (reserved "for" >> ident)
-            <*> (reserved "in"  >> variable)))
-        <*> consequent end
-        <*> alternative end
-         <* end
-  where
-    end = keyword "endfor"
-
 case' :: Parser UExp
 case' = UCase
     <$> meta
@@ -100,6 +93,28 @@ case' = UCase
     control n = section $ reserved n >> term
 
     end = keyword "endcase"
+
+loop :: Parser UExp
+loop = do
+    m <- meta
+    uncurry (ULoop m)
+        <$> (try $ section ((,)
+            <$> (reserved "for" >> ident)
+            <*> (reserved "in"  >> variable)))
+        <*> consequent end
+        <*> alternative end
+         <* end
+  where
+    end = keyword "endfor"
+
+include :: Parser UExp
+include = ("include" ??) $ do
+    m      <- meta
+    (k, v) <- try . section $ (,)
+        <$> (reserved "include" >> fmap Text.pack stringLiteral)
+        <*> optionMaybe (reserved "with" >> ident)
+    modifyState $ Map.insertWith (const id) k m
+    return $ UIncl m k v
 
 section :: Parser a -> Parser a
 section p = "section" ?? try (between start end p)

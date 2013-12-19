@@ -12,13 +12,16 @@ module Text.EDE.Internal.Lexer where
 
 import           Control.Monad
 import           Data.Functor.Identity
-import           Data.List             (nub)
-import           Data.Text.Lazy        (Text)
+import           Data.List               (nub)
+import           Data.Text.Lazy          (Text)
+import           Text.EDE.Internal.Types
 import           Text.Parsec
 import           Text.Parsec.Language
-import           Text.Parsec.Text.Lazy (Parser)
-import           Text.Parsec.Token     (GenTokenParser)
-import qualified Text.Parsec.Token     as Parsec
+import           Text.Parsec.Text.Lazy   (GenParser)
+import           Text.Parsec.Token       (GenTokenParser)
+import qualified Text.Parsec.Token       as Parsec
+
+type Parser = Parsec Text Includes
 
 identifier :: Parser String
 identifier = Parsec.identifier lexer
@@ -55,10 +58,10 @@ comments = try (string start) >> run
 whiteSpace :: Parser ()
 whiteSpace = Parsec.whiteSpace lexer
 
-lexer :: GenTokenParser Text () Identity
+lexer :: GenTokenParser Text Includes Identity
 lexer = Parsec.makeTokenParser rules
 
-rules :: GenLanguageDef Text u Identity
+rules :: GenLanguageDef Text Includes Identity
 rules = Parsec.LanguageDef
     { Parsec.commentStart    = "{#"
     , Parsec.commentEnd      = "#}"

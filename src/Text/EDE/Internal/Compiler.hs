@@ -54,15 +54,25 @@ data Col where
 
 data TExp = forall a. Eq a => a ::: TType a
 
-type Env = ReaderT (Object, HashMap Text Fun) Result
+data Env = Env
+    { _filters   :: Filters
+    , _templates :: Templates
+    , _variables :: Object
+    }
 
-render :: UExp -> Object -> HashMap Text Fun -> Result Builder
-render e o fs = flip runReaderT (o, fs) $ do
+type Context = ReaderT Env Result
+
+render :: Filters
+       -> Templates
+       -> Object
+       -> UExp
+       -> Result Builder
+render fs ts o e = flip runReaderT (Env fs ts o) $ do
     v ::: vt <- eval e >>= build (mkMeta "render")
     Eq       <- equal (mkMeta "cast") TBld vt
     return v
 
-eval :: UExp -> Env TExp
+eval :: UExp -> Context TExp
 eval UNil        = return $ "" ::: TBld
 eval (UText _ t) = return $ t  ::: TText
 eval (UBool _ b) = return $ b  ::: TBool
@@ -70,9 +80,7 @@ eval (UInt  _ n) = return $ n  ::: TInt
 eval (UDbl  _ d) = return $ d  ::: TDbl
 eval (UBld  _ b) = return $ b  ::: TBld
 
-eval (UVar m (Id i)) = do
-    mv <- Map.lookup i . fst <$> ask
-    maybe (throw m "binding {} doesn't exist." [i]) (return . f) mv
+eval (UVar m i) = f <$> variable m i
   where
     f Null           = "" ::: TBld
     f (String t)     = t  ::: TText
@@ -167,7 +175,14 @@ eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
     hmap :: HashMap Text Value -> [(Maybe Text, Value)]
     hmap  = map (first Just) . sortBy (comparing fst) . Map.toList
 
-loop :: Text -> UExp -> UExp -> Col -> Env TExp
+eval (UIncl m k mi) = do
+    te <- template m k
+    s  <- maybe (return id) f mi
+    bind s te
+  where
+    f (Id x) = (\y -> const $ fromPairs [x .= y]) <$> variable m (Id x)
+
+loop :: Text -> UExp -> UExp -> Col -> Context TExp
 loop _ _ b (Col 0 _)  = eval b
 loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
   where
@@ -193,9 +208,9 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
     shadowed =
         let f x = [Text.unpack k, show x]
             g   = throw  (_meta a) "binding {} shadows existing variable {}." . f
-        in ask >>= maybe (return ()) g . Map.lookup k . fst
+        in ask >>= maybe (return ()) g . Map.lookup k . _variables
 
-equal :: Meta -> TType a -> TType b -> Env (Equal a b)
+equal :: Meta -> TType a -> TType b -> Context (Equal a b)
 equal _ TNil  TNil  = return Eq
 equal _ TText TText = return Eq
 equal _ TBool TBool = return Eq
@@ -206,7 +221,7 @@ equal _ TMap  TMap  = return Eq
 equal _ TList TList = return Eq
 equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
 
-order :: Meta -> TType a -> Env (Order a)
+order :: Meta -> TType a -> Context (Order a)
 order _ TNil  = return Ord
 order _ TText = return Ord
 order _ TBool = return Ord
@@ -214,7 +229,7 @@ order _ TInt  = return Ord
 order _ TDbl  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
-shw :: Meta -> TType a -> Env (Shw a)
+shw :: Meta -> TType a -> Context (Shw a)
 shw _ TNil  = return Shw
 shw _ TText = return Shw
 shw _ TBool = return Shw
@@ -225,10 +240,10 @@ shw _ TMap  = return Shw
 shw _ TList = return Shw
 shw m t = throw m "constraint check of Show a => a ~ {} failed." [show t]
 
-bind :: (Object -> Object) -> UExp -> Env TExp
-bind f = withReaderT (first f) . eval
+bind :: (Object -> Object) -> UExp -> Context TExp
+bind f = withReaderT (\x -> x { _variables = f $ _variables x }) . eval
 
-predicate :: UExp -> Env TExp
+predicate :: UExp -> Context TExp
 predicate = mapReaderT (return . (::: TBool) . f) . eval
   where
     f (Success (_ ::: TNil))  = False
@@ -236,12 +251,22 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
     f (Success _)             = True
     f _                       = False
 
-function :: Meta -> Id -> Env Fun
-function m (Id k) = do
-    fs <- snd <$> ask
-    maybe (throw m "filter {} doesn't exist." [k]) return $ Map.lookup k fs
+variable :: Meta -> Id -> Context Value
+variable m (Id k) = do
+    mv <- Map.lookup k . _variables <$> ask
+    maybe (throw m "binding {} doesn't exist." [k]) return mv
 
-build :: Meta -> TExp -> Env TExp
+function :: Meta -> Id -> Context Fun
+function m (Id k) = do
+    mf <- Map.lookup k . _filters <$> ask
+    maybe (throw m "filter {} doesn't exist." [k]) return mf
+
+template :: Meta -> Text -> Context UExp
+template m k = do
+    mt <- Map.lookup k . _templates <$> ask
+    maybe (throw m "template {} is not in scope." [k]) return mt
+
+build :: Meta -> TExp -> Context TExp
 build _ (_ ::: TNil)  = return $ mempty ::: TBld
 build _ (t ::: TText) = return $ Build.build t ::: TBld
 build _ (b ::: TBool) = return $ Build.build b ::: TBld
@@ -250,5 +275,5 @@ build _ (d ::: TDbl)  = return $ Build.build d ::: TBld
 build _ (b ::: TBld)  = return $ b ::: TBld
 build m (_ ::: t)     = throw m "unable to render variable of type {}" [show t]
 
-throw :: Params ps => Meta -> Format -> ps -> Env a
+throw :: Params ps => Meta -> Format -> ps -> Context a
 throw m f = lift . throwError m f

@@ -15,6 +15,8 @@
 module Text.EDE.Internal.Types where
 
 import           Data.Aeson              hiding (Result, Success, Error)
+import           Data.Aeson.Types        (Pair)
+import           Data.HashMap.Strict     (HashMap)
 import           Data.List               (intercalate)
 import           Data.Text               (Text)
 import           Data.Text.Buildable
@@ -22,6 +24,14 @@ import           Data.Text.Format        (Format, format)
 import           Data.Text.Format.Params (Params)
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
+
+type Filters   = HashMap Text Fun
+type Includes  = HashMap Text Meta
+type Templates = HashMap Text UExp
+
+-- | A valid parsed and compiled template.
+newtype Template = Template UExp
+    deriving (Eq, Ord)
 
 -- | Meta information describing the source position of an expression or error.
 data Meta = Meta
@@ -108,12 +118,13 @@ data UExp
     | UCond !Meta !UExp  !UExp !UExp
     | UCase !Meta !UExp  [(UExp, UExp)] !UExp
     | ULoop !Meta !Id    !UExp !UExp !UExp
+    | UIncl !Meta !Text  (Maybe Id)
       deriving (Eq, Ord, Show)
 
 -- FIXME:
--- {% raw %} {% endraw %}
 -- {% assign ... %}
 -- {% capture ... %}
+-- {% include ... %}
 
 data BinOp = And | Or
     deriving (Eq, Ord, Show)
@@ -150,3 +161,9 @@ _meta u = case u of
     UCond m _ _ _   -> m
     UCase m _ _ _   -> m
     ULoop m _ _ _ _ -> m
+    UIncl m _ _     -> m
+
+-- | Create an 'Object' from a list of name/value 'Pair's.
+-- See 'Aeson''s documentation for more details.
+fromPairs :: [Pair] -> Object
+fromPairs = (\(Object o) -> o) . object

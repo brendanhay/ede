@@ -85,9 +85,11 @@ import           Text.EDE.Internal.Types
 -- Add render from file
 -- Add template includes
 
--- | A valid parsed and compiled template.
-newtype Template = Template UExp
-    deriving (Eq, Ord)
+load from file needs to parse a template, then find all template includes
+and load those, recursively performing the same operation
+
+the surface apis should reflect the ability to load from file (and the tradeoffs)
+and rendering, or rendering specifying supplementary templates.
 
 -- | Parse 'Text' into a compiled template.
 parse :: Text -> Result Template
@@ -99,18 +101,13 @@ eitherParse :: Text -> Either String Template
 eitherParse = eitherResult . parse
 
 -- | Render an 'Object' using the supplied 'Template'.
-render :: Object -> Template -> Result Builder
-render o (Template e) = Compiler.render e o Filters.defaults
+render :: Object -> HashMap Text Template -> Result Builder
+render = Compiler.render Filters.defaults
 
 -- | Render an 'Object' using the supplied 'Template',
 -- and convert the 'Result' using 'eitherResult'.
-eitherRender :: Object -> Template -> Either String Builder
+eitherRender :: Object -> HashMap Text Template -> Either String Builder
 eitherRender o = eitherResult . render o
-
--- | Create an 'Object' from a list of name/value 'Pair's.
--- See 'Aeson''s documentation for more details.
-fromPairs :: [Pair] -> Object
-fromPairs = (\(Object o) -> o) . object
 
 -- $usage
 --
