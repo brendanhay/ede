@@ -113,7 +113,8 @@ import           Text.Parsec                (SourceName)
 --
 -- Because this function is pure and does not resolve @include@ expressions,
 -- it is required that the caller supplies a 'HashMap' of 'Template's at
--- render time using 'renderWith'.
+-- render time using 'renderWith' if 'include's are used, otherwise an error
+-- will be returned.
 parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
       -> Result Template
 parse = parseAs "Text.EDE.parse"
