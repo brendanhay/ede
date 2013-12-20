@@ -130,9 +130,9 @@ render = renderWith defaultFilters Map.empty
 -- all template resolution and parsing recursively, with non-existent templates
 -- and parse errors returning an error immediately.
 --
--- If you wish to defer loading of includes, or supply additional precompiled/named
--- includes at runtime (using 'renderWith' rather than exclusively using file paths)
--- you should specify 'False' as the first parameter,
+-- If you wish to defer loading of missing includes, or supply additional
+-- precompiled/named includes at runtime (using 'renderWith' rather than
+-- exclusively using file paths) you should specify 'False' as the first parameter,
 -- or use 'parse' and 'renderWith' directly.
 parseFile :: Bool     -- ^ Error if target @include@ tag is a non-existent file.
           -> FilePath -- ^ Path to the template to load.
