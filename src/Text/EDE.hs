@@ -143,9 +143,7 @@ parseFile strict f = do
     p <- doesFileExist f
     if not p
         then failure (mkMeta f) ["File " ++ f ++ " doesn't exist."]
-        else do
-            txt <- LText.readFile f
-            result failure resolve $ parseAs f txt
+        else LText.readFile f >>= result failure resolve . parseAs f
   where
     resolve t@(Template e _) =
         template Map.empty (Text.pack f) t >>=
