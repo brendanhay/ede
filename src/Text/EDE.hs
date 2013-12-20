@@ -111,19 +111,16 @@ import           Text.Parsec                (SourceName)
 
 -- | Parse 'Text' into a compiled template.
 --
--- This function is pure and does not resolve include expressions. This requires
--- that the caller supplies a 'HashMap' of 'Template's at render time
--- using 'renderWith'.
+-- Because this function is pure and does not resolve @include@ expressions,
+-- it is required that the caller supplies a 'HashMap' of 'Template's at
+-- render time using 'renderWith'.
 parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
       -> Result Template
 parse = parseAs "Text.EDE.parse"
 
 -- | Render an 'Object' using the supplied 'Template'.
---
--- Rendering a 'Template' which has been been parsed used the pure variants of
--- 'parse', and contains
-render :: Template
-       -> Object
+render :: Template -- ^ Parsed 'Template' to render.
+       -> Object   -- ^ Bindings to make available in the environment.
        -> Result LText.Text
 render = renderWith defaultFilters Map.empty
 
@@ -173,10 +170,10 @@ parseAs :: SourceName -- ^ Descriptive name for error messages.
 parseAs = Parser.runParser
 
 -- | Render an 'Object' using the supplied 'Template'.
-renderWith :: HashMap Text Fun      -- ^ Filters
-           -> HashMap Text Template -- ^ Additional Templates
-           -> Template              -- ^ Parsed Template
-           -> Object                -- ^ Environment
+renderWith :: HashMap Text Fun      -- ^ Filters to make available in the environment.
+           -> HashMap Text Template -- ^ Additional 'Template's to satisfy @include@ statements.
+           -> Template              -- ^ Parsed 'Template' to render.
+           -> Object                -- ^ Bindings to make available in the environment.
            -> Result LText.Text
 renderWith fs ts (Template e is) o =
     fmap toLazyText $ resolve >>= \es -> Compiler.render fs es e o
