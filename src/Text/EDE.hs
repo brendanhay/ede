@@ -123,11 +123,14 @@ render :: Template
 render = renderWith defaultFilters Map.empty
 
 -- | Read and parse a file into a compile template.
--- This resolves and loads all includes recursively, with unresolvable templates
--- returning an error.
+--
+-- Due to the purity of both 'parse' and 'render' variants, 'parseFile' performs
+-- all template resolution and parsing recursively, with non-existent templates
+-- and parse errors returning an error immediately.
 --
 -- If you wish to defer loading of includes, or supply additional precompiled/named
--- includes at runtime you should use 'parse' and 'renderWith' directly.
+-- includes (rather than using file paths) at runtime you should use 'parse'
+-- and 'renderWith' directly.
 parseFile :: FilePath -> IO (Result Template)
 parseFile f = do
     p <- doesFileExist f
