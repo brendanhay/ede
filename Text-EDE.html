@@ -78,8 +78,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
  all template resolution and parsing recursively, with non-existent templates
  and parse errors returning an error immediately.
 </p><p>If you wish to defer loading of includes, or supply additional precompiled/named
- includes at runtime (rather than exclusively using file paths) you should
- specify <code><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Bool.html#v:False">False</a></code> as the first parameter, or use <code><a href="Text-EDE.html#v:parse">parse</a></code> and <code><a href="Text-EDE.html#v:renderWith">renderWith</a></code> directly.
+ includes at runtime (using <code><a href="Text-EDE.html#v:renderWith">renderWith</a></code> rather than exclusively using file paths)
+ you should specify <code><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Bool.html#v:False">False</a></code> as the first parameter,
+ or use <code><a href="Text-EDE.html#v:parse">parse</a></code> and <code><a href="Text-EDE.html#v:renderWith">renderWith</a></code> directly.
 </p></div></div><h2 id="g:5">Configurable
 </h2><div class="top"><p class="src"><a name="v:parseAs" class="def">parseAs</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: SourceName</td><td class="doc"><p>Descriptive name for error messages.
 </p></td></tr><tr><td class="src">-&gt; Text</td><td class="doc"><p>Lazy <code><a href="Data-Text-Lazy.html#t:Text">Text</a></code> template definition.
