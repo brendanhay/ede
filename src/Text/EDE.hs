@@ -122,7 +122,12 @@ render :: Template
        -> Result LText.Text
 render = renderWith defaultFilters Map.empty
 
--- | Read and parse a file (with includes) into a compile template.
+-- | Read and parse a file into a compile template.
+-- This resolves and loads all includes recursively, with unresolvable templates
+-- returning an error.
+--
+-- If you wish to defer loading of includes, or supply additional precompiled/named
+-- includes at runtime you should use 'parse' and 'renderWith' directly.
 parseFile :: FilePath -> IO (Result Template)
 parseFile f = do
     p <- doesFileExist f
