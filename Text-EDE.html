@@ -64,12 +64,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </p></div><div class="subs instances"><p id="control.i:Template" class="caption collapser" onclick="toggleSection('i:Template')">Instances</p><div id="section.i:Template" class="show"><table><tr><td class="src"><a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Eq.html#t:Eq">Eq</a> <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc empty">&nbsp;</td></tr></table></div></div></div><h2 id="g:3">Basic
 </h2><div class="top"><p class="src"><a name="v:parse" class="def">parse</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: Text</td><td class="doc"><p>Lazy <code><a href="Data-Text-Lazy.html#t:Text">Text</a></code> template definition.
 </p></td></tr><tr><td class="src">-&gt; <a href="Text-EDE.html#t:Result">Result</a> <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc empty">&nbsp;</td></tr></table></div><div class="doc"><p>Parse <code>Text</code> into a compiled template.
-</p><p>This function is pure and does not resolve include expressions. This requires
- that the caller supplies a <code>HashMap</code> of <code><a href="Text-EDE.html#t:Template">Template</a></code>s at render time
- using <code><a href="Text-EDE.html#v:renderWith">renderWith</a></code>.
-</p></div></div><div class="top"><p class="src"><a name="v:render" class="def">render</a> :: <a href="Text-EDE.html#t:Template">Template</a> -&gt; Object -&gt; <a href="Text-EDE.html#t:Result">Result</a> Text</p><div class="doc"><p>Render an <code>Object</code> using the supplied <code><a href="Text-EDE.html#t:Template">Template</a></code>.
-</p><p>Rendering a <code><a href="Text-EDE.html#t:Template">Template</a></code> which has been been parsed used the pure variants of
- <code><a href="Text-EDE.html#v:parse">parse</a></code>, and contains
+</p><p>Because this function is pure and does not resolve <code>include</code> expressions,
+ it is required that the caller supplies a <code>HashMap</code> of <code><a href="Text-EDE.html#t:Template">Template</a></code>s at
+ render time using <code><a href="Text-EDE.html#v:renderWith">renderWith</a></code>.
+</p></div></div><div class="top"><p class="src"><a name="v:render" class="def">render</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc"><p>Parsed <code><a href="Text-EDE.html#t:Template">Template</a></code> to render.
+</p></td></tr><tr><td class="src">-&gt; Object</td><td class="doc"><p>Bindings to make available in the environment.
+</p></td></tr><tr><td class="src">-&gt; <a href="Text-EDE.html#t:Result">Result</a> Text</td><td class="doc empty">&nbsp;</td></tr></table></div><div class="doc"><p>Render an <code>Object</code> using the supplied <code><a href="Text-EDE.html#t:Template">Template</a></code>.
 </p></div></div><h2 id="g:4">IO and Includes
 </h2><div class="top"><p class="src"><a name="v:parseFile" class="def">parseFile</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: <a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Bool.html#t:Bool">Bool</a></td><td class="doc"><p>Error if target <code>include</code> tag is a non-existent file.
 </p></td></tr><tr><td class="src">-&gt; <a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/System-IO.html#t:FilePath">FilePath</a></td><td class="doc"><p>Path to the template to load.
@@ -85,10 +85,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </h2><div class="top"><p class="src"><a name="v:parseAs" class="def">parseAs</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: SourceName</td><td class="doc"><p>Descriptive name for error messages.
 </p></td></tr><tr><td class="src">-&gt; Text</td><td class="doc"><p>Lazy <code><a href="Data-Text-Lazy.html#t:Text">Text</a></code> template definition.
 </p></td></tr><tr><td class="src">-&gt; <a href="Text-EDE.html#t:Result">Result</a> <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc empty">&nbsp;</td></tr></table></div><div class="doc"><p>Parse <code>Text</code> into a compiled template.
-</p></div></div><div class="top"><p class="src"><a name="v:renderWith" class="def">renderWith</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: HashMap Text <a href="Text-EDE.html#t:Fun">Fun</a></td><td class="doc"><p>Filters
-</p></td></tr><tr><td class="src">-&gt; HashMap Text <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc"><p>Additional Templates
-</p></td></tr><tr><td class="src">-&gt; <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc"><p>Parsed Template
-</p></td></tr><tr><td class="src">-&gt; Object</td><td class="doc"><p>Environment
+</p></div></div><div class="top"><p class="src"><a name="v:renderWith" class="def">renderWith</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: HashMap Text <a href="Text-EDE.html#t:Fun">Fun</a></td><td class="doc"><p>Filters to make available in the environment.
+</p></td></tr><tr><td class="src">-&gt; HashMap Text <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc"><p>Additional <code><a href="Text-EDE.html#t:Template">Template</a></code>s to satisfy <code>include</code> statements.
+</p></td></tr><tr><td class="src">-&gt; <a href="Text-EDE.html#t:Template">Template</a></td><td class="doc"><p>Parsed <code><a href="Text-EDE.html#t:Template">Template</a></code> to render.
+</p></td></tr><tr><td class="src">-&gt; Object</td><td class="doc"><p>Bindings to make available in the environment.
 </p></td></tr><tr><td class="src">-&gt; <a href="Text-EDE.html#t:Result">Result</a> Text</td><td class="doc empty">&nbsp;</td></tr></table></div><div class="doc"><p>Render an <code>Object</code> using the supplied <code><a href="Text-EDE.html#t:Template">Template</a></code>.
 </p></div></div><h2 id="g:6">Either Variants
 </h2><div class="top"><p class="src"><a name="v:eitherParse" class="def">eitherParse</a> :: Text -&gt; <a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Either.html#t:Either">Either</a> <a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-String.html#t:String">String</a> <a href="Text-EDE.html#t:Template">Template</a></p><div class="doc"><p>See: <code><a href="Text-EDE.html#v:parse">parse</a></code>
