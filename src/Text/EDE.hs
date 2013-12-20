@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- |
 -- Module      : Text.EDE
@@ -25,10 +26,24 @@ module Text.EDE
     -- * Parsing and rendering
     -- $parsing_and_rendering
       Template
+
+    -- ** Basic
     , parse
     , render
+
+    -- ** IO
+    , parseFile
+
+    -- ** Configurable
+    -- $configuration
+    , parseAs
+    , renderWith
+
+    -- ** Either Variants
     , eitherParse
+    , eitherParseAs
     , eitherRender
+    , eitherRenderWith
 
     -- * Results and errors
     -- $results
@@ -37,15 +52,20 @@ module Text.EDE
     , eitherResult
     , result
 
+    -- * Includes
+    -- $includes
+
+    -- * Filters
+    -- $filters
+    , Fun    (..)
+    , TType  (..)
+    , defaultFilters
+
     -- * Convenience
     -- ** Data.Aeson
     -- $input
     , fromPairs
     , (.=)
-
-    -- ** Data.Text.Lazy.Builder
-    -- $output
-    , toLazyText
 
     -- * Syntax
     -- ** Comments
@@ -66,48 +86,132 @@ module Text.EDE
     -- ** Loops
     -- $loops
 
+    -- ** Includes
+    -- $includes
+
     -- ** Filters
     -- $filters
-
-    -- ** Debugging
-    -- $debugging
     ) where
 
-import           Data.Aeson                 (object, (.=))
-import           Data.Aeson.Types           (Object, Pair, Value(..))
-import           Data.Text.Lazy             (Text)
-import           Data.Text.Lazy.Builder     (Builder, toLazyText)
+import           Data.Aeson                 ((.=))
+import           Data.Aeson.Types           (Object)
+import           Data.Foldable              (foldl', foldrM)
+import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as Map
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import qualified Data.Text.Lazy             as LText
+import           Data.Text.Lazy.Builder     (toLazyText)
+import qualified Data.Text.Lazy.IO          as LText
+import           System.Directory
 import qualified Text.EDE.Internal.Compiler as Compiler
 import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
-
--- Add render from file
--- Add template includes
-
-load from file needs to parse a template, then find all template includes
-and load those, recursively performing the same operation
-
-the surface apis should reflect the ability to load from file (and the tradeoffs)
-and rendering, or rendering specifying supplementary templates.
+import           Text.Parsec                (SourceName)
 
 -- | Parse 'Text' into a compiled template.
-parse :: Text -> Result Template
-parse = fmap Template . Parser.runParser
-
--- | Parse 'Text' into a compiled template,
--- and convert the 'Result' using 'eitherResult'.
-eitherParse :: Text -> Either String Template
-eitherParse = eitherResult . parse
+parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+      -> Result Template
+parse = parseAs "Text.EDE.parse"
 
 -- | Render an 'Object' using the supplied 'Template'.
-render :: Object -> HashMap Text Template -> Result Builder
-render = Compiler.render Filters.defaults
+render :: Template
+       -> Object
+       -> Result LText.Text
+render = renderWith defaultFilters Map.empty
 
--- | Render an 'Object' using the supplied 'Template',
--- and convert the 'Result' using 'eitherResult'.
-eitherRender :: Object -> HashMap Text Template -> Either String Builder
-eitherRender o = eitherResult . render o
+-- | Read and parse a file (with includes) into a compile template.
+parseFile :: FilePath -> IO (Result Template)
+parseFile f = do
+    p <- doesFileExist f
+    if not p
+        then failure (mkMeta f) ["File " ++ f ++ " doesn't exist."]
+        else do
+            txt <- LText.readFile f
+            result failure resolve $ parseAs f txt
+  where
+    resolve t@(Template e _) = do
+        rus <- template Map.empty (Text.pack f) t
+        result failure
+               (success . Template e . Map.map Resolved)
+               rus
+
+    template :: HashMap Text UExp
+             -> Text
+             -> Template
+             -> IO (Result (HashMap Text UExp))
+    template us k (Template e is) =
+        foldrM includes (Success $ Map.insert k e us) $ Map.toList is
+
+    includes :: (Text, Include)
+             -> Result (HashMap Text UExp)
+             -> IO (Result (HashMap Text UExp))
+    includes _                 (Error m xs) = failure m xs
+    includes (k, Resolved   u) (Success us) = success $ Map.insert k u us
+    includes (k, Unresolved _) (Success us) = do
+        rt <- parseFile $ Text.unpack k
+        result failure
+               (template us k)
+               rt
+
+    failure :: Meta -> [String] -> IO (Result a)
+    failure m = return . Error m
+
+    success :: a -> IO (Result a)
+    success = return . Success
+
+-- | Parse 'Text' into a compiled template.
+parseAs :: SourceName -- ^ Descriptive name for error messages.
+        -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+        -> Result Template
+parseAs = Parser.runParser
+
+-- | Render an 'Object' using the supplied 'Template'.
+renderWith :: HashMap Text Fun      -- ^ Filters
+           -> HashMap Text Template -- ^ Additional Templates
+           -> Template              -- ^ Parsed Template
+           -> Object                -- ^ Environment
+           -> Result LText.Text
+renderWith fs ts (Template e is) o = fmap toLazyText $
+    resolve >>= \es -> Compiler.render fs es e o
+  where
+    resolve = Map.traverseWithKey g
+        . foldl' (Map.unionWith f) is
+        $ Map.map tmplIncl ts
+      where
+        f (Unresolved _) b = b
+        f a (Unresolved _) = a
+        f a _              = a
+
+        g _ (Resolved   u) = Success u
+        g k (Unresolved m) =
+            Error m ["include target " ++ Text.unpack k ++ " is unresolved."]
+
+-- | See: 'parse'
+eitherParse :: LText.Text
+            -> Either String Template
+eitherParse = eitherResult . parse
+
+-- | See: 'parseAs'
+eitherParseAs :: SourceName
+              -> LText.Text
+              -> Either String Template
+eitherParseAs n = eitherResult . parseAs n
+
+-- | See: 'render'
+eitherRender :: Template
+             -> Object
+             -> Either String LText.Text
+eitherRender t = eitherResult . render t
+
+-- | See: 'renderWith'
+eitherRenderWith :: HashMap Text Fun
+                 -> HashMap Text Template
+                 -> Template
+                 -> Object
+                 -> Either String LText.Text
+eitherRenderWith fs ts t = eitherResult . renderWith fs ts t
 
 -- $usage
 --
@@ -121,11 +225,11 @@ eitherRender o = eitherResult . render o
 -- Then an 'Object' is defined containing the environment which will be
 -- available to the 'Template' during rendering:
 --
--- >>> let env = render $ fromPairs [ "var" .= "World" ] :: Template -> Result Builder
+-- >>> let env = render $ fromPairs [ "var" .= "World" ] :: Template -> Result Text
 --
 -- Finally the environment is applied to the 'Template':
 --
--- >>> tmpl >>= env :: Result Builder
+-- >>> tmpl >>= env :: Result Text
 -- > Success "Hello, World!"
 --
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
@@ -181,12 +285,7 @@ eitherRender o = eitherResult . render o
 --
 -- It is used in combination with the re-exported '.=' as follows:
 --
--- >>> render (fromPairs [ "foo" .= "value", "bar" .= 1 ]) :: Template -> Result Builder
-
--- $output
---
--- The successful result of rendering an 'Object' environment and 'Template' is
--- a lazy 'Builder' which can be converted to 'Text' using the re-exported 'toLazyText'.
+-- >>> render (fromPairs [ "foo" .= "value", "bar" .= 1 ]) :: Template -> Result Text
 
 -- $comments #syntax#
 --
@@ -338,6 +437,10 @@ eitherRender o = eitherResult . render o
 -- Will render each item with its (1-based) loop index as a prefix, separated
 -- by a blank newline, without a trailing at the end of the document.
 
+-- $includes
+--
+-- TODO
+
 -- $filters
 --
 -- Filters are typed functions which can be applied to variables and literals.
@@ -355,7 +458,4 @@ eitherRender o = eitherResult . render o
 -- * @lower :: Text -> Text@: Lower case a textual value.
 --
 -- * @upper :: Text -> Text@: Upper case a textual value.
---
-
--- $Debugging
 --

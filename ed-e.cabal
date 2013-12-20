@@ -58,6 +58,7 @@ library
         aeson
       , attoparsec
       , base                  >= 4.6 && < 5
+      , directory
       , parsec
       , text
       , text-format

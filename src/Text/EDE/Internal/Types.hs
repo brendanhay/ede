@@ -14,10 +14,13 @@
 
 module Text.EDE.Internal.Types where
 
+import           Control.Applicative
+import           Control.Monad
 import           Data.Aeson              hiding (Result, Success, Error)
 import           Data.Aeson.Types        (Pair)
 import           Data.HashMap.Strict     (HashMap)
 import           Data.List               (intercalate)
+import           Data.Monoid
 import           Data.Text               (Text)
 import           Data.Text.Buildable
 import           Data.Text.Format        (Format, format)
@@ -25,19 +28,22 @@ import           Data.Text.Format.Params (Params)
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 
-type Filters   = HashMap Text Fun
-type Includes  = HashMap Text Meta
-type Templates = HashMap Text UExp
+data Include
+    = Unresolved !Meta
+    | Resolved UExp
+      deriving (Eq)
 
 -- | A valid parsed and compiled template.
-newtype Template = Template UExp
-    deriving (Eq, Ord)
+data Template = Template
+    { tmplExpr :: UExp
+    , tmplIncl :: HashMap Text Include
+    } deriving (Eq)
 
 -- | Meta information describing the source position of an expression or error.
 data Meta = Meta
-    { _source :: !String
-    , _row    :: !Int
-    , _column :: !Int
+    { metaSource :: !String
+    , metaRow    :: !Int
+    , metaColumn :: !Int
     } deriving (Eq, Ord)
 
 instance Show Meta where
@@ -45,18 +51,40 @@ instance Show Meta where
 
 -- | The result of running parsing or rendering steps.
 data Result a
-    = Error Meta [String]
+    = Error !Meta [String]
     | Success a
       deriving (Eq, Ord, Show)
 
 instance Functor Result where
     fmap _ (Error m e) = Error m e
     fmap f (Success x) = Success $ f x
+    {-# INLINE fmap #-}
 
 instance Monad Result where
     return          = Success
+    {-# INLINE return #-}
     Error m e >>= _ = Error m e
     Success a >>= k = k a
+    {-# INLINE (>>=) #-}
+
+instance Applicative Result where
+    pure  = return
+    {-# INLINE pure #-}
+    (<*>) = ap
+    {-# INLINE (<*>) #-}
+
+instance MonadPlus Result where
+    mzero = fail "mzero"
+    {-# INLINE mzero #-}
+    mplus a@(Success _) _ = a
+    mplus _ b             = b
+    {-# INLINE mplus #-}
+
+instance Monoid a => Monoid (Result a) where
+    mempty  = Success mempty
+    {-# INLINE mempty #-}
+    mappend = mplus
+    {-# INLINE mappend #-}
 
 -- | Perform a case analysis on a 'Result'.
 result :: (Meta -> [String] -> b) -- ^ Function to apply to the 'Error' parameters.
@@ -73,7 +101,7 @@ eitherResult = result f Right
   where
     f Meta{..} e = Left . concat $
         [ "ED-E error position: "
-        , concat [_source, ":(", show _row, ",", show _column, ")"]
+        , concat [metaSource, ":(", show metaRow, ",", show metaColumn, ")"]
         , ", messages: " ++ intercalate ", " e
         ]
 
@@ -82,6 +110,7 @@ newtype Id = Id Text
 
 instance Buildable Id where
     build (Id i) = build i
+    {-# INLINE build #-}
 
 data Fun where
     Fun :: (Eq a, Eq b) => TType a -> TType b -> (a -> b) -> Fun

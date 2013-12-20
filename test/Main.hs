@@ -18,7 +18,6 @@ import qualified Data.Aeson              as Aeson
 import           Data.List               (isSuffixOf)
 import           Data.Maybe
 import qualified Data.Text.Lazy          as LText
-import           Data.Text.Lazy.Builder
 import qualified Data.Text.Lazy.Encoding as LText
 import qualified Data.Text.Lazy.IO       as LText
 import           System.Directory
@@ -47,7 +46,7 @@ tests = files >>= mapM (fmap test . load)
         let (js, t) = split txt
             obj     = input js
         in  goldenVsStringDiff name diff (name ++ ".expected") $
-                either error output $ eitherParse t >>= eitherRender obj
+                either error output $ eitherParse t >>= (`eitherRender` obj)
 
     diff r n = ["diff", "-u", r, n]
 
@@ -57,6 +56,4 @@ tests = files >>= mapM (fmap test . load)
         . Aeson.decode
         . LText.encodeUtf8
 
-    output = return
-        . LText.encodeUtf8
-        . toLazyText
+    output = return . LText.encodeUtf8

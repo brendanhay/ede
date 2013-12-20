@@ -12,7 +12,7 @@
 -- Portability : non-portable (GHC extensions)
 
 module Text.EDE.Internal.Filters
-    ( defaults
+    ( defaultFilters
     ) where
 
 import           Data.Char
@@ -24,8 +24,8 @@ import qualified Data.Vector             as Vector
 import           Text.EDE.Internal.Types
 
 -- FIXME: Create polymorphic filters
-defaults :: HashMap Text Fun
-defaults = Map.fromList
+defaultFilters :: HashMap Text Fun
+defaultFilters = Map.fromList
     [ ("lower",      Fun TText TText $ Text.map toLower)
     , ("upper",      Fun TText TText $ Text.map toUpper)
     , ("lowerFirst", Fun TText TText $ lowerFirst)

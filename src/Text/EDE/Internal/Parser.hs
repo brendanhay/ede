@@ -19,7 +19,7 @@ import           Data.Foldable           (foldr')
 import qualified Data.HashMap.Strict     as Map
 import           Data.Monoid
 import qualified Data.Text               as Text
-import           Data.Text.Lazy          (Text)
+import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
@@ -27,12 +27,11 @@ import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (Error, runParser, parse, spaces)
 import           Text.Parsec.Expr
 
-runParser :: Text -> Result (UExp, Includes)
-runParser = either failure Success . Parsec.runParser template mempty "ede"
+runParser :: SourceName -> LText.Text -> Result Template
+runParser src = either failure success . Parsec.runParser template mempty src
   where
-    failure e = Error
-        (positionMeta $ errorPos e)
-        [show e]
+    failure e = Error (positionMeta $ errorPos e) [show e]
+    success   = Success . uncurry Template
 
     template = (,)
         <$> pack (manyTill expression eof)
@@ -113,7 +112,7 @@ include = ("include" ??) $ do
     (k, v) <- try . section $ (,)
         <$> (reserved "include" >> fmap Text.pack stringLiteral)
         <*> optionMaybe (reserved "with" >> ident)
-    modifyState $ Map.insertWith (const id) k m
+    modifyState . Map.insertWith (const id) k $ Unresolved m
     return $ UIncl m k v
 
 section :: Parser a -> Parser a

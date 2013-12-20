@@ -55,19 +55,19 @@ data Col where
 data TExp = forall a. Eq a => a ::: TType a
 
 data Env = Env
-    { _filters   :: Filters
-    , _templates :: Templates
+    { _filters   :: HashMap Text Fun
+    , _templates :: HashMap Text UExp
     , _variables :: Object
     }
 
 type Context = ReaderT Env Result
 
-render :: Filters
-       -> Templates
-       -> Object
+render :: HashMap Text Fun
+       -> HashMap Text UExp
        -> UExp
+       -> Object
        -> Result Builder
-render fs ts o e = flip runReaderT (Env fs ts o) $ do
+render fs ts e o = flip runReaderT (Env fs ts o) $ do
     v ::: vt <- eval e >>= build (mkMeta "render")
     Eq       <- equal (mkMeta "cast") TBld vt
     return v
