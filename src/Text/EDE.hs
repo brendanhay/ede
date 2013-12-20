@@ -124,6 +124,10 @@ render :: Template -- ^ Parsed 'Template' to render.
        -> Result LText.Text
 render = renderWith defaultFilters Map.empty
 
+-- FIXME: make the lookup of include identifiers safe
+--   ie: if the target is some key but it also happened to be a file unintentionally
+--   how could this be made more robust?
+
 -- | Read and parse a file into a compiled template.
 --
 -- If 'True' is specified as the first parameter, 'parseFile' performs
