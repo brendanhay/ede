@@ -41,6 +41,7 @@ module Text.EDE
 
     -- ** Either Variants
     , eitherParse
+    , eitherParseFile
     , eitherParseAs
     , eitherRender
     , eitherRenderWith
@@ -192,6 +193,11 @@ renderWith fs ts (Template e is) o = fmap toLazyText $
 eitherParse :: LText.Text
             -> Either String Template
 eitherParse = eitherResult . parse
+
+-- | See: 'parseFile'
+eitherParseFile :: FilePath
+                -> IO (Either String Template)
+eitherParseFile = fmap eitherResult . parseFile
 
 -- | See: 'parseAs'
 eitherParseAs :: SourceName
