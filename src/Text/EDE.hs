@@ -31,7 +31,7 @@ module Text.EDE
     , parse
     , render
 
-    -- ** IO and Dependencies
+    -- ** IO and Includes
     , parseFile
 
     -- ** Configurable
