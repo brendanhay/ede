@@ -142,7 +142,7 @@ parseFile :: Bool     -- ^ Error if target @include@ tag is a non-existent file.
 parseFile strict f = do
     p <- doesFileExist f
     if not p
-        then failure (mkMeta f) ["File " ++ f ++ " doesn't exist."]
+        then failure (mkMeta f) ["file " ++ f ++ " doesn't exist."]
         else LText.readFile f >>= result failure resolve . parseAs f
   where
     resolve t@(Template e _) =
