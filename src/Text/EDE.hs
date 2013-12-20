@@ -470,3 +470,11 @@ eitherRenderWith fs ts t = eitherResult . renderWith fs ts t
 --
 -- * @upper :: Text -> Text@: Upper case a textual value.
 --
+-- * @lowerFirst :: Text -> Text@: Lower case the first character of a textual value.
+--
+-- * @upperFirst :: Text -> Text@: Upper case the first character of a textual value.
+--
+-- * @listLength :: Array -> Integer@: Get the length of an 'Array'.
+--
+-- * @mapLength :: Object -> Integer@: Get the length of an 'Object'.
+--
