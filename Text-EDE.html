@@ -4,7 +4,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><a href="index.html">Contents</a></li><li><a href="doc-index.html">Index</a></li></ul><p class="caption">ed-e-0.1.0: Textual Templating Language</p></div><div id="content"><div id="module-header"><table class="info"><tr><th>Portability</th><td>non-portable (GHC extensions)</td></tr><tr><th>Stability</th><td>experimental</td></tr><tr><th>Maintainer</th><td>Brendan Hay &lt;brendan.g.hay@gmail.com&gt;</td></tr><tr><th>Safe Haskell</th><td>None</td></tr></table><p class="caption">Text.EDE</p></div><div id="table-of-contents"><p class="caption">Contents</p><ul><li><a href="#g:1">How to use this library
 </a></li><li><a href="#g:2">Parsing and Rendering
 </a><ul><li><a href="#g:3">Basic
-</a></li><li><a href="#g:4">IO and Dependencies
+</a></li><li><a href="#g:4">IO and Includes
 </a></li><li><a href="#g:5">Configurable
 </a></li><li><a href="#g:6">Either Variants
 </a></li></ul></li><li><a href="#g:7">Results and Errors
@@ -70,7 +70,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </p></div></div><div class="top"><p class="src"><a name="v:render" class="def">render</a> :: <a href="Text-EDE.html#t:Template">Template</a> -&gt; Object -&gt; <a href="Text-EDE.html#t:Result">Result</a> Text</p><div class="doc"><p>Render an <code>Object</code> using the supplied <code><a href="Text-EDE.html#t:Template">Template</a></code>.
 </p><p>Rendering a <code><a href="Text-EDE.html#t:Template">Template</a></code> which has been been parsed used the pure variants of
  <code><a href="Text-EDE.html#v:parse">parse</a></code>, and contains
-</p></div></div><h2 id="g:4">IO and Dependencies
+</p></div></div><h2 id="g:4">IO and Includes
 </h2><div class="top"><p class="src"><a name="v:parseFile" class="def">parseFile</a></p><div class="subs arguments"><p class="caption">Arguments</p><table><tr><td class="src">:: <a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/Data-Bool.html#t:Bool">Bool</a></td><td class="doc"><p>Error if target <code>include</code> tag is a non-existent file.
 </p></td></tr><tr><td class="src">-&gt; <a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/System-IO.html#t:FilePath">FilePath</a></td><td class="doc"><p>Path to the template to load.
 </p></td></tr><tr><td class="src">-&gt; <a href="file:///usr/local/share/doc/ghc/html/libraries/base-4.6.0.1/System-IO.html#t:IO">IO</a> (<a href="Text-EDE.html#t:Result">Result</a> <a href="Text-EDE.html#t:Template">Template</a>)</td><td class="doc empty">&nbsp;</td></tr></table></div><div class="doc"><p>Read and parse a file into a compiled template.
