@@ -16,7 +16,7 @@ git checkout gh-pages
 
 mv $DOCDIR/* .
 
-git add ed-e *.html *.js *.css *.gif *.png
+git add *.html *.js *.css *.gif *.png
 git commit -m "Generated documentation from $HEAD"
 git push origin gh-pages
 git checkout master
