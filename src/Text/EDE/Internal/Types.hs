@@ -29,8 +29,8 @@ import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 
 data Include
-    = Unresolved !Meta
-    | Resolved UExp
+    = Resolved UExp
+    | Unresolved !Meta
       deriving (Eq)
 
 -- | A valid parsed and compiled template.
@@ -140,20 +140,19 @@ data UExp
     | UBld  !Meta !Builder
     | UVar  !Meta !Id
     | UFun  !Meta !Id
-    | UApp  !Meta !UExp  !UExp
+    | UApp  !Meta !UExp !UExp
     | UNeg  !Meta !UExp
     | UBin  !Meta !BinOp !UExp !UExp
     | URel  !Meta !RelOp !UExp !UExp
-    | UCond !Meta !UExp  !UExp !UExp
-    | UCase !Meta !UExp  [(UExp, UExp)] !UExp
-    | ULoop !Meta !Id    !UExp !UExp !UExp
-    | UIncl !Meta !Text  (Maybe Id)
+    | UCond !Meta !UExp !UExp !UExp
+    | UCase !Meta !UExp [(UExp, UExp)] !UExp
+    | ULoop !Meta !Id !UExp !UExp !UExp
+    | UIncl !Meta !Text (Maybe Id)
       deriving (Eq, Ord, Show)
 
 -- FIXME:
 -- {% assign ... %}
 -- {% capture ... %}
--- {% include ... %}
 
 data BinOp = And | Or
     deriving (Eq, Ord, Show)
