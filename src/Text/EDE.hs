@@ -154,18 +154,12 @@ parseWith f n = result failure resolve . Parser.runParser (Text.unpack n)
   where
     resolve (u, is) = do
         r <- foldrM include (Success $ Map.singleton n u) $ Map.toList is
-        result failure
-             (success . Template n u)
-             r
+        result failure (success . Template n u) r
 
+     -- Presuming self is always in self's includes, see singleton above.
     include (_, _) (Error m xs) = failure m xs
-    include (k, m) (Success ss) = do
-        r <- f k m
-        result failure
-               -- Shouldn't need to insert self, presuming self
-               -- is always in self's includes.
-               (success . mappend ss . tmplIncl)
-               r
+    include (k, m) (Success ss) =
+        f k m >>= result failure (success . mappend ss . tmplIncl)a
 
 includeMap :: Monad m
            => HashMap Text Template
