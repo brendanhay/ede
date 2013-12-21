@@ -119,6 +119,14 @@ parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
       -> Result Template
 parse = parseAs "Text.EDE.parse"
 
+Maybe move this logic to Parse?
+Should template resolution be done at parse, or at render?
+
+Should the temaplates be done only at parse, strictly, with a loader specified?
+
+Or try something more elaborate at the type level, using tags or type classes
+to constraint unresolved templates to IO
+
 -- | Render an 'Object' using the supplied 'Template'.
 render :: Template -- ^ Parsed 'Template' to render.
        -> Object   -- ^ Bindings to make available in the environment.
@@ -139,15 +147,47 @@ render = renderWith defaultFilters Map.empty
 -- precompiled/named includes at runtime (using 'renderWith' rather than
 -- exclusively using file paths) you should specify 'False' as the first parameter,
 -- or use 'parse' and 'renderWith' directly.
-parseFile :: Bool     -- ^ Error if target @include@ tag is a non-existent file.
-          -> FilePath -- ^ Path to the template to load.
-          -> IO (Result Template)
-parseFile strict f = do
+
+
+parse :: (Text -> m (Result Template)) -- ^ Function to lookup includes.
+      -> LText.Text                    -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+      -> m (Result LText.Text)
+parse f = parseAs f "Text.EDE.parse"
+
+
+parseAs :: (Text -> Meta -> m (Result Template)) -- ^ Function to lookup includes.
+        -> SourceName                    -- ^ Descriptive name for error messages.
+        -> LText.Text                    -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+        -> Result Template
+parseAs f = Parser.runParser
+  where
+
+type Cache = StateT (HashMap Text Template)
+
+
+
+includeMap :: Monad m
+           => HashMap Text Template
+           -> (Text -> Meta -> m (Result Template))
+includeMap ts k m
+    | Just x <- Map.lookup k ts = return $ Success x
+    | otherwise = return $ Error m ["unable to find template " ++ Text.unpack k]
+
+includeFile :: Monad m
+            => (Text -> Meta -> m (Result Template))
+includeFile k m = do
+
+include :: HashMap Text Template -> Text -> IO (Result Template)
+include ts k
+    | Just x <- Map.lookup k ts = 
+    | otherwise = do
     p <- doesFileExist f
     if not p
         then failure (mkMeta f) ["file " ++ f ++ " doesn't exist."]
         else LText.readFile f >>= result failure resolve . parseAs f
   where
+    path = Text.unpack k
+
     resolve t@(Template e _) =
         template Map.empty (Text.pack f) t >>=
             result failure (success . Template e)
@@ -168,17 +208,10 @@ parseFile strict f = do
     failure m = return . Error m
     success   = return . Success
 
--- | Parse 'Text' into a compiled template.
-parseAs :: SourceName -- ^ Descriptive name for error messages.
-        -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
-        -> Result Template
-parseAs = Parser.runParser
-
 -- | Render an 'Object' using the supplied 'Template'.
-renderWith :: HashMap Text Fun      -- ^ Filters to make available in the environment.
-           -> HashMap Text Template -- ^ Additional 'Template's to satisfy @include@ statements.
-           -> Template              -- ^ Parsed 'Template' to render.
-           -> Object                -- ^ Bindings to make available in the environment.
+renderWith :: HashMap Text Fun -- ^ Filters to make available in the environment.
+           -> Template         -- ^ Parsed 'Template' to render.
+           -> Object           -- ^ Bindings to make available in the environment.
            -> Result LText.Text
 renderWith fs ts (Template e is) o =
     fmap toLazyText $ resolve >>= \es -> Compiler.render fs es e o

@@ -28,15 +28,10 @@ import           Data.Text.Format.Params (Params)
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 
-data Include
-    = Resolved UExp
-    | Unresolved !Meta
-      deriving (Eq)
-
 -- | A valid parsed and compiled template.
 data Template = Template
     { tmplExpr :: UExp
-    , tmplIncl :: HashMap Text Include
+    , tmplIncl :: HashMap Text UExp
     } deriving (Eq)
 
 -- | Meta information describing the source position of an expression or error.
