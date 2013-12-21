@@ -159,7 +159,7 @@ parseWith f n = result failure resolve . Parser.runParser (Text.unpack n)
      -- Presuming self is always in self's includes, see singleton above.
     include (_, _) (Error m xs) = failure m xs
     include (k, m) (Success ss) =
-        f k m >>= result failure (success . mappend ss . tmplIncl)a
+        f k m >>= result failure (success . mappend ss . tmplIncl)
 
 includeMap :: Monad m
            => HashMap Text Template
