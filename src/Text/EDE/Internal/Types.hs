@@ -30,7 +30,8 @@ import           Data.Text.Lazy.Builder
 
 -- | A valid parsed and compiled template.
 data Template = Template
-    { tmplExpr :: UExp
+    { tmplName :: !Text
+    , tmplExpr :: UExp
     , tmplIncl :: HashMap Text UExp
     } deriving (Eq)
 
@@ -81,14 +82,6 @@ instance Monoid a => Monoid (Result a) where
     mappend = mplus
     {-# INLINE mappend #-}
 
--- | Perform a case analysis on a 'Result'.
-result :: (Meta -> [String] -> b) -- ^ Function to apply to the 'Error' parameters.
-       -> (a -> b)                -- ^ Function to apply to the 'Success' case.
-       -> Result a                -- ^ The 'Result' to map over.
-       -> b
-result f _ (Error m e) = f m e
-result _ g (Success x) = g x
-
 -- | Convert a 'Result' to an 'Either' with the 'Left' case holding a formatted
 -- error message, and 'Right' being the successful result over which 'Result' is paramterised.
 eitherResult :: Result a -> Either String a
@@ -99,6 +92,22 @@ eitherResult = result f Right
         , concat [metaSource, ":(", show metaRow, ",", show metaColumn, ")"]
         , ", messages: " ++ intercalate ", " e
         ]
+
+-- | Perform a case analysis on a 'Result'.
+result :: (Meta -> [String] -> b) -- ^ Function to apply to the 'Error' parameters.
+       -> (a -> b)                -- ^ Function to apply to the 'Success' case.
+       -> Result a                -- ^ The 'Result' to map over.
+       -> b
+result f _ (Error m e) = f m e
+result _ g (Success x) = g x
+
+-- |
+success :: Monad m => a -> m (Result a)
+success = return . Success
+
+-- |
+failure :: Monad m => Meta -> [String] -> m (Result a)
+failure m = return . Error m
 
 newtype Id = Id Text
     deriving (Eq, Ord, Show)

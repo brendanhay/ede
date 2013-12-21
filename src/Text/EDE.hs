@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TupleSections     #-}
 
 -- |
@@ -27,22 +28,19 @@ module Text.EDE
     -- $parsing_and_rendering
       Template
 
-    -- ** Basic
+    -- ** Parsing
     , parse
-    , render
-
-    -- ** IO and Includes
     , parseFile
+    , parseWith
 
-    -- ** Configurable
-    -- $configuration
-    , parseAs
+    -- ** Rendering
+    , render
     , renderWith
 
     -- ** Either Variants
     , eitherParse
     , eitherParseFile
-    , eitherParseAs
+    , eitherParseWith
     , eitherRender
     , eitherRenderWith
 
@@ -52,6 +50,8 @@ module Text.EDE
     , Result (..)
     , eitherResult
     , result
+    , success
+    , failure
 
     -- * Includes
 
@@ -92,11 +92,13 @@ module Text.EDE
     -- $filters
     ) where
 
+import           Control.Monad
 import           Data.Aeson                 ((.=))
 import           Data.Aeson.Types           (Object)
 import           Data.Foldable              (foldl', foldrM)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
+import           Data.Monoid
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Lazy             as LText
@@ -109,155 +111,118 @@ import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
 import           Text.Parsec                (SourceName)
 
--- | Parse 'Text' into a compiled template.
---
--- Because this function is pure and does not resolve @include@ expressions,
--- it is required that the caller supplies a 'HashMap' of 'Template's at
--- render time using 'renderWith' if 'include's are used, otherwise an error
--- will be returned.
+-- -- | Parse 'Text' into a compiled template.
+-- --
+-- -- Because this function is pure and does not resolve @include@ expressions,
+-- -- it is required that the caller supplies a 'HashMap' of 'Template's at
+-- -- render time using 'renderWith' if 'include's are used, otherwise an error
+-- -- will be returned.
+
+-- -- FIXME: make the lookup of include identifiers safe
+-- --   ie: if the target is some key but it also happened to be a file unintentionally
+-- --   how could this be made more robust?
+
+-- -- | Read and parse a file into a compiled template.
+-- --
+-- -- If 'True' is specified as the first parameter, 'parseFile' performs
+-- -- all template resolution and parsing recursively, with non-existent templates
+-- -- and parse errors returning an error immediately.
+-- --
+-- -- If you wish to defer loading of missing includes, or supply additional
+-- -- precompiled/named includes at runtime (using 'renderWith' rather than
+-- -- exclusively using file paths) you should specify 'False' as the first parameter,
+-- -- or use 'parse' and 'renderWith' directly.
+
 parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
       -> Result Template
-parse = parseAs "Text.EDE.parse"
+parse = join . parseWith (includeMap mempty) "Text.EDE.parse"
 
-Maybe move this logic to Parse?
-Should template resolution be done at parse, or at render?
+parseFile :: FilePath -- ^ Path to the file to load.
+          -> IO (Result Template)
+parseFile p = do
+    e <- doesFileExist p
+    if not e
+        then failure (mkMeta p) ["file " ++ p ++ " doesn't exist."]
+        else LText.readFile p >>= parseWith includeFile (Text.pack p)
 
-Should the temaplates be done only at parse, strictly, with a loader specified?
+parseWith :: Monad m
+          => (Text -> Meta -> m (Result Template)) -- ^ Function to resolve includes.
+          -> Text                                  -- ^ Template name.
+          -> LText.Text                            -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+          -> m (Result Template)
+parseWith f n = result failure resolve . Parser.runParser (Text.unpack n)
+  where
+    resolve (u, is) = do
+        r <- foldrM include (Success $ Map.singleton n u) $ Map.toList is
+        result failure
+             (success . Template n u)
+             r
 
-Or try something more elaborate at the type level, using tags or type classes
-to constraint unresolved templates to IO
+    include (_, _) (Error m xs) = failure m xs
+    include (k, m) (Success ss) = do
+        r <- f k m
+        result failure
+               -- Shouldn't need to insert self, presuming self
+               -- is always in self's includes.
+               (success . mappend ss . tmplIncl)
+               r
+
+includeMap :: Monad m
+           => HashMap Text Template
+           -> Text
+           -> Meta
+           -> m (Result Template)
+includeMap ts k m
+    | Just v <- Map.lookup k ts = success v
+    | otherwise = failure m ["unable to resolve " ++ Text.unpack k]
+
+includeFile :: Text
+            -> Meta
+            -> IO (Result Template)
+includeFile k = const (parseFile $ Text.unpack k)
 
 -- | Render an 'Object' using the supplied 'Template'.
 render :: Template -- ^ Parsed 'Template' to render.
        -> Object   -- ^ Bindings to make available in the environment.
        -> Result LText.Text
-render = renderWith defaultFilters Map.empty
-
--- FIXME: make the lookup of include identifiers safe
---   ie: if the target is some key but it also happened to be a file unintentionally
---   how could this be made more robust?
-
--- | Read and parse a file into a compiled template.
---
--- If 'True' is specified as the first parameter, 'parseFile' performs
--- all template resolution and parsing recursively, with non-existent templates
--- and parse errors returning an error immediately.
---
--- If you wish to defer loading of missing includes, or supply additional
--- precompiled/named includes at runtime (using 'renderWith' rather than
--- exclusively using file paths) you should specify 'False' as the first parameter,
--- or use 'parse' and 'renderWith' directly.
-
-
-parse :: (Text -> m (Result Template)) -- ^ Function to lookup includes.
-      -> LText.Text                    -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
-      -> m (Result LText.Text)
-parse f = parseAs f "Text.EDE.parse"
-
-
-parseAs :: (Text -> Meta -> m (Result Template)) -- ^ Function to lookup includes.
-        -> SourceName                    -- ^ Descriptive name for error messages.
-        -> LText.Text                    -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
-        -> Result Template
-parseAs f = Parser.runParser
-  where
-
-type Cache = StateT (HashMap Text Template)
-
-
-
-includeMap :: Monad m
-           => HashMap Text Template
-           -> (Text -> Meta -> m (Result Template))
-includeMap ts k m
-    | Just x <- Map.lookup k ts = return $ Success x
-    | otherwise = return $ Error m ["unable to find template " ++ Text.unpack k]
-
-includeFile :: Monad m
-            => (Text -> Meta -> m (Result Template))
-includeFile k m = do
-
-include :: HashMap Text Template -> Text -> IO (Result Template)
-include ts k
-    | Just x <- Map.lookup k ts = 
-    | otherwise = do
-    p <- doesFileExist f
-    if not p
-        then failure (mkMeta f) ["file " ++ f ++ " doesn't exist."]
-        else LText.readFile f >>= result failure resolve . parseAs f
-  where
-    path = Text.unpack k
-
-    resolve t@(Template e _) =
-        template Map.empty (Text.pack f) t >>=
-            result failure (success . Template e)
-
-    template us k (Template u is) =
-        let initial = Success $ Map.insert k (Resolved u) us
-        in  foldrM includes initial $ Map.toList is
-
-    includes _                     (Error m xs) = failure m xs
-    includes (k, r@(Resolved   _)) (Success us) = success $ Map.insert k r us
-    includes (k, r@(Unresolved _)) (Success us) = do
-        let f' = Text.unpack k
-        p <- doesFileExist f'
-        if not p && strict
-            then success $ Map.insert k r us
-            else parseFile strict f' >>= result failure (template us k)
-
-    failure m = return . Error m
-    success   = return . Success
+render = renderWith defaultFilters
 
 -- | Render an 'Object' using the supplied 'Template'.
 renderWith :: HashMap Text Fun -- ^ Filters to make available in the environment.
            -> Template         -- ^ Parsed 'Template' to render.
            -> Object           -- ^ Bindings to make available in the environment.
            -> Result LText.Text
-renderWith fs ts (Template e is) o =
-    fmap toLazyText $ resolve >>= \es -> Compiler.render fs es e o
-  where
-    resolve = Map.traverseWithKey g
-        . foldl' (Map.unionWith f) is
-        $ Map.map tmplIncl ts
+renderWith fs (Template _ u ts) = fmap toLazyText . Compiler.render fs ts u
 
-    f (Unresolved _) b = b
-    f a (Unresolved _) = a
-    f a _              = a
-
-    g _ (Resolved   u) = Success u
-    g k (Unresolved m) =
-        Error m ["include target " ++ Text.unpack k ++ " is unresolved."]
-
--- | See: 'parse'
-eitherParse :: LText.Text
-            -> Either String Template
+-- -- | See: 'parse'
+-- eitherParse :: LText.Text
+--             -> Either String Template
 eitherParse = eitherResult . parse
 
--- | See: 'parseFile'
-eitherParseFile :: Bool
-                -> FilePath
-                -> IO (Either String Template)
-eitherParseFile strict = fmap eitherResult . parseFile strict
+-- -- | See: 'parseFile'
+-- eitherParseFile :: Bool
+--                 -> FilePath
+--                 -> IO (Either String Template)
+eitherParseFile = fmap eitherResult . parseFile
 
--- | See: 'parseAs'
-eitherParseAs :: SourceName
-              -> LText.Text
-              -> Either String Template
-eitherParseAs n = eitherResult . parseAs n
+-- -- | See: 'parseAs'
+-- eitherParseWith :: SourceName
+--               -> LText.Text
+--               -> Either String Template
+eitherParseWith n = fmap eitherResult . parseWith n
 
--- | See: 'render'
-eitherRender :: Template
-             -> Object
-             -> Either String LText.Text
+-- -- | See: 'render'
+-- eitherRender :: Template
+--              -> Object
+--              -> Either String LText.Text
 eitherRender t = eitherResult . render t
 
--- | See: 'renderWith'
-eitherRenderWith :: HashMap Text Fun
-                 -> HashMap Text Template
-                 -> Template
-                 -> Object
-                 -> Either String LText.Text
-eitherRenderWith fs ts t = eitherResult . renderWith fs ts t
+-- -- | See: 'renderWith'
+-- eitherRenderWith :: HashMap Text Fun
+--                  -> Template
+--                  -> Object
+--                  -> Either String LText.Text
+eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $usage
 --

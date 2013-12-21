@@ -23,7 +23,7 @@ import           Text.Parsec.Text.Lazy   (GenParser)
 import           Text.Parsec.Token       (GenTokenParser)
 import qualified Text.Parsec.Token       as Parsec
 
-type Parser = Parsec LText.Text (HashMap Text.Text Include)
+type Parser = Parsec LText.Text (HashMap Text.Text Meta)
 
 identifier :: Parser String
 identifier = Parsec.identifier lexer

@@ -16,19 +16,20 @@ module Text.EDE.Internal.Parser where
 import           Control.Applicative     ((<$>), (<*>), (<*), (*>))
 import           Control.Monad
 import           Data.Foldable           (foldr')
+import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
 import           Data.Monoid
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Lexer
-import           Text.EDE.Internal.Types
+import           Text.EDE.Internal.Types hiding (failure)
 import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (Error, runParser, parse, spaces)
 import           Text.Parsec.Expr
 
-runParser :: SourceName -> LText.Text -> Result (UExp, HashMap Text Meta)
-runParser src = either failure Success . Parsec.runParser template mempty src
+runParser :: SourceName -> LText.Text -> Result (UExp, HashMap Text.Text Meta)
+runParser n = either failure Success . Parsec.runParser template mempty n
   where
     failure e = Error (positionMeta $ errorPos e) [show e]
 
@@ -111,7 +112,7 @@ include = ("include" ??) $ do
     (k, v) <- try . section $ (,)
         <$> (reserved "include" >> fmap Text.pack stringLiteral)
         <*> optionMaybe (reserved "with" >> ident)
-    modifyState . Map.insertWith (const id) k m
+    modifyState $ Map.insertWith (const id) k m
     return $ UIncl m k v
 
 section :: Parser a -> Parser a
