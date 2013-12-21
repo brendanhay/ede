@@ -94,7 +94,7 @@ module Text.EDE
 import           Control.Monad
 import           Data.Aeson                 ((.=))
 import           Data.Aeson.Types           (Object)
-import           Data.Foldable              (foldl', foldrM)
+import           Data.Foldable              (foldrM)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import           Data.Monoid
@@ -108,7 +108,6 @@ import qualified Text.EDE.Internal.Compiler as Compiler
 import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
-import           Text.Parsec                (SourceName)
 
 -- -- | Parse 'Text' into a compiled template.
 -- --
@@ -193,34 +192,35 @@ renderWith :: HashMap Text Fun -- ^ Filters to make available in the environment
            -> Result LText.Text
 renderWith fs (Template _ u ts) = fmap toLazyText . Compiler.render fs ts u
 
--- -- | See: 'parse'
--- eitherParse :: LText.Text
---             -> Either String Template
+-- | See: 'parse'
+eitherParse :: LText.Text
+            -> Either String Template
 eitherParse = eitherResult . parse
 
--- -- | See: 'parseFile'
--- eitherParseFile :: Bool
---                 -> FilePath
---                 -> IO (Either String Template)
+-- | See: 'parseFile'
+eitherParseFile :: FilePath
+                -> IO (Either String Template)
 eitherParseFile = fmap eitherResult . parseFile
 
--- -- | See: 'parseAs'
--- eitherParseWith :: SourceName
---               -> LText.Text
---               -> Either String Template
-eitherParseWith n = fmap eitherResult . parseWith n
+-- | See: 'parseWith'
+eitherParseWith :: (Functor m, Monad m)
+                => (Text -> Meta -> m (Result Template))
+                -> Text
+                -> LText.Text
+                -> m (Either String Template)
+eitherParseWith f n = fmap eitherResult . parseWith f n
 
--- -- | See: 'render'
--- eitherRender :: Template
---              -> Object
---              -> Either String LText.Text
+-- | See: 'render'
+eitherRender :: Template
+             -> Object
+             -> Either String LText.Text
 eitherRender t = eitherResult . render t
 
--- -- | See: 'renderWith'
--- eitherRenderWith :: HashMap Text Fun
---                  -> Template
---                  -> Object
---                  -> Either String LText.Text
+-- | See: 'renderWith'
+eitherRenderWith :: HashMap Text Fun
+                 -> Template
+                 -> Object
+                 -> Either String LText.Text
 eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $usage
