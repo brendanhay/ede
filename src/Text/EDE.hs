@@ -32,6 +32,10 @@ module Text.EDE
     , parseFile
     , parseWith
 
+    -- * Includes
+    , includeMap
+    , includeFile
+
     -- ** Rendering
     , render
     , renderWith
@@ -43,6 +47,11 @@ module Text.EDE
     , eitherRender
     , eitherRenderWith
 
+    -- * Filters
+    , Fun    (..)
+    , TType  (..)
+    , defaultFilters
+
     -- * Results and Errors
     -- $results
     , Meta   (..)
@@ -51,13 +60,6 @@ module Text.EDE
     , result
     , success
     , failure
-
-    -- * Includes
-
-    -- * Filters
-    , Fun    (..)
-    , TType  (..)
-    , defaultFilters
 
     -- * Convenience
     -- ** Data.Aeson
