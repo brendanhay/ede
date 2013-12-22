@@ -28,7 +28,10 @@ import           Data.Text.Format.Params (Params)
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 
--- | A valid parsed and compiled template.
+-- | A function to resolve the target of an @include@ expression.
+type Resolver m = Text -> Meta -> m (Result Template)
+
+-- | A parsed and compiled template.
 data Template = Template
     { tmplName :: !Text
     , tmplExpr :: UExp
@@ -101,11 +104,11 @@ result :: (Meta -> [String] -> b) -- ^ Function to apply to the 'Error' paramete
 result f _ (Error m e) = f m e
 result _ g (Success x) = g x
 
--- |
+-- | Convenience for returning a successful 'Result'.
 success :: Monad m => a -> m (Result a)
 success = return . Success
 
--- |
+-- | Convenience for returning an error 'Result'.
 failure :: Monad m => Meta -> [String] -> m (Result a)
 failure m = return . Error m
 

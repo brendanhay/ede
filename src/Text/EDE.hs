@@ -33,6 +33,7 @@ module Text.EDE
     , parseWith
 
     -- ** Includes
+    -- $resolvers
     , Resolver
     , includeMap
     , includeFile
@@ -62,8 +63,7 @@ module Text.EDE
     , success
     , failure
 
-    -- * Convenience
-    -- ** Data.Aeson
+    -- * Input
     -- $input
     , fromPairs
     , (.=)
@@ -111,9 +111,6 @@ import qualified Text.EDE.Internal.Compiler as Compiler
 import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
-
--- | A function to resolve the target of an @include@ expression.
-type Resolver m = Text -> Meta -> m (Result Template)
 
 -- | Parse Lazy 'LText.Text' into a compiled 'Template'.
 --
@@ -235,16 +232,19 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- First the 'Template' is defined:
 --
--- >>> let tmpl = parse "{% if var %}Hello, {{ var }}!{% else %}negative!{% endif %}" :: Result Template
+-- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Result Template
 --
 -- Then an 'Object' is defined containing the environment which will be
 -- available to the 'Template' during rendering:
 --
--- >>> let env = render $ fromPairs [ "var" .= "World" ] :: Template -> Result Text
+-- >>> let env = fromPairs [ "var" .= "World" ] :: Object
+--
+-- Note: the 'fromPairs' function above is a wrapper over Aeson's 'object'
+-- which removes the 'Value' constructor, exposing the delicious 'HashMap' underneath.
 --
 -- Finally the environment is applied to the 'Template':
 --
--- >>> tmpl >>= env :: Result Text
+-- >>> render tmpl env :: Result Text
 -- > Success "Hello, World!"
 --
 -- In this manner, 'Template's can be pre-compiled to the internal AST and
@@ -257,8 +257,8 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- >
 -- > main :: IO ()
 -- > main = do
--- >     tmpl <- LText.readFile "template.ede"
--- >     either error print $ eitherParse tmpl >>= eitherRender env
+-- >     r <- eitherParseFile "template.ede"
+-- >     either error print $ r >>= (`eitherRender` env)
 -- >   where
 -- >     env = fromPairs
 -- >         [ "text" .= "Some Text."
@@ -284,18 +284,27 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- 'Template' to subsitute the values into.
 -- The result is a Lazy 'LText.Text' value containing the rendered output.
 
+-- $resolvers
+--
+-- The 'Resolver' used to resolve @include@ expressions determines the purity
+-- of 'Template' parsing.
+--
+-- For example, using the 'includeFile' 'Resolver' means parsing is restricted
+-- to 'IO', while pre-caching a 'HashMap' of 'Template's and supplying them to
+-- 'parseWith' using 'includeMap' offers a pure variant for @include@ resolution.
+
 -- $results
 --
--- Unsuccessful 'parse' or 'render' steps can be inspected or analysed using
--- 'result'.
+-- The 'Result' of a 'parse' or 'render' steps can be inspected or analysed using
+-- 'result' as follows:
 --
--- >>> result failure success $ parse tmpl >>= render env
+-- >>> result failure success $ render tmpl env
 --
 -- If you're only interested in dealing with errors as strings, and the positional
 -- information contained in 'Meta' is not of use you can use the convenience functions
 -- 'eitherParse', 'eitherRender', or convert a 'Result' to 'Either' using 'eitherResult'.
 --
--- >>> either failure success $ eitherParse tmpl >>= eitherRender env
+-- >>> either failure success $ eitherParse tmpl
 
 -- $input
 --
@@ -458,7 +467,30 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $includes
 --
--- TODO
+-- Includes are a way to reduce the amount of noise in large templates.
+-- They can be used to abstract out common snippets and idioms into partials.
+--
+-- If 'parseFile' or the 'includeFile' resolver is used, templates will be loaded
+-- from 'FilePath's, for example:
+--
+-- > {% include "/var/tmp/partial.ede" %}
+--
+-- Loads @partial.ede@ from the file system.
+--
+-- By default, the current environment is made available to the included template,
+-- but this can be overriden by specifying a specific binding to make available:
+--
+-- > {% include "/var/tmp/partial.ede" with value %}
+--
+-- Will ensure only the key @value@ (and descendents) is available in the
+-- partial's environment.
+--
+-- Includes can also be resolved using pure 'Resolver's such as 'includeMap',
+-- which will treat the @include@ expression's identifier as a 'HashMap' key:
+--
+-- > {% include "arbitrary_key" %}
+--
+-- Uses 'Map.lookup' to find @arbitrary_key@ in the 'HashMap' supplied to 'includeMap'.
 
 -- $filters
 --
