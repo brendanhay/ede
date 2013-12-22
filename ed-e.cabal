@@ -30,7 +30,7 @@ description:
     .
     * Easy to debug. All parsing, type checking, and rendering steps report helpful
     error messages with line/column metadata. Variable shadowing, unprintable expressions,
-    type coercion, and unbound variable access are all considered errors.
+    implicit type coercion, and unbound variable access are all considered errors.
     .
     * Control over purity. Users can choose to introduce impure resolution of
     @include@ expressions or to use their own pure mechanism.
@@ -87,14 +87,14 @@ test-suite golden
       , tasty
       , tasty-golden
 
-test-suite doctests
-    default-language:  Haskell2010
-    type:              exitcode-stdio-1.0
-    hs-source-dirs:    test
-    main-is:           doctests.hs
+-- test-suite doctests
+--     default-language:  Haskell2010
+--     type:              exitcode-stdio-1.0
+--     hs-source-dirs:    test
+--     main-is:           doctests.hs
 
-    ghc-options:       -Wall -threaded
+--     ghc-options:       -Wall -threaded
 
-    build-depends:
-        base >= 4.6 && < 5
-      , doctest
+--     build-depends:
+--         base >= 4.6 && < 5
+--       , doctest
