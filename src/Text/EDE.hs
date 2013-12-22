@@ -13,8 +13,8 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 --
--- A (mostly logicless) textual templating language in the same
--- vein as <https://github.com/Shopify/liquid Liquid> or <http://jinja.pocoo.org/docs/ Jinja2>.
+-- A (mostly logicless) textual templating language with similar syntax to
+-- <https://github.com/Shopify/liquid Liquid> or <http://jinja.pocoo.org/docs/ Jinja2>.
 --
 -- (ED-E is a character from Fallout New Vegas, pronounced iː-diː-iː, or Eddie.)
 
