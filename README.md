@@ -23,7 +23,7 @@ ED-E is a templating language written in Haskell with a specific set of features
   error messages with line/column metadata. Variable shadowing, unprintable expressions,
   implicit type coercion, and unbound variable access are all considered errors.
 * Control over purity. Users can choose to introduce impure resolution of
-  @include@ expressions or to use their own pure mechanism.
+  `include` expressions or to use their own pure mechanism.
 
 Please see the [documentation](http://brendanhay.github.io/ed-e/Text-EDE.html)
 for more information.
