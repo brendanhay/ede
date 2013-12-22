@@ -19,7 +19,7 @@ import qualified Data.Text.Lazy          as LText
 import           Text.EDE.Internal.Types
 import           Text.Parsec
 import           Text.Parsec.Language
-import           Text.Parsec.Text.Lazy   (GenParser)
+import           Text.Parsec.Text.Lazy   ()
 import           Text.Parsec.Token       (GenTokenParser)
 import qualified Text.Parsec.Token       as Parsec
 
