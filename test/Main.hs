@@ -17,6 +17,7 @@ import           Control.Arrow
 import qualified Data.Aeson              as Aeson
 import           Data.List               (isSuffixOf)
 import           Data.Maybe
+import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
 import qualified Data.Text.Lazy.Encoding as LText
 import qualified Data.Text.Lazy.IO       as LText
@@ -33,20 +34,25 @@ resources :: FilePath
 resources = "test/resources/"
 
 tests :: IO [TestTree]
-tests = files >>= mapM (fmap test . load)
+tests = files >>= mapM test
   where
+    files :: IO [FilePath]
     files = map (resources ++) . filter (isSuffixOf ".ede")
         <$> getDirectoryContents resources
 
-    load f = (,)
-        <$> LText.readFile f
-        <*> pure (takeWhile (/= '.') f)
+    test :: FilePath -> IO TestTree
+    test f = do
+        (txt, name) <- (,)
+            <$> LText.readFile f
+            <*> pure (takeWhile (/= '.') f)
 
-    test (txt, name) =
-        let (js, t) = split txt
-            obj     = input js
-        in  goldenVsStringDiff name diff (name ++ ".expected") $
-                either error output $ eitherParse t >>= (`eitherRender` obj)
+        let (js, src) = split txt
+
+        return . goldenVsStringDiff name diff (name ++ ".expected") $ do
+            t <- parseWith includeFile (Text.pack name) src
+            either error output
+                . eitherResult
+                $ t >>= (`render` input js)
 
     diff r n = ["diff", "-u", r, n]
 
