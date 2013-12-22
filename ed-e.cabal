@@ -86,15 +86,3 @@ test-suite golden
       , text
       , tasty
       , tasty-golden
-
--- test-suite doctests
---     default-language:  Haskell2010
---     type:              exitcode-stdio-1.0
---     hs-source-dirs:    test
---     main-is:           doctests.hs
-
---     ghc-options:       -Wall -threaded
-
---     build-depends:
---         base >= 4.6 && < 5
---       , doctest

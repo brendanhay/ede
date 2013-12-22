@@ -241,7 +241,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- First the 'Template' is defined:
 --
--- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Result Template
+-- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n"
 --
 -- Then an 'Object' is defined containing the environment which will be
 -- available to the 'Template' during rendering:
