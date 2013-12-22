@@ -32,13 +32,19 @@ module Text.EDE
     , parseFile
     , parseWith
 
-    -- * Includes
+    -- ** Includes
+    , Resolver
     , includeMap
     , includeFile
 
     -- ** Rendering
     , render
     , renderWith
+
+    -- ** Filters
+    , Fun    (..)
+    , TType  (..)
+    , defaultFilters
 
     -- ** Either Variants
     , eitherParse
@@ -47,12 +53,7 @@ module Text.EDE
     , eitherRender
     , eitherRenderWith
 
-    -- * Filters
-    , Fun    (..)
-    , TType  (..)
-    , defaultFilters
-
-    -- * Results and Errors
+    -- ** Results and Errors
     -- $results
     , Meta   (..)
     , Result (..)
@@ -111,33 +112,25 @@ import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
 
--- -- | Parse 'Text' into a compiled template.
--- --
--- -- Because this function is pure and does not resolve @include@ expressions,
--- -- it is required that the caller supplies a 'HashMap' of 'Template's at
--- -- render time using 'renderWith' if 'include's are used, otherwise an error
--- -- will be returned.
+-- | A function to resolve the target of an @include@ expression.
+type Resolver m = Text -> Meta -> m (Result Template)
 
--- -- FIXME: make the lookup of include identifiers safe
--- --   ie: if the target is some key but it also happened to be a file unintentionally
--- --   how could this be made more robust?
-
--- -- | Read and parse a file into a compiled template.
--- --
--- -- If 'True' is specified as the first parameter, 'parseFile' performs
--- -- all template resolution and parsing recursively, with non-existent templates
--- -- and parse errors returning an error immediately.
--- --
--- -- If you wish to defer loading of missing includes, or supply additional
--- -- precompiled/named includes at runtime (using 'renderWith' rather than
--- -- exclusively using file paths) you should specify 'False' as the first parameter,
--- -- or use 'parse' and 'renderWith' directly.
-
+-- | Parse Lazy 'LText.Text' into a compiled 'Template'.
+--
+-- Because this function is pure and does not resolve @include@s,
+-- encountering an @include@ expression during parsing will result in an 'Error'.
+--
+-- See 'parseFile' or 'parseWith' for mechanisms to deal with @include@
+-- dependencies.
 parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
       -> Result Template
 parse = join . parseWith (includeMap mempty) "Text.EDE.parse"
 
-parseFile :: FilePath -- ^ Path to the file to load.
+-- | Load and parse a 'Template' from a file.
+--
+-- This function handles all @include@ expressions as 'FilePath's and performs
+-- recursive loading/parsing.
+parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
 parseFile p = do
     e <- doesFileExist p
@@ -145,10 +138,20 @@ parseFile p = do
         then failure (mkMeta p) ["file " ++ p ++ " doesn't exist."]
         else LText.readFile p >>= parseWith includeFile (Text.pack p)
 
+-- | Parse a 'Template' from a Lazy 'LText.Text' using a custom function for
+-- resolving @include@ expressions.
+--
+-- Two custom @include@ resolvers are supplied:
+--
+-- * 'includeMap'
+--
+-- * 'includeFile'
+--
+-- 'parseFile' for example, is defined as: 'parseWith' 'includeFile'.
 parseWith :: Monad m
-          => (Text -> Meta -> m (Result Template)) -- ^ Function to resolve includes.
-          -> Text                                  -- ^ Template name.
-          -> LText.Text                            -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+          => Resolver m -- ^ Function to resolve includes.
+          -> Text       -- ^ Strict 'Data.Text.Text' name.
+          -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
           -> m (Result Template)
 parseWith f n = result failure resolve . Parser.runParser (Text.unpack n)
   where
@@ -161,18 +164,24 @@ parseWith f n = result failure resolve . Parser.runParser (Text.unpack n)
     include (k, m) (Success ss) =
         f k m >>= result failure (success . mappend ss . tmplIncl)
 
+-- | 'HashMap' resolver for @include@ expressions.
+--
+-- The 'identifier' component of the @include@ expression is treated as a lookup
+-- key into the supplied 'HashMap'.
+-- If the 'identifier' doesn't exist in the 'HashMap', an 'Error' is returned.
 includeMap :: Monad m
-           => HashMap Text Template
-           -> Text
-           -> Meta
-           -> m (Result Template)
+           => HashMap Text Template -- ^ A 'HashMap' of named 'Template's.
+           -> Resolver m            -- ^ Resolver for 'parseWith'.
 includeMap ts k m
     | Just v <- Map.lookup k ts = success v
     | otherwise = failure m ["unable to resolve " ++ Text.unpack k]
 
-includeFile :: Text
-            -> Meta
-            -> IO (Result Template)
+-- | 'FilePath' resolver for @include@ expressions.
+--
+-- The 'identifier' component of the @include@ expression is treated as a relative
+-- 'FilePath' and the template is loaded and parsed using 'parseFile'.
+-- If the 'identifier' doesn't exist as a valid 'FilePath', an 'Error' is returned.
+includeFile :: Resolver IO
 includeFile k = const (parseFile $ Text.unpack k)
 
 -- | Render an 'Object' using the supplied 'Template'.
@@ -263,13 +272,17 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- $parsing_and_rendering
 --
 -- Parsing and rendering require two separate steps intentionally so that the
--- more expensive result of parsing can be embedded, and/or reused.
+-- more expensive (and potentially impure) action of parsing and resolving
+-- @include@s can be embedded and re-used in a pure fashion.
 --
 -- * Parsing tokenises the input and converts it to an internal AST representation,
+-- resolving @include@s using a custom function. The result is a compiled template
 -- which can be cached for future use.
 --
--- * Rendering takes an 'Object' as the environment and a parsed 'Template'
--- to subsitute the values into.
+-- * Rendering takes a 'HashMap' of custom 'Fun's (functions available in the
+-- template context), an 'Object' as the binding environment, and a parsed
+-- 'Template' to subsitute the values into.
+-- The result is a Lazy 'LText.Text' value containing the rendered output.
 
 -- $results
 --
