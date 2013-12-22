@@ -57,7 +57,7 @@ library
     build-depends:
         aeson
       , attoparsec
-      , base                  >= 4.6 && < 5
+      , base >= 4.6 && < 5
       , directory
       , parsec
       , text
@@ -66,19 +66,31 @@ library
       , unordered-containers
       , vector
 
-test-suite ed-e-test
+test-suite golden
     default-language:  Haskell2010
     type:              exitcode-stdio-1.0
     hs-source-dirs:    test
-    main-is:           Main.hs
+    main-is:           golden.hs
 
-    ghc-options:       -Wall
+    ghc-options:       -Wall -threaded
 
     build-depends:
         aeson
-      , base         >= 4.6 && < 5
+      , base >= 4.6 && < 5
       , directory
       , ed-e
       , text
       , tasty
       , tasty-golden
+
+test-suite doctests
+    default-language:  Haskell2010
+    type:              exitcode-stdio-1.0
+    hs-source-dirs:    test
+    main-is:           doctests.hs
+
+    ghc-options:       -Wall -threaded
+
+    build-depends:
+        base >= 4.6 && < 5
+      , doctest
