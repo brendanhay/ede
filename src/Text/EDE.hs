@@ -241,7 +241,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- First the 'Template' is defined:
 --
--- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n"
+-- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Data.Text.Lazy.Text
 --
 -- Then an 'Object' is defined containing the environment which will be
 -- available to the 'Template' during rendering:
