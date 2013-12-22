@@ -26,7 +26,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Text-EDE.html");};
 </h1><div class="doc"><p>A simple example of parsing and rendering <code>Text</code> containing a basic conditional
  expression and variable interpolation follows.
 </p><p>First the <code><a href="Text-EDE.html#t:Template">Template</a></code> is defined:
-</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let tmpl = &quot;{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n&quot; :: Result Template
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let tmpl = &quot;{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n&quot; :: Data.Text.Lazy.Text
 </code></strong></pre><p>Then an <code>Object</code> is defined containing the environment which will be
  available to the <code><a href="Text-EDE.html#t:Template">Template</a></code> during rendering:
 </p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let env = fromPairs [ &quot;var&quot; .= &quot;World&quot; ] :: Object
