@@ -29,6 +29,7 @@ module Text.EDE
 
     -- ** Parsing
     , parse
+    , parseIO
     , parseFile
     , parseWith
 
@@ -122,6 +123,14 @@ import           Text.EDE.Internal.Types
 parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
       -> Result Template
 parse = join . parseWith (includeMap mempty) "Text.EDE.parse"
+
+-- | Parse Lazy 'LText.Text' into a compiled 'Template'.
+--
+-- This function handles all @include@ expressions as 'FilePath's and performs
+-- recursive loading/parsing.
+parseIO :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+        -> IO (Result Template)
+parseIO = parseWith includeFile "Text.EDE.parse"
 
 -- | Load and parse a 'Template' from a file.
 --
