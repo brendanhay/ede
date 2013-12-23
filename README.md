@@ -25,19 +25,19 @@ ED-E is a templating language written in Haskell with a specific set of features
 * **Control over purity.** Users can choose to introduce impure resolution of
   `include` expressions or to use their own pure mechanism.
 
-Please see the [documentation](http://brendanhay.github.io/ed-e/Text-EDE.html)
+Please see the [documentation](http://brendanhay.github.io/ede/Text-EDE.html)
 for more information.
 
 
 ## Syntax
 
 A set of syntatic/semantic fragments for all supported expressions can be
-found in the [tests](test/resources) or the [documentation](http://brendanhay.github.io/ed-e/Text-EDE.html#syntax).
+found in the [tests](test/resources) or the [documentation](http://brendanhay.github.io/ede/Text-EDE.html#syntax).
 
 
 ## Contribute
 
-For any problems, comments or feedback please create an issue [here on GitHub](github.com/brendanhay/ed-e/issues).
+For any problems, comments or feedback please create an issue [here on GitHub](github.com/brendanhay/ede/issues).
 
 
 ## Licence
