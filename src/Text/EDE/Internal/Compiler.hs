@@ -263,8 +263,9 @@ function m (Id k) = do
 
 template :: Meta -> Text -> Context UExp
 template m k = do
-    mt <- Map.lookup k . _templates <$> ask
-    maybe (throw m "template {} is not in scope." [k]) return mt
+    ts <- _templates <$> ask
+    maybe (throw m "template {} is not in scope: {}" [k, Text.intercalate "," $ Map.keys ts]) return $
+        Map.lookup k ts
 
 build :: Meta -> TExp -> Context TExp
 build _ (_ ::: TNil)  = return $ mempty ::: TBld

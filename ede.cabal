@@ -64,6 +64,7 @@ library
       , base >= 4.6 && < 5
       , directory
       , parsec
+      , system-filepath
       , text
       , text-format
       , transformers
