@@ -95,18 +95,21 @@ module Text.EDE
     -- $filters
     ) where
 
+import           Control.Applicative
 import           Control.Monad
 import           Data.Aeson                 ((.=))
 import           Data.Aeson.Types           (Object)
 import           Data.Foldable              (foldrM)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
+import           Data.Maybe                 (listToMaybe)
 import           Data.Monoid
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Lazy             as LText
 import           Data.Text.Lazy.Builder     (toLazyText)
 import qualified Data.Text.Lazy.IO          as LText
+import qualified Filesystem.Path.CurrentOS  as Path
 import           System.Directory
 import qualified Text.EDE.Internal.Compiler as Compiler
 import           Text.EDE.Internal.Filters  as Filters
@@ -128,21 +131,22 @@ parse = join . parseWith (includeMap mempty) "Text.EDE.parse"
 --
 -- This function handles all @include@ expressions as 'FilePath's and performs
 -- recursive loading/parsing.
-parseIO :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+parseIO :: FilePath   -- ^ Parent directory for relatively pathed includes.
+        -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
         -> IO (Result Template)
-parseIO = parseWith includeFile "Text.EDE.parse"
+parseIO p = parseWith (includeFile p) "Text.EDE.parse"
 
 -- | Load and parse a 'Template' from a file.
 --
 -- This function handles all @include@ expressions as 'FilePath's and performs
--- recursive loading/parsing.
+-- recursive loading/parsing, with pathing of @include@s relatively to the
+-- target (unless absolute paths are used).
 parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
-parseFile p = do
-    e <- doesFileExist p
-    if not e
-        then failure (mkMeta p) ["file " ++ p ++ " doesn't exist."]
-        else LText.readFile p >>= parseWith includeFile (Text.pack p)
+parseFile p =
+    loadFile p >>= result failure (parseWith (includeFile d) (Text.pack p))
+  where
+    d = Path.encodeString . Path.directory $ Path.decodeString p
 
 -- | Parse a 'Template' from a Lazy 'LText.Text' using a custom function for
 -- resolving @include@ expressions.
@@ -187,8 +191,27 @@ includeMap ts k m
 -- The 'identifier' component of the @include@ expression is treated as a relative
 -- 'FilePath' and the template is loaded and parsed using 'parseFile'.
 -- If the 'identifier' doesn't exist as a valid 'FilePath', an 'Error' is returned.
-includeFile :: Resolver IO
-includeFile k = const (parseFile $ Text.unpack k)
+includeFile :: FilePath -- ^ Parent directory for relatively pathed includes.
+            -> Resolver IO
+includeFile d k _ = loadFile p >>= result failure (parseWith (includeFile r) k)
+    where
+      r = Path.encodeString
+        . Path.directory
+        $ Path.decodeString p
+
+      p | Text.null k        = Text.unpack k
+        | Text.head k == '/' = Text.unpack k
+        | otherwise =
+                Path.encodeString
+              . Path.append (Path.decodeString d)
+              $ Path.fromText k
+
+loadFile :: FilePath -> IO (Result LText.Text)
+loadFile p = do
+    e <- doesFileExist p
+    if not e
+        then failure (mkMeta p) ["file " ++ p ++ " doesn't exist."]
+        else LText.readFile p >>= success
 
 -- | Render an 'Object' using the supplied 'Template'.
 render :: Template -- ^ Parsed 'Template' to render.
