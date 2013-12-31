@@ -49,6 +49,9 @@ data Order a where
 data Shw a where
     Shw :: Show a => Shw a
 
+data JS a where
+    JS :: ToJSON a => JS a
+
 data Col where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col
 
@@ -175,12 +178,16 @@ eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
     hmap :: HashMap Text Value -> [(Maybe Text, Value)]
     hmap  = map (first Just) . sortBy (comparing fst) . Map.toList
 
-eval (UIncl m k mi) = do
+eval (UIncl m k mu) = do
     te <- template m k
-    s  <- maybe (return id) f mi
+    s  <- maybe (return global) local' mu
     bind s te
   where
-    f (Id x) = (\y -> const $ fromPairs [x .= y]) <$> variable m (Id x)
+    global o = fromPairs ["scope" .= o]
+    local' u = do
+        e ::: et <- eval u
+        JS       <- js m et
+        return . const $ fromPairs ["scope" .= e]
 
 loop :: Text -> UExp -> UExp -> Col -> Context TExp
 loop _ _ b (Col 0 _)  = eval b
@@ -240,6 +247,16 @@ shw _ TMap  = return Shw
 shw _ TList = return Shw
 shw m t = throw m "constraint check of Show a => a ~ {} failed." [show t]
 
+js :: Meta -> TType a -> Context (JS a)
+js _ TNil  = return JS
+js _ TText = return JS
+js _ TBool = return JS
+js _ TInt  = return JS
+js _ TDbl  = return JS
+js _ TMap  = return JS
+js _ TList = return JS
+js m t = throw m "constraint check of ToJSON a => a ~ {} failed." [show t]
+
 bind :: (Object -> Object) -> UExp -> Context TExp
 bind f = withReaderT (\x -> x { _variables = f $ _variables x }) . eval
 
@@ -264,8 +281,9 @@ function m (Id k) = do
 template :: Meta -> Text -> Context UExp
 template m k = do
     ts <- _templates <$> ask
-    maybe (throw m "template {} is not in scope: {}" [k, Text.intercalate "," $ Map.keys ts]) return $
-        Map.lookup k ts
+    maybe (throw m "template {} is not in scope: {}" [k, Text.intercalate "," $ Map.keys ts])
+          return
+          (Map.lookup k ts)
 
 build :: Meta -> TExp -> Context TExp
 build _ (_ ::: TNil)  = return $ mempty ::: TBld

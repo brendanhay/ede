@@ -111,9 +111,11 @@ include = ("include" ??) $ do
     m      <- meta
     (k, v) <- try . section $ (,)
         <$> (reserved "include" >> fmap Text.pack stringLiteral)
-        <*> optionMaybe (reserved "with" >> ident)
+        <*> optionMaybe (reserved "with" >> var)
     modifyState $ Map.insertWith (const id) k m
     return $ UIncl m k v
+  where
+    var = "variable" ?? pack (sepBy1 (UVar <$> meta <*> ident) (char '.'))
 
 section :: Parser a -> Parser a
 section p = "section" ?? try (between start end p)

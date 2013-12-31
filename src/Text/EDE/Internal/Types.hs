@@ -154,7 +154,7 @@ data UExp
     | UCond !Meta !UExp !UExp !UExp
     | UCase !Meta !UExp [(UExp, UExp)] !UExp
     | ULoop !Meta !Id !UExp !UExp !UExp
-    | UIncl !Meta !Text (Maybe Id)
+    | UIncl !Meta !Text (Maybe UExp)
       deriving (Eq, Ord, Show)
 
 -- FIXME:
