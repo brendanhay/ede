@@ -30,6 +30,8 @@ defaultFilters = Map.fromList
     , ("upper",      Fun TText TText $ Text.map toUpper)
     , ("lowerFirst", Fun TText TText $ lowerFirst)
     , ("upperFirst", Fun TText TText $ upperFirst)
+    , ("titleize",   Fun TText TText $ Text.toTitle)
+    , ("pascalize",  Fun TText TText $ Text.filter skip . Text.toTitle)
     , ("listLength", Fun TList TInt  $ fromIntegral . Vector.length)
     , ("mapLength",  Fun TMap TInt   $ fromIntegral . Map.size)
     ]
@@ -47,3 +49,9 @@ defaultFilters = Map.fromList
         | otherwise   = t
       where
         h = Text.head t
+
+    skip ' '  = False
+    skip '\n' = False
+    skip '_'  = False
+    skip '-'  = False
+    skip  _   = True
