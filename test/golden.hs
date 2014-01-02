@@ -49,7 +49,7 @@ tests = files >>= mapM test
         let (js, src) = split txt
 
         return . goldenVsStringDiff name diff (name ++ ".expected") $ do
-            t <- parseWith includeFile (Text.pack name) src
+            t <- parseWith (includeFile resources) (Text.pack name) src
             either error output
                 . eitherResult
                 $ t >>= (`render` input js)
