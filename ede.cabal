@@ -61,11 +61,11 @@ library
     build-depends:
         aeson
       , attoparsec
-      , base >= 4.6 && < 5
+      , base            >= 4.6 && < 5
       , directory
+      , filepath
       , parsec
-      , system-filepath
-      , text
+      , text            >= 1.0
       , text-format
       , transformers
       , unordered-containers

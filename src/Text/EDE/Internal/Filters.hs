@@ -16,8 +16,9 @@ module Text.EDE.Internal.Filters
     ) where
 
 import           Data.Char
-import qualified Data.HashMap.Strict     as Map
 import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as Map
+import           Data.Monoid
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Vector             as Vector
@@ -50,8 +51,8 @@ defaultFilters = Map.fromList
       where
         h = Text.head t
 
-    skip ' '  = False
-    skip '\n' = False
-    skip '_'  = False
-    skip '-'  = False
-    skip  _   = True
+    skip ' '  = True
+    skip '\n' = True
+    skip '_'  = True
+    skip '-'  = True
+    skip  _   = False

@@ -109,8 +109,8 @@ import qualified Data.Text                  as Text
 import qualified Data.Text.Lazy             as LText
 import           Data.Text.Lazy.Builder     (toLazyText)
 import qualified Data.Text.Lazy.IO          as LText
-import qualified Filesystem.Path.CurrentOS  as Path
 import           System.Directory
+import           System.FilePath
 import qualified Text.EDE.Internal.Compiler as Compiler
 import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
@@ -143,10 +143,9 @@ parseIO p = parseWith (includeFile p) "Text.EDE.parse"
 -- target (unless absolute paths are used).
 parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
-parseFile p =
-    loadFile p >>= result failure (parseWith (includeFile d) (Text.pack p))
+parseFile p = loadFile p >>= result failure (parseWith inc $ Text.pack p)
   where
-    d = Path.encodeString . Path.directory $ Path.decodeString p
+    inc = includeFile $ takeDirectory p
 
 -- | Parse a 'Template' from a Lazy 'LText.Text' using a custom function for
 -- resolving @include@ expressions.
@@ -193,18 +192,12 @@ includeMap ts k m
 -- If the 'identifier' doesn't exist as a valid 'FilePath', an 'Error' is returned.
 includeFile :: FilePath -- ^ Parent directory for relatively pathed includes.
             -> Resolver IO
-includeFile d k _ = loadFile p >>= result failure (parseWith (includeFile r) k)
+includeFile d k _ = loadFile p >>= result failure (parseWith inc k)
     where
-      r = Path.encodeString
-        . Path.directory
-        $ Path.decodeString p
+      inc = includeFile $ takeDirectory p
 
-      p | Text.null k        = Text.unpack k
-        | Text.head k == '/' = Text.unpack k
-        | otherwise =
-                Path.encodeString
-              . Path.append (Path.decodeString d)
-              $ Path.fromText k
+      p | Text.null k = Text.unpack k
+        | otherwise   = d </> Text.unpack k
 
 loadFile :: FilePath -> IO (Result LText.Text)
 loadFile p = do
