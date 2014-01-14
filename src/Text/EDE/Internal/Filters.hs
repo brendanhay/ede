@@ -18,7 +18,6 @@ module Text.EDE.Internal.Filters
 import           Data.Char
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
-import           Data.Monoid
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Vector             as Vector
@@ -33,8 +32,8 @@ defaultFilters = Map.fromList
     , ("upperFirst", Fun TText TText $ upperFirst)
     , ("titleize",   Fun TText TText $ Text.toTitle)
     , ("pascalize",  Fun TText TText $ Text.filter skip . Text.toTitle)
-    , ("listLength", Fun TList TInt  $ fromIntegral . Vector.length)
-    , ("mapLength",  Fun TMap TInt   $ fromIntegral . Map.size)
+    , ("listLength", Fun TList TNum  $ fromIntegral . Vector.length)
+    , ("mapLength",  Fun TMap  TNum  $ fromIntegral . Map.size)
     ]
   where
     lowerFirst t

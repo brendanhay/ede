@@ -19,6 +19,7 @@ import           Data.Foldable           (foldr')
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
 import           Data.Monoid
+import           Data.Scientific
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
@@ -177,7 +178,7 @@ literal = filtered $ do
     m <- meta
     "literal" ?? choice
         [ try $ UBool m <$> (try true <|> false)
-        , try $ either (UInt m) (UDbl m) <$> numberLiteral
+        , try . fmap (UNum m) $ either fromIntegral fromFloatDigits <$> numberLiteral
         , UText m . Text.pack <$> stringLiteral
         ]
 

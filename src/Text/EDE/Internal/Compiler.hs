@@ -22,7 +22,6 @@ import           Control.Arrow              (first)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
 import           Data.Aeson                 hiding (Result, Success)
-import           Data.Attoparsec.Number     (Number(..))
 import           Data.Foldable              (Foldable, foldlM)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
@@ -30,6 +29,7 @@ import           Data.List                  (sortBy)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
+import           Data.Scientific            (scientificBuilder)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Buildable        as Build
@@ -79,19 +79,17 @@ eval :: UExp -> Context TExp
 eval UNil        = return $ "" ::: TBld
 eval (UText _ t) = return $ t  ::: TText
 eval (UBool _ b) = return $ b  ::: TBool
-eval (UInt  _ n) = return $ n  ::: TInt
-eval (UDbl  _ d) = return $ d  ::: TDbl
+eval (UNum  _ n) = return $ n  ::: TNum
 eval (UBld  _ b) = return $ b  ::: TBld
 
 eval (UVar m i) = f <$> variable m i
   where
-    f Null           = "" ::: TBld
-    f (String t)     = t  ::: TText
-    f (Bool   b)     = b  ::: TBool
-    f (Number (I n)) = n  ::: TInt
-    f (Number (D d)) = d  ::: TDbl
-    f (Object o)     = o  ::: TMap
-    f (Array  a)     = a  ::: TList
+    f Null       = "" ::: TBld
+    f (String t) = t  ::: TText
+    f (Bool   b) = b  ::: TBool
+    f (Number n) = n  ::: TNum
+    f (Object o) = o  ::: TMap
+    f (Array  a) = a  ::: TList
 
 eval (UFun m f) = (::: TFun) <$> function m f
 
@@ -221,8 +219,7 @@ equal :: Meta -> TType a -> TType b -> Context (Equal a b)
 equal _ TNil  TNil  = return Eq
 equal _ TText TText = return Eq
 equal _ TBool TBool = return Eq
-equal _ TInt  TInt  = return Eq
-equal _ TDbl  TDbl  = return Eq
+equal _ TNum  TNum  = return Eq
 equal _ TBld  TBld  = return Eq
 equal _ TMap  TMap  = return Eq
 equal _ TList TList = return Eq
@@ -232,16 +229,14 @@ order :: Meta -> TType a -> Context (Order a)
 order _ TNil  = return Ord
 order _ TText = return Ord
 order _ TBool = return Ord
-order _ TInt  = return Ord
-order _ TDbl  = return Ord
+order _ TNum  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
 shw :: Meta -> TType a -> Context (Shw a)
 shw _ TNil  = return Shw
 shw _ TText = return Shw
 shw _ TBool = return Shw
-shw _ TInt  = return Shw
-shw _ TDbl  = return Shw
+shw _ TNum  = return Shw
 shw _ TBld  = return Shw
 shw _ TMap  = return Shw
 shw _ TList = return Shw
@@ -251,8 +246,7 @@ js :: Meta -> TType a -> Context (JS a)
 js _ TNil  = return JS
 js _ TText = return JS
 js _ TBool = return JS
-js _ TInt  = return JS
-js _ TDbl  = return JS
+js _ TNum  = return JS
 js _ TMap  = return JS
 js _ TList = return JS
 js m t = throw m "constraint check of ToJSON a => a ~ {} failed." [show t]
@@ -289,8 +283,7 @@ build :: Meta -> TExp -> Context TExp
 build _ (_ ::: TNil)  = return $ mempty ::: TBld
 build _ (t ::: TText) = return $ Build.build t ::: TBld
 build _ (b ::: TBool) = return $ Build.build b ::: TBld
-build _ (n ::: TInt)  = return $ Build.build n ::: TBld
-build _ (d ::: TDbl)  = return $ Build.build d ::: TBld
+build _ (n ::: TNum)  = return $ scientificBuilder n ::: TBld
 build _ (b ::: TBld)  = return $ b ::: TBld
 build m (_ ::: t)     = throw m "unable to render variable of type {}" [show t]
 

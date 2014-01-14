@@ -59,12 +59,12 @@ library
     ghc-options:       -Wall
 
     build-depends:
-        aeson
-      , attoparsec
+        aeson           >= 0.7
       , base            >= 4.6 && < 5
       , directory
       , filepath
       , parsec
+      , scientific
       , text            >= 1.0
       , text-format
       , transformers

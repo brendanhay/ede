@@ -95,14 +95,12 @@ module Text.EDE
     -- $filters
     ) where
 
-import           Control.Applicative
 import           Control.Monad
 import           Data.Aeson                 ((.=))
 import           Data.Aeson.Types           (Object)
 import           Data.Foldable              (foldrM)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
-import           Data.Maybe                 (listToMaybe)
 import           Data.Monoid
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text

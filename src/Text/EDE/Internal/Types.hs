@@ -21,6 +21,7 @@ import           Data.Aeson.Types        (Pair)
 import           Data.HashMap.Strict     (HashMap)
 import           Data.List               (intercalate)
 import           Data.Monoid
+import           Data.Scientific
 import           Data.Text               (Text)
 import           Data.Text.Buildable
 import           Data.Text.Format        (Format, format)
@@ -129,8 +130,7 @@ data TType a where
     TNil  :: TType ()
     TText :: TType Text
     TBool :: TType Bool
-    TInt  :: TType Integer
-    TDbl  :: TType Double
+    TNum  :: TType Scientific
     TBld  :: TType Builder
     TMap  :: TType Object
     TList :: TType Array
@@ -142,8 +142,7 @@ data UExp
     = UNil
     | UText !Meta !Text
     | UBool !Meta !Bool
-    | UInt  !Meta !Integer
-    | UDbl  !Meta !Double
+    | UNum  !Meta !Scientific
     | UBld  !Meta !Builder
     | UVar  !Meta !Id
     | UFun  !Meta !Id
@@ -184,8 +183,7 @@ _meta u = case u of
     UNil            -> mkMeta "_meta"
     UText m _       -> m
     UBool m _       -> m
-    UInt  m _       -> m
-    UDbl  m _       -> m
+    UNum  m _       -> m
     UBld  m _       -> m
     UVar  m _       -> m
     UFun  m _       -> m
