@@ -21,6 +21,8 @@ module Text.EDE.Filters
     , upper
     , lowerFirst
     , upperFirst
+    , lowerFilter
+    , upperFilter
     , titleize
     , pascalize
     , underscore
@@ -46,24 +48,26 @@ import           Text.EDE.Internal.Types
 -- FIXME: Create polymorphic filters
 defaultFilters :: HashMap Text Fun
 defaultFilters = Map.fromList
-    [ ("lower",      Fun TText TText lower)
-    , ("upper",      Fun TText TText upper)
-    , ("lowerFirst", Fun TText TText lowerFirst)
-    , ("upperFirst", Fun TText TText upperFirst)
-    , ("titleize",   Fun TText TText titleize)
-    , ("pascalize",  Fun TText TText pascalize)
-    , ("camelize",   Fun TText TText camelize)
-    , ("underscore", Fun TText TText underscore)
-    , ("hyphenate",  Fun TText TText hyphenate)
-    , ("listLength", Fun TList TNum  listLength)
-    , ("mapLength",  Fun TMap  TNum  mapLength)
+    [ ("lower",       Fun TText TText lower)
+    , ("upper",       Fun TText TText upper)
+    , ("lowerFirst",  Fun TText TText lowerFirst)
+    , ("upperFirst",  Fun TText TText upperFirst)
+    , ("lowerFilter", Fun TText TText lowerFilter)
+    , ("upperFilter", Fun TText TText upperFilter)
+    , ("titleize",    Fun TText TText titleize)
+    , ("pascalize",   Fun TText TText pascalize)
+    , ("camelize",    Fun TText TText camelize)
+    , ("underscore",  Fun TText TText underscore)
+    , ("hyphenate",   Fun TText TText hyphenate)
+    , ("listLength",  Fun TList TNum  listLength)
+    , ("mapLength",   Fun TMap  TNum  mapLength)
     ]
 
 lower :: Text -> Text
-lower = Text.map toLower
+lower = Text.toLower
 
 upper :: Text -> Text
-upper = Text.map toUpper
+upper = Text.toUpper
 
 lowerFirst :: Text -> Text
 lowerFirst t
@@ -80,6 +84,18 @@ upperFirst t
     | otherwise   = t
   where
     h = Text.head t
+
+lowerFilter :: Text -> Text
+lowerFilter = Text.concatMap f
+  where
+    f c | isLower c = ""
+        | otherwise = Text.singleton c
+
+upperFilter :: Text -> Text
+upperFilter = Text.concatMap f
+  where
+    f c | isUpper c = ""
+        | otherwise = Text.singleton c
 
 titleize :: Text -> Text
 titleize = Text.toTitle

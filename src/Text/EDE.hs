@@ -537,6 +537,10 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * @upperFirst :: Text -> Text@: Upper case the first character of a textual value.
 --
+-- * @lowerFilter :: Text -> Text@: -
+--
+-- * @upperFilter :: Text -> Text@: -
+
 -- * @titleize :: Text -> Text@: -
 --
 -- * @pascalize :: Text -> Text@: -
