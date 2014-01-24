@@ -1,5 +1,5 @@
 name:                  ede
-version:               0.1.1
+version:               0.1.2
 synopsis:              Textual Templating Language
 homepage:              http://github.com/brendanhay/ede
 license:               OtherLicense
