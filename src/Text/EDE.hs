@@ -109,8 +109,8 @@ import           Data.Text.Lazy.Builder     (toLazyText)
 import qualified Data.Text.Lazy.IO          as LText
 import           System.Directory
 import           System.FilePath
+import           Text.EDE.Filters           as Filters
 import qualified Text.EDE.Internal.Compiler as Compiler
-import           Text.EDE.Internal.Filters  as Filters
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
 
@@ -536,6 +536,16 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- * @lowerFirst :: Text -> Text@: Lower case the first character of a textual value.
 --
 -- * @upperFirst :: Text -> Text@: Upper case the first character of a textual value.
+--
+-- * @titleize :: Text -> Text@: -
+--
+-- * @pascalize :: Text -> Text@: -
+--
+-- * @camelize :: Text -> Text@: -
+--
+-- * @underscore :: Text -> Text@: -
+--
+-- * @hyphenate :: Text -> Text@: -
 --
 -- * @listLength :: Array -> Integer@: Get the length of an 'Array'.
 --
