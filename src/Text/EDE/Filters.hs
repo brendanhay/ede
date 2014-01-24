@@ -25,13 +25,21 @@ module Text.EDE.Filters
     , pascalize
     , underscore
     , hyphenate
+
+    -- * HashMap
+    , mapLength
+
+    -- * Vector
+    , listLength
     ) where
 
 import           Data.Char
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
+import           Data.Scientific
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
+import           Data.Vector             (Vector)
 import qualified Data.Vector             as Vector
 import           Text.EDE.Internal.Types
 
@@ -47,8 +55,8 @@ defaultFilters = Map.fromList
     , ("camelize",   Fun TText TText camelize)
     , ("underscore", Fun TText TText underscore)
     , ("hyphenate",  Fun TText TText hyphenate)
-    , ("listLength", Fun TList TNum  $ fromIntegral . Vector.length)
-    , ("mapLength",  Fun TMap  TNum  $ fromIntegral . Map.size)
+    , ("listLength", Fun TList TNum  listLength)
+    , ("mapLength",  Fun TMap  TNum  mapLength)
     ]
 
 lower :: Text -> Text
@@ -104,3 +112,9 @@ substitute = Text.concatMap f
     f '(' = "_"
     f ')' = ""
     f  c  = Text.singleton c
+
+listLength :: Vector a -> Scientific
+listLength = fromIntegral . Vector.length
+
+mapLength :: HashMap k v -> Scientific
+mapLength = fromIntegral . Map.size
