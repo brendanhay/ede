@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- Module      : Text.EDE.Filters
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -31,16 +30,21 @@ module Text.EDE.Filters
 
     -- * Vector
     , listLength
+
+    -- * Filter signatures
+    , Fun   (..)
+    , TType (..)
     ) where
 
 import           Data.Char
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as Map
+import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as Map
 import           Data.Scientific
-import           Data.Text               (Text)
-import qualified Data.Text               as Text
-import           Data.Vector             (Vector)
-import qualified Data.Vector             as Vector
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           Data.Text.Unsafe           (unsafeHead, unsafeTail)
+import           Data.Vector                (Vector)
+import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Types
 
 -- FIXME: Create polymorphic filters
@@ -96,13 +100,33 @@ underscore = Text.intercalate (Text.singleton '_') . split
 hyphenate :: Text -> Text
 hyphenate = Text.intercalate (Text.singleton '-') . split
 
+listLength :: Vector a -> Scientific
+listLength = fromIntegral . Vector.length
+
+mapLength :: HashMap k v -> Scientific
+mapLength = fromIntegral . Map.size
+
 split :: Text -> [Text]
-split = filter (/= "") . Text.split f
+split t
+    | Text.null t = []
+    | otherwise   = filter (/= "") $ loop t
   where
-    f ' '  = True
-    f '\n' = True
-    f '-'  = True
-    f  _   = False
+    loop s
+        | Text.null s' = [l]
+        | otherwise    = l : g (loop (unsafeTail s'))
+      where
+        g [] = []
+        g x'@(x:xs)
+            | Just c <- snd . f $ unsafeHead s' = (c `Text.cons` x) : xs
+            | otherwise = x'
+
+        (l, s') = Text.span (not . fst . f) s
+
+    f ' '           = (True, Nothing)
+    f '\n'          = (True, Nothing)
+    f '-'           = (True, Nothing)
+    f c | isUpper c = (True,  Just c)
+        | otherwise = (False, Nothing)
 
 substitute :: Text -> Text
 substitute = Text.concatMap f
@@ -112,9 +136,3 @@ substitute = Text.concatMap f
     f '(' = "_"
     f ')' = ""
     f  c  = Text.singleton c
-
-listLength :: Vector a -> Scientific
-listLength = fromIntegral . Vector.length
-
-mapLength :: HashMap k v -> Scientific
-mapLength = fromIntegral . Map.size
