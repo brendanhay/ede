@@ -113,7 +113,7 @@ split t
   where
     loop s
         | Text.null s' = [l]
-        | otherwise    = l : g (loop (unsafeTail s'))
+        | otherwise    = l : g (loop $ unsafeTail s')
       where
         g [] = []
         g x'@(x:xs)
