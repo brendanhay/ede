@@ -135,6 +135,7 @@ data TType a where
     TMap  :: TType Object
     TList :: TType Array
     TFun  :: TType Fun
+    TVar  :: TType a
 
 deriving instance Show (TType a)
 

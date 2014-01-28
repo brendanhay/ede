@@ -114,6 +114,8 @@ import qualified Text.EDE.Internal.Compiler as Compiler
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
 
+-- FIXME: detect include/import loops
+
 -- | Parse Lazy 'LText.Text' into a compiled 'Template'.
 --
 -- Because this function is pure and does not resolve @include@s,

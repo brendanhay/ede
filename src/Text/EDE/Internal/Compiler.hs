@@ -29,7 +29,7 @@ import           Data.List                  (sortBy)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
-import           Data.Scientific            (scientificBuilder)
+import           Data.Scientific
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Buildable        as Build
@@ -283,7 +283,11 @@ build :: Meta -> TExp -> Context TExp
 build _ (_ ::: TNil)  = return $ mempty ::: TBld
 build _ (t ::: TText) = return $ Build.build t ::: TBld
 build _ (b ::: TBool) = return $ Build.build b ::: TBld
-build _ (n ::: TNum)  = return $ scientificBuilder n ::: TBld
+build _ (n ::: TNum)  = return $ bld ::: TBld
+  where
+    bld | base10Exponent n == 0 = formatScientificBuilder Fixed (Just 0) n
+        | otherwise             = scientificBuilder n
+
 build _ (b ::: TBld)  = return $ b ::: TBld
 build m (_ ::: t)     = throw m "unable to render variable of type {}" [show t]
 
