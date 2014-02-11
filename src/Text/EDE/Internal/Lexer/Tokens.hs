@@ -12,16 +12,9 @@ module Text.EDE.Internal.Lexer.Tokens where
 
 data Tok
     = KJunk String
-    | KM !TokMeta
+    | KNewLine
     | KA !TokAtom
     | KP !TokPrim
-      deriving (Eq, Show)
-
-data TokMeta
-    = KNewLine
-    | KCommentStart
-    | KCommentEnd
-    | KCommentUnterminated
       deriving (Eq, Show)
 
 data TokAtom
@@ -29,12 +22,16 @@ data TokAtom
     | KSectionR
     | KIdentL
     | KIdentR
+
     | KParenL
     | KParenR
     | KComma
+
     | KOp !String
+
     | KTrue
     | KFalse
+
     | KElse
     | KIf
     | KElseIf
@@ -50,6 +47,7 @@ data TokAtom
     | KAssign
     | KEqual
     | KCapture
+    | KEndCapture
     | KCycle
       deriving (Eq, Show)
 

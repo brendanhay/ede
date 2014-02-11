@@ -33,20 +33,10 @@ lexWord name line column w = case w of
     ' '  : w' -> lexMore 1 w'
     '\t' : w' -> lexMore 8 w'
 
-    c : cs
-     | isStringStart c
-     , (body, rest) <- span isStringBody cs
-         -> tokP (KLit $ KText body) : lexMore (length body) rest
-
-    c : cs
-     | isNumStart c
-     , (body, rest) <- span isNumBody cs
-         -> tokP (KLit $ KNum (c : body)) : lexMore (length (c : body)) rest
-
     -- Meta tokens
-    '{' : '-' : w' -> tokM KCommentStart : lexMore 2 (lexTo "-}" w')
-    '-' : '}' : w' -> tokM KCommentEnd   : lexMore 2 w'
-    '\n' : w'      -> tokM KNewLine      : lexNextLine 1 w'
+    '{' : '-' : w' -> lexMore 2 (lexTo "-}" w')
+    '-' : '}' : w' -> lexMore 2 w'
+    '\n' : w'      -> tok KNewLine : lexNextLine 1 w'
 
     -- Sections
     '{' : '%' : w' -> tokA KSectionL : lexMore 2 w'
@@ -56,12 +46,6 @@ lexWord name line column w = case w of
     '{' : '{' : w' -> tokA KIdentL : lexMore 2 w'
     '}' : '}' : w' -> tokA KIdentR : lexMore 2 w'
 
-    -- Operators
-    c : cs
-     |  isOpStart c
-     ,  (body, rest) <- span isOpBody cs
-         -> tokA (KOp (c : body)) : lexMore (length (c : body)) rest
-
     -- Parens
     '(' : w' -> tokA KParenL : lexMore 1 w'
     ')' : w' -> tokA KParenR : lexMore 1 w'
@@ -69,8 +53,22 @@ lexWord name line column w = case w of
     -- Punctuation
     ',' : w' -> tokA KComma : lexMore 1 w'
 
-    -- Keywords
+    -- Literals
     c : cs
+     | isStringStart c
+     , (body, rest) <- span isStringBody cs
+         -> tokP (KLit $ KText body) : lexMore (length body) rest
+
+     | isNumStart c
+     , (body, rest) <- span isNumBody cs
+         -> tokP (KLit $ KNum (c : body)) : lexMore (length (c : body)) rest
+
+    -- Operators
+     |  isOpStart c
+     ,  (body, rest) <- span isOpBody cs
+         -> tokA (KOp (c : body)) : lexMore (length (c : body)) rest
+
+    -- Keywords
      | isVarStart c
      , (body,  rest)  <- span isVarBody cs
      , (body', rest') <- case rest of
@@ -92,7 +90,6 @@ lexWord name line column w = case w of
     c : cs -> (tok $ KJunk [c]) : lexMore 1 cs
   where
     tok t = Token t (SourcePos name line column)
-    tokM  = tok . KM
     tokA  = tok . KA
     tokP  = tok . KP
 

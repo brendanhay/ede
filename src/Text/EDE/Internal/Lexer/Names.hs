@@ -22,6 +22,7 @@ keyword = fmap KA . f
     f "else"    = Just KElse
     f "if"      = Just KIf
     f "elif"    = Just KElseIf
+    f "elsif"   = Just KElseIf
     f "endif"   = Just KEndIf
     f "case"    = Just KCase
     f "when"    = Just KWhen

@@ -25,6 +25,7 @@ import           Text.EDE.Internal.Types
 import qualified Text.Parsec             as P
 import           Text.Parsec             hiding (SourcePos, runParser)
 import           Text.Parsec.Error
+import           Text.Show.Pretty        (ppShow)
 
 type Parser a = ParsecT [Token Tok] ParserState Identity a
 
@@ -36,34 +37,108 @@ runParser :: String      -- ^ Source name for error messages.
           -> Either ParseError a
 runParser name parser = P.runParser parser name name
 
-
---pDocument :: Parser Document
-
 pExp :: Parser (Exp SourcePos)
-pExp = P.choice
+pExp = choice
     [ -- assign <name> = <exp>
-      do p <- snd <$> pTokSP KSectionL
-         pTok KAssign
-         n <- UName <$> pVar
-         pTokSP (KOp "=")
-         b <- pExp
+      try $ do
+        (_, p) <- pTokSP KSectionL
+        pTok KAssign
+        (n, _) <- pVarSP
+        pTok (KOp "=")
+        b      <- pExp
+        pTok KSectionR
+        return $ ELet p (UName n) b
+
+      -- capture <name> ...
+    , try $ do
+        (_, p) <- pTokSP KSectionL
+        pTok KCapture
+        (n, _) <- pVarSP
+        pTok KSectionR
+        b      <- pExp
+        pSection KEndCapture
+        return $ ELet p (UName n) b
+
+      -- if [<alt>]
+    , try $ do
+        (_, p) <- pTokSP KSectionL
+        pTok KIf
+        s      <- pExp
+        pTok KSectionR
+        c      <- pExp
+        as     <- pAlts KElseIf KEndIf
+        return $ ECond p (ACond s c : as)
+
+      -- case <exp> [<alt>]
+    , try $ do
+        (_, p) <- pTokSP KSectionL
+        pTok KCase
+        s      <- pExp
+        pTok KSectionR
+        as     <- pAlts KWhen KEndCase
+        return $ ECase p s as
+
+      -- for <name> in <exp>
+    , try $ do
+        (_, p) <- pTokSP KSectionL
+        pTok KFor
+        (n, _) <- pVarSP
+        pTok KIn
+        s      <- pExp
+        pTok KSectionR
+        ma     <- optionMaybe (pDefault KEndCase)
+        return $ ELoop p (UName n) s ma
+
+      -- include <exp> [with <exp>]
+    , try $ do
+         (_, p) <- pTokSP KSectionL
+         pTok KInclude
+         (n, _) <- pVarSP
+         mw     <- optionMaybe $ pTok KWith >> pExp
          pTok KSectionR
-         return $ ELet p n b
+         return $ EIncl p (UName n) mw
 
       -- application
-    , do pExpApp
+    , pExpApp
     ]
+        <?> "an expression"
+
+pAlts :: TokAtom -> TokAtom -> Parser [Alt SourcePos]
+pAlts begin end = (<?> "an alternate expression") $
+        try pCons
+    <|> try ((:[]) <$> pDefault end)
+    <|> pEnd
+  where
+    pCons = do
+        pTok KSectionL
+        pTok begin
+        s <- pExp
+        pTok KSectionR
+        c <- pExp
+        (ACond s c :) <$> pAlts begin end
+
+    pEnd = pSection end >> return []
+
+pDefault :: TokAtom -> Parser (Alt SourcePos)
+pDefault end = (<?> "an else expression") $ do
+    pSection KElse
+    a <- pExp
+    pSection end
+    return $ ADefault a
+
+pSection :: TokAtom -> Parser ()
+pSection k = (pTok KSectionL >> pTok k >> pTok KSectionR) <?> ("a" ++ ppShow k)
 
 pExpApp :: Parser (Exp SourcePos)
 pExpApp = do
     (x1, _) <- pExpAtomSP
-    P.choice
-        [ foldl' (\x (x', p) -> EApp p x x') x1 <$> P.many1 pExpAtomSP
+    choice
+        [ foldl' (\x (x', p) -> EApp p x x') x1 <$> many1 pExpAtomSP
         , return x1
         ] <?> "an expression or application"
 
 pExpAtomSP :: Parser (Exp SourcePos, SourcePos)
-pExpAtomSP = P.choice
+pExpAtomSP = choice
     [ -- (EXP)
       do (_, p) <- pTokSP KParenL
          t      <- pExp
@@ -73,10 +148,14 @@ pExpAtomSP = P.choice
       -- literals
     , do (l, p) <- pLitSP
          return (ELit p l, p)
+
+      -- variables
+    , do (v, p) <- pVarSP
+         return (EVar p (UName v), p)
     ]
 
-pVar :: Parser String
-pVar = fst <$> pTokMaybe f <?> "a variable"
+pVarSP :: Parser (String, SourcePos)
+pVarSP = pTokMaybe f <?> "a variable"
   where
     f (KP (KVar n)) = Just n
     f _             = Nothing
@@ -95,7 +174,7 @@ pLitSP = try bool <|> literal
 
     g (KText  s) = return $ LText s
     g n@(KNum x) =
-        maybe (fail $ "unexpected " ++ show n)
+        maybe (fail $ "unexpected " ++ ppShow n)
               (return . LNum)
               (readMay x) <?> "a valid numeric literal"
 
@@ -110,6 +189,6 @@ pTokSP :: TokAtom -> Parser (Tok, SourcePos)
 pTokSP x = pTokMaybe $ \y -> if (KA x) == y then Just y else Nothing
 
 pTokMaybe  :: (Tok -> Maybe a) -> Parser (a, SourcePos)
-pTokMaybe f = P.token (show . tokenTok) takeSourcePos g
+pTokMaybe f = token (ppShow . tokenTok) takeSourcePos g
   where
     g x = (, tokenPos x) <$> f (tokenTok x)

@@ -45,14 +45,6 @@ takeSourcePos t =
     let SourcePos src line col = tokenPos t
     in  P.newPos src line col
 
--- data Bind
---     = BName !Type
---       -- ^ Named variable in the environment.
---     | BNone !Type
---       -- ^ Variable with no uses in the body doesn't need a name.
---     | BAnon !Type
---       -- ^ Nameless variable on the deBruijn stack.
-
 data Lit
     = LText !String
     | LBool !Bool
@@ -61,38 +53,27 @@ data Lit
 
 data Bound
     = UName !String
-      -- ^ Named variable that should be in the environment.
     | UPrim !String !Type
-      -- ^ Named primitive with it's attached type.
       deriving (Show)
 
 data Exp a
     = EVar  !a !Bound
-      -- ^ Variable.
     | ELit  !a !Lit
-      -- ^ Literal.
     | ELet  !a !Bound   !(Exp a)
-      -- ^ Variable bindings.
     | EApp  !a !(Exp a) !(Exp a)
-      -- ^ Application.
-    | ECond !a !(Exp a) ![Alt a]
-      -- ^ Conditionals.
-    | ELoop !a !Bound   !(Exp a) !(Alt a)
-      -- ^ Loops.
-    | EIncl !a !Lit     !Bound
-      -- ^ Includes
+    | ECond !a ![Alt a]
+    | ECase !a !(Exp a) ![Alt a]
+    | ELoop !a !Bound   !(Exp a) (Maybe (Alt a))
+    | EIncl !a !Bound   (Maybe (Exp a))
       deriving (Show)
 
 data Alt a
-    = ACond !(Exp a)
-    | ADefault
+    = ACond    !(Exp a) !(Exp a)
+    | ADefault !(Exp a)
       deriving (Show)
 
 data Type
     = TVar !Bound
-      -- ^ Variable.
     | TApp !Type !Type
-      -- ^ Application.
     | TBot
-      -- ^ Bottom!
       deriving (Show)

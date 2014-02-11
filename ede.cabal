@@ -63,6 +63,7 @@ library
       , directory
       , filepath
       , parsec
+      , pretty-show
       , safe
       , scientific
       , text            >= 1.0
