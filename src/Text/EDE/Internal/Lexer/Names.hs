@@ -34,7 +34,6 @@ keyword = fmap KA . f
     f "with"    = Just KWith
     f "assign"  = Just KAssign
     f "capture" = Just KCapture
-    f "cycle"   = Just KCycle
     f _         = Nothing
 
 -- | Read a named, user defined variable.

@@ -24,6 +24,8 @@ import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (runParser)
 import           Text.Show.Pretty        (ppShow)
 
+-- Add the show function to the parser state
+
 type Parser a = ParsecT [Token] ParserState Identity a
 
 type ParserState = String
@@ -35,9 +37,9 @@ pExp :: Parser Exp
 pExp = choice
     [ -- assign <name> = <exp>
       try $ do
-        (_, p) <- pTokSP KSectionL
+        (_, p) <- pTokM KSectionL
         pTok KAssign
-        (n, _) <- pVarSP
+        (n, _) <- pVarM
         pTok (KOp "=")
         b      <- pExp
         pTok KSectionR
@@ -45,9 +47,9 @@ pExp = choice
 
       -- capture <name> ...
     , try $ do
-        (_, p) <- pTokSP KSectionL
+        (_, p) <- pTokM KSectionL
         pTok KCapture
-        (n, _) <- pVarSP
+        (n, _) <- pVarM
         pTok KSectionR
         b      <- pExp
         pSection KEndCapture
@@ -55,7 +57,7 @@ pExp = choice
 
       -- if [<alt>]
     , try $ do
-        (_, p) <- pTokSP KSectionL
+        (_, p) <- pTokM KSectionL
         pTok KIf
         s      <- pExp
         pTok KSectionR
@@ -65,7 +67,7 @@ pExp = choice
 
       -- case <exp> [<alt>]
     , try $ do
-        (_, p) <- pTokSP KSectionL
+        (_, p) <- pTokM KSectionL
         pTok KCase
         s      <- pExp
         pTok KSectionR
@@ -74,9 +76,9 @@ pExp = choice
 
       -- for <name> in <exp>
     , try $ do
-        (_, p) <- pTokSP KSectionL
+        (_, p) <- pTokM KSectionL
         pTok KFor
-        (n, _) <- pVarSP
+        (n, _) <- pVarM
         pTok KIn
         s      <- pExp
         pTok KSectionR
@@ -85,9 +87,9 @@ pExp = choice
 
       -- include <exp> [with <exp>]
     , try $ do
-         (_, p) <- pTokSP KSectionL
+         (_, p) <- pTokM KSectionL
          pTok KInclude
-         (n, _) <- pVarSP
+         (n, _) <- pVarM
          mw     <- optionMaybe $ pTok KWith >> pExp
          pTok KSectionR
          return $ EIncl p (UName n) mw
@@ -125,42 +127,42 @@ pSection k = (pTok KSectionL >> pTok k >> pTok KSectionR) <?> ("a" ++ ppShow k)
 
 pApp :: Parser Exp
 pApp = do
-    (x1, _) <- pAtomSP
+    (x1, _) <- pAtomM
     choice
-        [ foldl' (\x (x', p) -> EApp p x x') x1 <$> many1 pAtomSP
+        [ foldl' (\x (x', p) -> EApp p x x') x1 <$> many1 pAtomM
         , return x1
         ] <?> "an expression or application"
 
-pAtomSP :: Parser (Exp, Meta)
-pAtomSP = choice
+pAtomM :: Parser (Exp, Meta)
+pAtomM = choice
     [ -- (EXP)
-      do (_, p) <- pTokSP KParenL
+      do (_, p) <- pTokM KParenL
          t      <- pExp
          pTok KParenR
          return (t, p)
 
       -- literals
-    , do (l, p) <- pLitSP
+    , do (l, p) <- pLitM
          return (ELit p l, p)
 
       -- variables
-    , do (v, p) <- pVarSP
+    , do (v, p) <- pVarM
          return (EVar p (UName v), p)
     ]
 
-pVarSP :: Parser (String, Meta)
-pVarSP = pTokMaybe f <?> "a variable"
+pVarM :: Parser (String, Meta)
+pVarM = pTokMaybeM f <?> "a variable"
   where
     f (KP (KVar n)) = Just n
     f _             = Nothing
 
-pLitSP :: Parser (Lit, Meta)
-pLitSP = try bool <|> literal
+pLitM :: Parser (Lit, Meta)
+pLitM = try bool <|> literal
   where
-    bool = first LBool <$> pTokMaybe h <?> "a boolean"
+    bool = first LBool <$> pTokMaybeM h <?> "a boolean"
 
     literal = do
-        (l, p) <- pTokMaybe f <?> "a string or numeric literal"
+        (l, p) <- pTokMaybeM f <?> "a string or numeric literal"
         (,p) <$> g l
 
     f (KP (KLit x)) = Just x
@@ -177,12 +179,12 @@ pLitSP = try bool <|> literal
     h _           = Nothing
 
 pTok :: TokAtom -> Parser ()
-pTok = void . pTokSP
+pTok = void . pTokM
 
-pTokSP :: TokAtom -> Parser (Tok, Meta)
-pTokSP x = pTokMaybe $ \y -> if (KA x) == y then Just y else Nothing
+pTokM :: TokAtom -> Parser (Tok, Meta)
+pTokM x = pTokMaybeM $ \y -> if (KA x) == y then Just y else Nothing
 
-pTokMaybe  :: (Tok -> Maybe a) -> Parser (a, Meta)
-pTokMaybe f = token (ppShow . tokenTok) takeSourcePos g
+pTokMaybeM  :: (Tok -> Maybe a) -> Parser (a, Meta)
+pTokMaybeM f = token (ppShow . tokenTok) takeSourcePos g
   where
     g x = (, tokenPos x) <$> f (tokenTok x)

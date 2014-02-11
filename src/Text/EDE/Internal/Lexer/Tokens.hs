@@ -74,7 +74,6 @@ data TokAtom
     | KEqual
     | KCapture
     | KEndCapture
-    | KCycle
       deriving (Eq, Show)
 
 data TokPrim
