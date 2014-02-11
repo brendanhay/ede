@@ -12,11 +12,12 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Control.Applicative     ((<$>))
+import           Control.Applicative     ((<$>), (<*), (*>))
 import           Control.Arrow
 import           Control.Monad
 import           Data.Foldable           (foldl')
 import           Data.Functor.Identity
+import           Data.Tuple
 import           Safe                    (readMay)
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
@@ -37,62 +38,47 @@ pExp :: Parser Exp
 pExp = choice
     [ -- assign <name> = <exp>
       try $ do
-        (_, p) <- pTokM KSectionL
-        pTok KAssign
-        (n, _) <- pVarM
-        pTok (KOp "=")
-        b      <- pExp
-        pTok KSectionR
-        return $ ELet p (UName n) b
+        (_, m) <- pTokM KSectionL
+        n      <- pTok  KAssign *> pVar
+        b      <- pTok  (KOp "=") *> pExp <* pTok KSectionR
+        return $ ELet m (UName n) b
 
       -- capture <name> ...
     , try $ do
-        (_, p) <- pTokM KSectionL
-        pTok KCapture
-        (n, _) <- pVarM
-        pTok KSectionR
-        b      <- pExp
-        pSection KEndCapture
-        return $ ELet p (UName n) b
+        (_, m) <- pTokM KSectionL
+        n      <- pTok  KCapture *> pVar
+        b      <- pTok  KSectionR *> pExp <* pSection KEndCapture
+        return $ ELet m (UName n) b
 
       -- if [<alt>]
     , try $ do
-        (_, p) <- pTokM KSectionL
-        pTok KIf
-        s      <- pExp
-        pTok KSectionR
-        c      <- pExp
+        (_, m) <- pTokM KSectionL
+        s      <- pTok  KIf *> pExp
+        c      <- pTok  KSectionR *> pExp
         as     <- pAlts KElseIf KEndIf
-        return $ ECond p (ACond s c : as)
+        return $ ECond m (ACond s c : as)
 
       -- case <exp> [<alt>]
     , try $ do
-        (_, p) <- pTokM KSectionL
-        pTok KCase
-        s      <- pExp
-        pTok KSectionR
+        (_, m) <- pTokM KSectionL
+        s      <- pTok  KCase *> pExp <* pTok KSectionR
         as     <- pAlts KWhen KEndCase
-        return $ ECase p s as
+        return $ ECase m s as
 
       -- for <name> in <exp>
     , try $ do
-        (_, p) <- pTokM KSectionL
-        pTok KFor
-        (n, _) <- pVarM
-        pTok KIn
-        s      <- pExp
-        pTok KSectionR
+        (_, m) <- pTokM KSectionL
+        n      <- pTok  KFor *> pVar
+        s      <- pTok  KIn  *> pExp <* pTok KSectionR
         ma     <- optionMaybe (pDefault KEndCase)
-        return $ ELoop p (UName n) s ma
+        return $ ELoop m (UName n) s ma
 
       -- include <exp> [with <exp>]
     , try $ do
-         (_, p) <- pTokM KSectionL
-         pTok KInclude
-         (n, _) <- pVarM
-         mw     <- optionMaybe $ pTok KWith >> pExp
-         pTok KSectionR
-         return $ EIncl p (UName n) mw
+         (_, m) <- pTokM KSectionL
+         n      <- pTok  KInclude *> pVar
+         mw     <- optionMaybe (pTok KWith >> pExp) <* pTok KSectionR
+         return $ EIncl m (UName n) mw
 
       -- APP1 APP2
     , pApp
@@ -106,21 +92,15 @@ pAlts begin end = (<?> "an alternate expression") $
     <|> pEnd
   where
     pCons = do
-        pTok KSectionL
-        pTok begin
-        s <- pExp
-        pTok KSectionR
+        s <- (pTok KSectionL >> pTok begin) *> pExp <* pTok KSectionR
         c <- pExp
         (ACond s c :) <$> pAlts begin end
 
     pEnd = pSection end >> return []
 
 pDefault :: TokAtom -> Parser Alt
-pDefault end = (<?> "an else expression") $ do
-    pSection KElse
-    a <- pExp
-    pSection end
-    return $ ADefault a
+pDefault end = ADefault <$> (pSection KElse *> pExp <* pSection end)
+    <?> "an else expression"
 
 pSection :: TokAtom -> Parser ()
 pSection k = (pTok KSectionL >> pTok k >> pTok KSectionR) <?> ("a" ++ ppShow k)
@@ -129,26 +109,33 @@ pApp :: Parser Exp
 pApp = do
     (x1, _) <- pAtomM
     choice
-        [ foldl' (\x (x', p) -> EApp p x x') x1 <$> many1 pAtomM
+        [ foldl' (\x (x', m) -> EApp m x x') x1 <$> many1 pAtomM
         , return x1
         ] <?> "an expression or application"
 
 pAtomM :: Parser (Exp, Meta)
 pAtomM = choice
     [ -- (EXP)
-      do (_, p) <- pTokM KParenL
-         t      <- pExp
-         pTok KParenR
-         return (t, p)
+      do (_, m) <- pTokM KParenL
+         t      <- pExp <* pTok KParenR
+         return (t, m)
 
       -- literals
-    , do (l, p) <- pLitM
-         return (ELit p l, p)
+    , do (l, m) <- pLitM
+         return (ELit m l, m)
 
       -- variables
-    , do (v, p) <- pVarM
-         return (EVar p (UName v), p)
+    , do (v, m) <- pVarM
+         return (EVar m (UName v), m)
     ]
+
+applyM :: Parser (a, Meta) -> (Meta -> a -> b) -> Parser (b, Meta)
+applyM parser f = do
+    (x, m) <- parser
+    return (f m x, m)
+
+pVar :: Parser String
+pVar = fst <$> pVarM
 
 pVarM :: Parser (String, Meta)
 pVarM = pTokMaybeM f <?> "a variable"
@@ -162,8 +149,8 @@ pLitM = try bool <|> literal
     bool = first LBool <$> pTokMaybeM h <?> "a boolean"
 
     literal = do
-        (l, p) <- pTokMaybeM f <?> "a string or numeric literal"
-        (,p) <$> g l
+        (l, m) <- pTokMaybeM f <?> "a string or numeric literal"
+        (,m) <$> g l
 
     f (KP (KLit x)) = Just x
     f _             = Nothing
