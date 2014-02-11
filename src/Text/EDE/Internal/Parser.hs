@@ -31,10 +31,7 @@ type Parser a = ParsecT [Token Tok] ParserState Identity a
 
 type ParserState = String
 
-runParser :: String      -- ^ Source name for error messages.
-          -> Parser a    -- ^ Parser to run.
-          -> [Token Tok] -- ^ Tokens to parse.
-          -> Either ParseError a
+runParser :: String -> Parser a -> [Token Tok] -> Either ParseError a
 runParser name parser = P.runParser parser name name
 
 pExp :: Parser (Exp SourcePos)
@@ -98,8 +95,8 @@ pExp = choice
          pTok KSectionR
          return $ EIncl p (UName n) mw
 
-      -- application
-    , pExpApp
+      -- APP1 APP2
+    , pApp
     ]
         <?> "an expression"
 
@@ -129,16 +126,16 @@ pDefault end = (<?> "an else expression") $ do
 pSection :: TokAtom -> Parser ()
 pSection k = (pTok KSectionL >> pTok k >> pTok KSectionR) <?> ("a" ++ ppShow k)
 
-pExpApp :: Parser (Exp SourcePos)
-pExpApp = do
-    (x1, _) <- pExpAtomSP
+pApp :: Parser (Exp SourcePos)
+pApp = do
+    (x1, _) <- pAtomSP
     choice
-        [ foldl' (\x (x', p) -> EApp p x x') x1 <$> many1 pExpAtomSP
+        [ foldl' (\x (x', p) -> EApp p x x') x1 <$> many1 pAtomSP
         , return x1
         ] <?> "an expression or application"
 
-pExpAtomSP :: Parser (Exp SourcePos, SourcePos)
-pExpAtomSP = choice
+pAtomSP :: Parser (Exp SourcePos, SourcePos)
+pAtomSP = choice
     [ -- (EXP)
       do (_, p) <- pTokSP KParenL
          t      <- pExp

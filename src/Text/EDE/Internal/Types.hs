@@ -10,8 +10,8 @@
 
 module Text.EDE.Internal.Types where
 
-import           Data.Scientific (Scientific)
-import qualified Text.Parsec.Pos as P
+import Data.Scientific (Scientific)
+import Text.Parsec.Pos
 
 -- data Delim = Delim !Char !Char
 
@@ -23,27 +23,27 @@ import qualified Text.Parsec.Pos as P
 --     , defFilterDelim  :: !Char
 --     }
 
-data SourcePos = SourcePos
-    { sourceName :: String
-    , sourceLine :: Int
-    , sourceCol  :: Int
+data Meta = Meta
+    { metaName :: String
+    , metaLine :: Int
+    , metaCol  :: Int
     } deriving (Eq, Show)
 
 data Token t = Token
     { tokenTok :: t
-    , tokenPos :: SourcePos
+    , tokenPos :: Meta
     } deriving (Eq, Show)
 
 tokenLine :: Token t -> Int
-tokenLine = sourceLine . tokenPos
+tokenLine = metaLine . tokenPos
 
 tokenCol :: Token t -> Int
-tokenCol = sourceCol . tokenPos
+tokenCol = metaCol . tokenPos
 
-takeSourcePos :: Token k -> P.SourcePos
+takeSourcePos :: Token k -> SourcePos
 takeSourcePos t =
-    let SourcePos src line col = tokenPos t
-    in  P.newPos src line col
+    let Meta src line col = tokenPos t
+    in  newPos src line col
 
 data Lit
     = LText !String
