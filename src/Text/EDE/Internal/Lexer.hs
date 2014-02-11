@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- Module      : Text.EDE.Internal.Lexer
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -8,92 +10,96 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Lexer where
+module Text.EDE.Internal.Lexer
+    ( lexString
+    , module Text.EDE.Internal.Lexer.Tokens
+    ) where
 
-import           Control.Monad
-import           Data.Functor.Identity
-import           Data.HashMap.Strict     (HashMap)
-import           Data.List               (nub)
-import qualified Data.Text               as Text
-import qualified Data.Text.Lazy          as LText
-import           Text.EDE.Internal.Types
-import           Text.Parsec
-import           Text.Parsec.Language
-import           Text.Parsec.Text.Lazy   ()
-import           Text.Parsec.Token       (GenTokenParser)
-import qualified Text.Parsec.Token       as Parsec
+import Data.Char
+import Data.List                      (isPrefixOf, tails)
+import Text.EDE.Internal.Lexer.Names
+import Text.EDE.Internal.Lexer.Tokens
+import Text.EDE.Internal.Types
 
-type Parser = Parsec LText.Text (HashMap Text.Text Meta)
+lexString :: String -> String -> [Token Tok]
+lexString name = lexWord name 0 1
 
-identifier :: Parser String
-identifier = Parsec.identifier lexer
+lexWord :: String -> Int -> Int -> String -> [Token Tok]
+lexWord name line column w = case w of
+    -- Empty
+    "" -> []
 
-reserved :: String -> Parser ()
-reserved = Parsec.reserved lexer
+    -- Whitespace
+    ' '  : w' -> lexMore 1 w'
+    '\t' : w' -> lexMore 8 w'
 
-reservedOp :: String -> Parser ()
-reservedOp = Parsec.reservedOp lexer
+    c : cs
+     | isStringStart c
+     , (body, rest) <- span isStringBody cs
+         -> tokP (KLit $ KText body) : lexMore (length body) rest
 
-stringLiteral :: Parser String
-stringLiteral = Parsec.stringLiteral lexer
+    c : cs
+     | isNumStart c
+     , (body, rest) <- span isNumBody cs
+         -> tokP (KLit $ KNum (c : body)) : lexMore (length (c : body)) rest
 
-numberLiteral :: Parser (Either Integer Double)
-numberLiteral = Parsec.naturalOrFloat lexer
+    -- Meta tokens
+    '{' : '-' : w' -> tokM KCommentStart : lexMore 2 (lexTo "-}" w')
+    '-' : '}' : w' -> tokM KCommentEnd   : lexMore 2 w'
+    '\n' : w'      -> tokM KNewLine      : lexNextLine 1 w'
 
-symbol :: String -> Parser String
-symbol = Parsec.symbol lexer
+    -- Sections
+    '{' : '%' : w' -> tokA KSectionL : lexMore 2 w'
+    '%' : '}' : w' -> tokA KSectionR : lexMore 2 w'
 
-comments :: Parser ()
-comments = try (string start) >> run
+    -- Identifiers
+    '{' : '{' : w' -> tokA KIdentL : lexMore 2 w'
+    '}' : '}' : w' -> tokA KIdentR : lexMore 2 w'
+
+    -- Operators
+    c : cs
+     |  isOpStart c
+     ,  (body, rest) <- span isOpBody cs
+         -> tokA (KOp (c : body)) : lexMore (length (c : body)) rest
+
+    -- Parens
+    '(' : w' -> tokA KParenL : lexMore 1 w'
+    ')' : w' -> tokA KParenR : lexMore 1 w'
+
+    -- Punctuation
+    ',' : w' -> tokA KComma : lexMore 1 w'
+
+    -- Keywords
+    c : cs
+     | isVarStart c
+     , (body,  rest)  <- span isVarBody cs
+     , (body', rest') <- case rest of
+                             '#' : rest' -> (body ++ "#", rest')
+                             _           -> (body, rest)
+         -> let readNamedVar s
+                 | Just t <- keyword s
+                 = tok t           : lexMore (length s) rest'
+
+                 | Just v <- readVar s
+                 = tokP (KVar v) : lexMore (length s) rest'
+
+                 | otherwise
+                 = [tok (KJunk [c])]
+            in  readNamedVar (c : body')
+
+    -- Some unrecognised character.
+    -- We still need to keep lexing as this may be in a comment.
+    c : cs -> (tok $ KJunk [c]) : lexMore 1 cs
   where
-    run =  (void . try $ string end)
-       <|> (comments >> run)
-       <|> (skipMany1 (noneOf startEnd) >> run)
-       <|> (oneOf startEnd >> run)
-       <?> "end of comment"
+    tok t = Token t (SourcePos name line column)
+    tokM  = tok . KM
+    tokA  = tok . KA
+    tokP  = tok . KP
 
-    startEnd = nub $ end ++ start
+    lexTo pat rest =
+        case dropWhile (not . isPrefixOf pat) (tails rest) of
+            x : _ -> x
+            _     -> []
 
-    start = Parsec.commentStart rules
-    end   = Parsec.commentEnd rules
-
-whiteSpace :: Parser ()
-whiteSpace = Parsec.whiteSpace lexer
-
-lexer :: GenTokenParser LText.Text u Identity
-lexer = Parsec.makeTokenParser rules
-
-rules :: GenLanguageDef LText.Text u Identity
-rules = Parsec.LanguageDef
-    { Parsec.commentStart    = "{#"
-    , Parsec.commentEnd      = "#}"
-    , Parsec.commentLine     = ""
-    , Parsec.nestedComments  = False
-    , Parsec.identStart      = letter <|> char '_'
-    , Parsec.identLetter     = alphaNum <|> oneOf "_'-"
-    , Parsec.opStart         = Parsec.opLetter rules
-    , Parsec.opLetter        = oneOf "!>=</|&"
-    , Parsec.caseSensitive   = False
-    , Parsec.reservedOpNames = operators
-    , Parsec.reservedNames   = names
-    }
-
-operators :: [String]
-operators = [">", ">=", "<", "<=", "==", "/=", "!", "||", "&&"]
-
-names :: [String]
-names =
-    [ "if"
-    , "endif"
-    , "for"
-    , "in"
-    , "endfor"
-    , "else"
-    , "true"
-    , "false"
-    , "case"
-    , "when"
-    , "endcase"
-    , "raw"
-    , "endraw"
-    ]
+    lexNextLine n = lexWord name (line + 1) (column + n)
+    lexMore n     = lexWord name line (column + n)
