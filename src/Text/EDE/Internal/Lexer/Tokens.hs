@@ -10,6 +10,35 @@
 
 module Text.EDE.Internal.Lexer.Tokens where
 
+import Text.EDE.Internal.Types
+import Text.Parsec.Pos
+
+-- data Delim = Delim !Char !Char
+
+-- data Language = Language
+--     { defSectionStart :: Delim
+--     , defSectionEnd   :: Delim
+--     , defCommentStart :: Delim
+--     , defCommentEnd   :: Delim
+--     , defFilterDelim  :: !Char
+--     }
+
+data Token = Token
+    { tokenTok :: Tok
+    , tokenPos :: Meta
+    } deriving (Eq, Show)
+
+tokenLine :: Token -> Int
+tokenLine = metaLine . tokenPos
+
+tokenCol :: Token -> Int
+tokenCol = metaCol . tokenPos
+
+takeSourcePos :: Token -> SourcePos
+takeSourcePos t =
+    let Meta src line col = tokenPos t
+    in  newPos src line col
+
 data Tok
     = KJunk String
     | KNewLine
@@ -22,16 +51,12 @@ data TokAtom
     | KSectionR
     | KIdentL
     | KIdentR
-
     | KParenL
     | KParenR
     | KComma
-
     | KOp !String
-
     | KTrue
     | KFalse
-
     | KElse
     | KIf
     | KElseIf

@@ -14,27 +14,24 @@ module Text.EDE.Internal.Parser where
 
 import           Control.Applicative     ((<$>))
 import           Control.Arrow
-import           Control.Arrow
 import           Control.Monad
 import           Data.Foldable           (foldl')
 import           Data.Functor.Identity
-import           Data.Tuple
 import           Safe                    (readMay)
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
 import qualified Text.Parsec             as P
 import           Text.Parsec             hiding (SourcePos, runParser)
-import           Text.Parsec.Error
 import           Text.Show.Pretty        (ppShow)
 
-type Parser a = ParsecT [Token Tok] ParserState Identity a
+type Parser a = ParsecT [Token] ParserState Identity a
 
 type ParserState = String
 
-runParser :: String -> Parser a -> [Token Tok] -> Either ParseError a
+runParser :: String -> Parser a -> [Token] -> Either ParseError a
 runParser name parser = P.runParser parser name name
 
-pExp :: Parser (Exp SourcePos)
+pExp :: Parser Exp
 pExp = choice
     [ -- assign <name> = <exp>
       try $ do
@@ -100,7 +97,7 @@ pExp = choice
     ]
         <?> "an expression"
 
-pAlts :: TokAtom -> TokAtom -> Parser [Alt SourcePos]
+pAlts :: TokAtom -> TokAtom -> Parser [Alt]
 pAlts begin end = (<?> "an alternate expression") $
         try pCons
     <|> try ((:[]) <$> pDefault end)
@@ -116,7 +113,7 @@ pAlts begin end = (<?> "an alternate expression") $
 
     pEnd = pSection end >> return []
 
-pDefault :: TokAtom -> Parser (Alt SourcePos)
+pDefault :: TokAtom -> Parser Alt
 pDefault end = (<?> "an else expression") $ do
     pSection KElse
     a <- pExp
@@ -126,7 +123,7 @@ pDefault end = (<?> "an else expression") $ do
 pSection :: TokAtom -> Parser ()
 pSection k = (pTok KSectionL >> pTok k >> pTok KSectionR) <?> ("a" ++ ppShow k)
 
-pApp :: Parser (Exp SourcePos)
+pApp :: Parser Exp
 pApp = do
     (x1, _) <- pAtomSP
     choice
@@ -134,7 +131,7 @@ pApp = do
         , return x1
         ] <?> "an expression or application"
 
-pAtomSP :: Parser (Exp SourcePos, SourcePos)
+pAtomSP :: Parser (Exp, Meta)
 pAtomSP = choice
     [ -- (EXP)
       do (_, p) <- pTokSP KParenL
@@ -151,13 +148,13 @@ pAtomSP = choice
          return (EVar p (UName v), p)
     ]
 
-pVarSP :: Parser (String, SourcePos)
+pVarSP :: Parser (String, Meta)
 pVarSP = pTokMaybe f <?> "a variable"
   where
     f (KP (KVar n)) = Just n
     f _             = Nothing
 
-pLitSP :: Parser (Lit, SourcePos)
+pLitSP :: Parser (Lit, Meta)
 pLitSP = try bool <|> literal
   where
     bool = first LBool <$> pTokMaybe h <?> "a boolean"
@@ -182,10 +179,10 @@ pLitSP = try bool <|> literal
 pTok :: TokAtom -> Parser ()
 pTok = void . pTokSP
 
-pTokSP :: TokAtom -> Parser (Tok, SourcePos)
+pTokSP :: TokAtom -> Parser (Tok, Meta)
 pTokSP x = pTokMaybe $ \y -> if (KA x) == y then Just y else Nothing
 
-pTokMaybe  :: (Tok -> Maybe a) -> Parser (a, SourcePos)
+pTokMaybe  :: (Tok -> Maybe a) -> Parser (a, Meta)
 pTokMaybe f = token (ppShow . tokenTok) takeSourcePos g
   where
     g x = (, tokenPos x) <$> f (tokenTok x)

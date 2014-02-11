@@ -15,7 +15,6 @@ module Text.EDE.Internal.Lexer
     , module Text.EDE.Internal.Lexer.Tokens
     ) where
 
-import Data.Char
 import Data.List                      (isPrefixOf, tails)
 import Text.EDE.Internal.Lexer.Names
 import Text.EDE.Internal.Lexer.Tokens
@@ -90,7 +89,7 @@ lexWord name line column w = case w of
     -- We still need to keep lexing as this may be in a comment.
     c : cs -> (tok $ KJunk [c]) : lexMore 1 cs
   where
-    tok t = Token t (SourcePos name line column)
+    tok t = Token t (Meta name line column)
     tokA  = tok . KA
     tokP  = tok . KP
 

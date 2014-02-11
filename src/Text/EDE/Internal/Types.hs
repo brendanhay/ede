@@ -29,22 +29,6 @@ data Meta = Meta
     , metaCol  :: Int
     } deriving (Eq, Show)
 
-data Token t = Token
-    { tokenTok :: t
-    , tokenPos :: Meta
-    } deriving (Eq, Show)
-
-tokenLine :: Token t -> Int
-tokenLine = metaLine . tokenPos
-
-tokenCol :: Token t -> Int
-tokenCol = metaCol . tokenPos
-
-takeSourcePos :: Token k -> SourcePos
-takeSourcePos t =
-    let Meta src line col = tokenPos t
-    in  newPos src line col
-
 data Lit
     = LText !String
     | LBool !Bool
@@ -56,20 +40,20 @@ data Bound
     | UPrim !String !Type
       deriving (Show)
 
-data Exp a
-    = EVar  !a !Bound
-    | ELit  !a !Lit
-    | ELet  !a !Bound   !(Exp a)
-    | EApp  !a !(Exp a) !(Exp a)
-    | ECond !a ![Alt a]
-    | ECase !a !(Exp a) ![Alt a]
-    | ELoop !a !Bound   !(Exp a) (Maybe (Alt a))
-    | EIncl !a !Bound   (Maybe (Exp a))
+data Exp
+    = EVar  Meta !Bound
+    | ELit  Meta !Lit
+    | ELet  Meta !Bound !Exp
+    | EApp  Meta !Exp   !Exp
+    | ECond Meta [Alt]
+    | ECase Meta !Exp   [Alt]
+    | ELoop Meta !Bound !Exp (Maybe Alt)
+    | EIncl Meta !Bound (Maybe Exp)
       deriving (Show)
 
-data Alt a
-    = ACond    !(Exp a) !(Exp a)
-    | ADefault !(Exp a)
+data Alt
+    = ACond    !Exp !Exp
+    | ADefault !Exp
       deriving (Show)
 
 data Type
