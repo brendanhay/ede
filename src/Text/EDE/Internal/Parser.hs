@@ -20,8 +20,8 @@ import           Data.Functor.Identity
 import           Safe                    (readMay)
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
-import qualified Text.Parsec             as P
-import           Text.Parsec             hiding (SourcePos, runParser)
+import qualified Text.Parsec             as Parsec
+import           Text.Parsec             hiding (runParser)
 import           Text.Show.Pretty        (ppShow)
 
 type Parser a = ParsecT [Token] ParserState Identity a
@@ -29,7 +29,7 @@ type Parser a = ParsecT [Token] ParserState Identity a
 type ParserState = String
 
 runParser :: String -> Parser a -> [Token] -> Either ParseError a
-runParser name parser = P.runParser parser name name
+runParser name parser = Parsec.runParser parser name name
 
 pExp :: Parser Exp
 pExp = choice

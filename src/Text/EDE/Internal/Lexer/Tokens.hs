@@ -11,6 +11,7 @@
 module Text.EDE.Internal.Lexer.Tokens where
 
 import Text.EDE.Internal.Types
+import Text.Parsec
 import Text.Parsec.Pos
 
 -- data Delim = Delim !Char !Char
