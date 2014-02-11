@@ -21,37 +21,38 @@ import Text.EDE.Internal.Lexer.Names
 import Text.EDE.Internal.Lexer.Tokens
 import Text.EDE.Internal.Types
 
-lexString :: String -> String -> [Token Tok]
+lexString :: String -> String -> [Token]
 lexString name = lexWord name 0 1
 
-lexWord :: String -> Int -> Int -> String -> [Token Tok]
+lexWord :: String -> Int -> Int -> String -> [Token]
 lexWord name line column w = case w of
     -- Empty
-    "" -> []
+    ""              -> []
 
     -- Whitespace
-    ' '  : w' -> lexMore 1 w'
-    '\t' : w' -> lexMore 8 w'
+    ' '  : w'       -> lexMore 1 w'
+    '\t' : w'       -> lexMore 8 w'
 
     -- Meta tokens
-    '{' : '-' : w' -> lexMore 2 (lexTo "-}" w')
-    '-' : '}' : w' -> lexMore 2 w'
-    '\n' : w'      -> tok KNewLine : lexNextLine 1 w'
+    '{'  : '-' : w' -> lexMore 2 (lexTo "-}" w')
+    '-'  : '}' : w' -> lexMore 2 w'
+
+    '\n' : w'       -> tok KNewLine : lexNextLine 1 w'
 
     -- Sections
-    '{' : '%' : w' -> tokA KSectionL : lexMore 2 w'
-    '%' : '}' : w' -> tokA KSectionR : lexMore 2 w'
+    '{' : '%' : w'  -> tokA KSectionL : lexMore 2 w'
+    '%' : '}' : w'  -> tokA KSectionR : lexMore 2 w'
 
     -- Identifiers
-    '{' : '{' : w' -> tokA KIdentL : lexMore 2 w'
-    '}' : '}' : w' -> tokA KIdentR : lexMore 2 w'
+    '{' : '{' : w'  -> tokA KIdentL : lexMore 2 w'
+    '}' : '}' : w'  -> tokA KIdentR : lexMore 2 w'
 
     -- Parens
-    '(' : w' -> tokA KParenL : lexMore 1 w'
-    ')' : w' -> tokA KParenR : lexMore 1 w'
+    '(' : w'        -> tokA KParenL : lexMore 1 w'
+    ')' : w'        -> tokA KParenR : lexMore 1 w'
 
     -- Punctuation
-    ',' : w' -> tokA KComma : lexMore 1 w'
+    ',' : w'        -> tokA KComma : lexMore 1 w'
 
     -- Literals
     c : cs
