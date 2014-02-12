@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -10,24 +12,30 @@
 
 module Text.EDE.Internal.Types where
 
-import Data.Scientific (Scientific)
-import Text.Parsec.Pos
-
--- data Delim = Delim !Char !Char
-
--- data Language = Language
---     { defSectionStart :: Delim
---     , defSectionEnd   :: Delim
---     , defCommentStart :: Delim
---     , defCommentEnd   :: Delim
---     , defFilterDelim  :: !Char
---     }
+import Data.Scientific              (Scientific)
+import Data.String
+import Text.PrettyPrint.Leijen.Text
 
 data Meta = Meta
     { metaName :: String
     , metaLine :: Int
     , metaCol  :: Int
-    } deriving (Eq, Show)
+    } deriving (Eq)
+
+instance Show Meta where
+    show = prettyString
+
+prettyString :: Pretty a => a -> String
+prettyString = show . renderCompact . pretty
+
+instance Pretty Meta where
+    pretty Meta{..} =
+          fromString metaName
+       <> char '('
+       <> pretty metaLine
+       <> char ','
+       <> pretty metaCol
+       <> char ')'
 
 data Lit
     = LText !String

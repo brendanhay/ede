@@ -63,7 +63,6 @@ library
       , directory
       , filepath
       , parsec
-      , pretty-show
       , safe
       , scientific
       , text            >= 1.0
@@ -71,6 +70,7 @@ library
       , transformers
       , unordered-containers
       , vector
+      , wl-pprint-text
 
 test-suite golden
     default-language:  Haskell2010

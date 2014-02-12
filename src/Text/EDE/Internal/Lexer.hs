@@ -31,7 +31,7 @@ runLexer name = fragment 0 1
     fragment :: Int -> Int -> String -> [Token]
     fragment line column w =
         let tok t = Token t (Meta name line column)
-            tokA  = tok . KA
+            tokA  = tok . KAtom
 
             nextLine  = fragment (line + 1) (column + 1)
             lexMore n = fragment line (column + n)
@@ -59,8 +59,8 @@ runLexer name = fragment 0 1
     language :: Int -> Int -> String -> [Token]
     language line column w =
         let tok t = Token t (Meta name line column)
-            tokA  = tok . KA
-            tokP  = tok . KP
+            tokA  = tok . KAtom
+            tokP  = tok . KPrim
 
             nextLine  = language (line + 1) (column + 1)
             lexMore n = language line (column + n)

@@ -110,7 +110,7 @@ pSection :: TokAtom -> Parser ()
 pSection k = do
     show   <- pTokShow
     (_, m) <- pTokM KSectionL <?> "the start of a section"
-    pTok k <?> ('a' : ' ' : show (Token (KA k) m))
+    pTok k <?> ('a' : ' ' : show (Token (KAtom k) m))
     pTok KSectionR <?> "the end of a section"
 
 pApp :: Parser Exp
@@ -148,8 +148,8 @@ pVar = fst <$> pVarM
 pVarM :: Parser (String, Meta)
 pVarM = pTokMaybeM f <?> "a variable"
   where
-    f (KP (KVar n)) = Just n
-    f _             = Nothing
+    f (KPrim (KVar n)) = Just n
+    f _                = Nothing
 
 pLitM :: Parser (Lit, Meta)
 pLitM = try bool <|> literal
@@ -160,30 +160,30 @@ pLitM = try bool <|> literal
         (l, m) <- pTokMaybeM f <?> "a string or numeric literal"
         (,m) <$> g m l
 
-    f (KP (KLit x)) = Just x
-    f _             = Nothing
+    f (KPrim (KLit x)) = Just x
+    f _                = Nothing
 
     g _ (KText  s) = return $ LText s
     g m n@(KNum x) = do
         show <- pTokShow
-        maybe (fail $ "unexpected " ++ show (Token (KP (KLit n)) m))
+        maybe (fail $ "unexpected " ++ show (Token (KPrim (KLit n)) m))
               (return . LNum)
               (readMay x) <?> "a valid numeric literal"
 
-    h (KA KTrue)  = Just True
-    h (KA KFalse) = Just False
-    h _           = Nothing
+    h (KAtom KTrue)  = Just True
+    h (KAtom KFalse) = Just False
+    h _              = Nothing
 
 pTok :: TokAtom -> Parser ()
 pTok = void . pTokM
 
 pTokM :: TokAtom -> Parser (Tok, Meta)
-pTokM x = pTokMaybeM $ \y -> if KA x == y then Just y else Nothing
+pTokM x = pTokMaybeM $ \y -> if KAtom x == y then Just y else Nothing
 
 pTokMaybeM  :: (Tok -> Maybe a) -> Parser (a, Meta)
 pTokMaybeM f = do
     show <- pTokShow
-    token show (tokenSourcePos) $ \x -> (, tokenPos x) <$> f (tokenTok x)
+    token show tokenSourcePos $ \x -> (, tokenPos x) <$> f (tokenTok x)
 
 pTokShow :: Parser (Token -> String)
 pTokShow = stateShow <$> getState

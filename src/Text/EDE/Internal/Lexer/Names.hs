@@ -15,57 +15,54 @@ import Safe                           (initMay)
 import Text.EDE.Internal.Lexer.Tokens
 
 keyword :: String -> Maybe Tok
-keyword = fmap KA . f
+keyword = fmap KAtom . f
   where
-    f "true"    = Just KTrue
-    f "false"   = Just KFalse
-    f "else"    = Just KElse
-    f "if"      = Just KIf
-    f "elif"    = Just KElseIf
-    f "elsif"   = Just KElseIf
-    f "endif"   = Just KEndIf
-    f "case"    = Just KCase
-    f "when"    = Just KWhen
-    f "endcase" = Just KEndCase
-    f "for"     = Just KFor
-    f "in"      = Just KIn
-    f "endfor"  = Just KEndFor
-    f "include" = Just KInclude
-    f "with"    = Just KWith
-    f "assign"  = Just KAssign
-    f "capture" = Just KCapture
-    f _         = Nothing
+    f "true"       = Just KTrue
+    f "false"      = Just KFalse
+    f "else"       = Just KElse
+    f "if"         = Just KIf
+    f "elif"       = Just KElseIf
+    f "elsif"      = Just KElseIf
+    f "endif"      = Just KEndIf
+    f "case"       = Just KCase
+    f "when"       = Just KWhen
+    f "endcase"    = Just KEndCase
+    f "for"        = Just KFor
+    f "in"         = Just KIn
+    f "endfor"     = Just KEndFor
+    f "include"    = Just KInclude
+    f "with"       = Just KWith
+    f "assign"     = Just KAssign
+    f "capture"    = Just KCapture
+    f "endcapture" = Just KEndCapture
+    f "raw"        = Just KRaw
+    f "endraw"     = Just KEndRaw
+    f _            = Nothing
 
-
-
--- | Read a named, user defined variable.
 readVar :: String -> Maybe String
 readVar s
     | isVarName s = Just s
     | otherwise   = Nothing
 
--- | String is a variable name
 isVarName :: String -> Bool
 isVarName [] = False
 isVarName (c : cs)
     | isVarStart c
-    , and (map isVarStart cs) = True
+    , all isVarStart cs = True
 
     | _ : _       <- cs
     , Just initCs <- initMay cs
     , isVarStart c
-    , and (map isVarBody initCs)
+    , all isVarBody initCs
     , last cs == '#'          = True
 
     | otherwise               = False
 
--- | Charater can start a variable name.
 isVarStart :: Char -> Bool
 isVarStart c
     =  isLower c
     || c == '?'
 
--- | Character can be part of a variable body.
 isVarBody  :: Char -> Bool
 isVarBody c
     =  isUpper c
@@ -75,15 +72,7 @@ isVarBody c
     || c == '\''
     || c == '$'
 
--- -- | String is the name of an operator.
--- isOpName :: String -> Bool
--- isOpName [] = False
--- isOpName (c : cs)
---     | isOpStart c
---     , and (map isOpStart cs) = True
---     | otherwise              = False
 
--- | Character can start an operator.
 isOpStart :: Char -> Bool
 isOpStart c
         =  c == '~'     || c == '!'     || c == '@'     || c == '#'
@@ -92,7 +81,6 @@ isOpStart c
         || c == ':'                     || c == '/'     || c == '|'
         || c == '<'     || c == '>'
 
--- | Character can be part of an operator body.
 isOpBody :: Char -> Bool
 isOpBody c
         =  c == '~'     || c == '!'     || c == '@'     || c == '#'
@@ -101,15 +89,6 @@ isOpBody c
         || c == ':'     || c == '?'     || c == '/'     || c == '|'
         || c == '<'     || c == '>'
 
--- -- | String is the name of a literal.
--- isLitName :: String -> Bool
--- isLitName [] = False
--- isLitName (c : cs)
---     | isLitStart c
---     , and (map isLitBody cs) = True
---     | otherwise              = False
-
--- | Character can start a literal.
 isStringStart :: Char -> Bool
 isStringStart c = c == '"'
 
@@ -121,14 +100,3 @@ isNumStart c = isDigit c || c == '-'
 
 isNumBody :: Char -> Bool
 isNumBody c = isDigit c || c == '.'
-
--- -- | Character can be part of a literal body.
--- isLitBody :: Char -> Bool
--- isLitBody c
---     = 
---     =  isDigit c
---     || c /= 'b' || c == 'o' || c == 'x'
---     || c == 'w' || c == 'f' || c == 'i'
---     || c == '.'
---     || c == '#'
---     || c == '\''
