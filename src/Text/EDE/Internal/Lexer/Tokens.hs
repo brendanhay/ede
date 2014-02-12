@@ -23,11 +23,14 @@ data Token = Token
     , tokenPos :: Meta
     } deriving (Eq)
 
-tokenSourcePos :: Token -> SourcePos
-tokenSourcePos t = let Meta src l c = tokenPos t in newPos src l c
+instance Show Token where
+    show = prettyString
 
 instance Pretty Token where
     pretty Token{..} = pretty tokenPos <+> pretty tokenTok
+
+tokenSourcePos :: Token -> SourcePos
+tokenSourcePos t = let Meta src l c = tokenPos t in newPos src l c
 
 data Tok
     = KNewLine

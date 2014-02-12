@@ -16,6 +16,9 @@ import Data.Scientific              (Scientific)
 import Data.String
 import Text.PrettyPrint.Leijen.Text
 
+prettyString :: Pretty a => a -> String
+prettyString = show . renderCompact . pretty
+
 data Meta = Meta
     { metaName :: String
     , metaLine :: Int
@@ -24,9 +27,6 @@ data Meta = Meta
 
 instance Show Meta where
     show = prettyString
-
-prettyString :: Pretty a => a -> String
-prettyString = show . renderCompact . pretty
 
 instance Pretty Meta where
     pretty Meta{..} =
