@@ -29,14 +29,8 @@ data Token = Token
     , tokenPos :: Meta
     } deriving (Eq, Show)
 
-tokenLine :: Token -> Int
-tokenLine = metaLine . tokenPos
-
-tokenCol :: Token -> Int
-tokenCol = metaCol . tokenPos
-
-takeSourcePos :: Token -> SourcePos
-takeSourcePos t =
+tokenSourcePos :: Token -> SourcePos
+tokenSourcePos t =
     let Meta src line col = tokenPos t
     in  newPos src line col
 
@@ -75,6 +69,8 @@ data TokAtom
     | KEqual
     | KCapture
     | KEndCapture
+    | KRaw
+    | KEndRaw
       deriving (Eq, Show)
 
 data TokPrim

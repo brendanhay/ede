@@ -17,14 +17,12 @@ import           Control.Arrow
 import           Control.Monad
 import           Data.Foldable           (foldl')
 import           Data.Functor.Identity
+import           Prelude                 hiding (show)
 import           Safe                    (readMay)
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
 import qualified Text.Parsec             as Parsec
 import           Text.Parsec             hiding (runParser)
-import           Text.Show.Pretty        (ppShow)
-
--- Add the show function to the parser state
 
 type Parser a = ParsecT [Token] ParserState Identity a
 
@@ -109,7 +107,11 @@ pDefault end = ADefault <$> (pSection KElse *> pExp <* pSection end)
     <?> "an else expression"
 
 pSection :: TokAtom -> Parser ()
-pSection k = (pTok KSectionL >> pTok k >> pTok KSectionR) <?> ("a" ++ ppShow k)
+pSection k = do
+    show   <- pTokShow
+    (_, m) <- pTokM KSectionL <?> "the start of a section"
+    pTok k <?> ('a' : ' ' : show (Token (KA k) m))
+    pTok KSectionR <?> "the end of a section"
 
 pApp :: Parser Exp
 pApp = do
@@ -156,14 +158,15 @@ pLitM = try bool <|> literal
 
     literal = do
         (l, m) <- pTokMaybeM f <?> "a string or numeric literal"
-        (,m) <$> g l
+        (,m) <$> g m l
 
     f (KP (KLit x)) = Just x
     f _             = Nothing
 
-    g (KText  s) = return $ LText s
-    g n@(KNum x) =
-        maybe (fail $ "unexpected " ++ ppShow n)
+    g _ (KText  s) = return $ LText s
+    g m n@(KNum x) = do
+        show <- pTokShow
+        maybe (fail $ "unexpected " ++ show (Token (KP (KLit n)) m))
               (return . LNum)
               (readMay x) <?> "a valid numeric literal"
 
@@ -175,9 +178,12 @@ pTok :: TokAtom -> Parser ()
 pTok = void . pTokM
 
 pTokM :: TokAtom -> Parser (Tok, Meta)
-pTokM x = pTokMaybeM $ \y -> if (KA x) == y then Just y else Nothing
+pTokM x = pTokMaybeM $ \y -> if KA x == y then Just y else Nothing
 
 pTokMaybeM  :: (Tok -> Maybe a) -> Parser (a, Meta)
-pTokMaybeM f = token (ppShow . tokenTok) takeSourcePos g
-  where
-    g x = (, tokenPos x) <$> f (tokenTok x)
+pTokMaybeM f = do
+    show <- pTokShow
+    token show (tokenSourcePos) $ \x -> (, tokenPos x) <$> f (tokenTok x)
+
+pTokShow :: Parser (Token -> String)
+pTokShow = stateShow <$> getState
