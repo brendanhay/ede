@@ -50,8 +50,8 @@ data Tok
 instance Pretty Tok where
     pretty t = case t of
         KNewLine -> "newline"
-        KJunk c  -> "junk "     <+> squotes (pretty c)
-        KFrag c  -> "fragment " <+> squotes (pretty c)
+        KJunk c  -> "junk"     <+> squotes (pretty c)
+        KFrag c  -> "fragment" <+> squotes (pretty c)
         KAtom a  -> pretty a
         KPrim p  -> pretty p
 
