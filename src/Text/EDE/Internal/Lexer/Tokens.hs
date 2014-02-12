@@ -41,7 +41,8 @@ takeSourcePos t =
     in  newPos src line col
 
 data Tok
-    = KJunk String
+    = KJunk Char
+    | KFrag Char
     | KNewLine
     | KA !TokAtom
     | KP !TokPrim

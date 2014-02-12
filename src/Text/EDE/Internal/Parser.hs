@@ -17,7 +17,6 @@ import           Control.Arrow
 import           Control.Monad
 import           Data.Foldable           (foldl')
 import           Data.Functor.Identity
-import           Data.Tuple
 import           Safe                    (readMay)
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Types
@@ -29,10 +28,17 @@ import           Text.Show.Pretty        (ppShow)
 
 type Parser a = ParsecT [Token] ParserState Identity a
 
-type ParserState = String
+data ParserState = ParserState
+    { stateShow :: Token -> String
+    , stateName :: String
+    }
 
-runParser :: String -> Parser a -> [Token] -> Either ParseError a
-runParser name parser = Parsec.runParser parser name name
+runParser :: (Token -> String)
+          -> String
+          -> Parser a
+          -> [Token]
+          -> Either ParseError a
+runParser f name parser = Parsec.runParser parser (ParserState f name) name
 
 pExp :: Parser Exp
 pExp = choice

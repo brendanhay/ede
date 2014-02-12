@@ -36,6 +36,8 @@ keyword = fmap KA . f
     f "capture" = Just KCapture
     f _         = Nothing
 
+
+
 -- | Read a named, user defined variable.
 readVar :: String -> Maybe String
 readVar s
