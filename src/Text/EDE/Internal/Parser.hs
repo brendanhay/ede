@@ -86,8 +86,7 @@ pExp = choice
 
       -- APP1 APP2
     , pApp
-    ]
-        <?> "an expression"
+    ] <?> "an expression"
 
 pAlts :: TokAtom -> TokAtom -> Parser [Alt]
 pAlts begin end = (<?> "an alternate expression") $
