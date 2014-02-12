@@ -18,16 +18,6 @@ import Text.EDE.Internal.Types
 import Text.Parsec.Pos
 import Text.PrettyPrint.Leijen.Text
 
--- data Delim = Delim !Char !Char
-
--- data Language = Language
---     { defSectionStart :: Delim
---     , defSectionEnd   :: Delim
---     , defCommentStart :: Delim
---     , defCommentEnd   :: Delim
---     , defFilterDelim  :: !Char
---     }
-
 data Token = Token
     { tokenTok :: Tok
     , tokenPos :: Meta
