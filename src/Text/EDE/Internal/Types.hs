@@ -14,6 +14,7 @@ module Text.EDE.Internal.Types where
 
 import Data.Scientific              (Scientific)
 import Data.String
+import Data.Text                    (Text)
 import Text.PrettyPrint.Leijen.Text
 
 prettyString :: Pretty a => a -> String
@@ -37,35 +38,49 @@ instance Pretty Meta where
        <> pretty metaCol
        <> char ')'
 
-data Lit
-    = LText !String
-    | LBool !Bool
-    | LNum  !Scientific
+data Ann a = Ann
+    { annType :: Type
+    , annTail :: a
+    } deriving (Show)
+
+data Bind
+    = BNone !Type
+    | BName !String !Type
+    | BAnon !Type
       deriving (Show)
 
 data Bound
-    = UName !String
-    | UPrim !String !Type
-      deriving (Show)
-
-data Exp
-    = EVar  Meta !Bound
-    | ELit  Meta !Lit
-    | ELet  Meta !Bound !Exp
-    | EApp  Meta !Exp   !Exp
-    | ECond Meta [Alt]
-    | ECase Meta !Exp   [Alt]
-    | ELoop Meta !Bound !Exp (Maybe Alt)
-    | EIncl Meta !Bound (Maybe Exp)
-      deriving (Show)
-
-data Alt
-    = ACond    !Exp !Exp
-    | ADefault !Exp
+    = UName  !String
+    | UIndex !Int
       deriving (Show)
 
 data Type
     = TVar !Bound
     | TApp !Type !Type
+    | TText
+    | TBool
+    | TNum
     | TBot
+      deriving (Show)
+
+data Exp a
+    = EVar  !a !Bound
+    | ELit  !a !Lit
+    | ELet  !a !Bind    !(Exp a)
+    | EApp  !a !(Exp a) !(Exp a)
+    | ECond !a [Alt a]
+    | ECase !a !(Exp a) [Alt a]
+    | ELoop !a !Bind    !(Exp a) (Maybe (Alt a))
+    | EIncl !a !Bind    (Maybe (Exp a))
+      deriving (Show)
+
+data Alt a
+    = ACond    !(Exp a) !(Exp a)
+    | ADefault !(Exp a)
+      deriving (Show)
+
+data Lit
+    = LText !Text
+    | LBool !Bool
+    | LNum  !Scientific
       deriving (Show)

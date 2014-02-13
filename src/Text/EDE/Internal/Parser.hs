@@ -17,6 +17,7 @@ import           Control.Arrow
 import           Control.Monad
 import           Data.Foldable           (foldl')
 import           Data.Functor.Identity
+import qualified Data.Text               as Text
 import           Prelude                 hiding (show)
 import           Safe                    (readMay)
 import           Text.EDE.Internal.Lexer
@@ -45,7 +46,7 @@ pFragM :: Parser (Exp, Meta)
 pFragM = do
     (c, m) <- pTokMaybeM f <?> "a fragment"
     cs     <- manyTill (pTokMaybeM f) (try . lookAhead $ void (pTokMaybeM g) <|> eof)
-    return (ELit m $ LText (c : map fst cs), m)
+    return (ELit m (LText . Text.pack $ c : map fst cs), m)
   where
     f (KFrag c) = Just c
     f _         = Nothing
@@ -176,7 +177,7 @@ pLitM = try bool <|> literal
     f (KPrim (KLit x)) = Just x
     f _                = Nothing
 
-    g _ (KText  s) = return $ LText s
+    g _ (KText  s) = return . LText $ Text.pack s
     g m n@(KNum x) = do
         show <- pTokShow
         maybe (fail $ "unexpected " ++ show (Token (KPrim (KLit n)) m))
