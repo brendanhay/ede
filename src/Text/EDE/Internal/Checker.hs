@@ -63,33 +63,33 @@ principal :: Exp a
           -> Env
           -> Sub
           -> Check Int String Sub
-principal x t env subs = go x
+principal x t env subs = f x
   where
-    go (ELit _ l) = (\v -> unify v t subs) $
+    f (ELit _ l) = (\v -> unify v t subs) $
         case l of
             LText _ -> TCon "string"  []
             LBool _ -> TCon "boolean" []
             LNum  _ -> TCon "number"  []
 
-    go (EVar _ n) =
+    f (EVar _ n) =
         maybe (throw $ "Unable to find varible name: " ++ bindName n)
               (\(t', _) -> unify (Sub.substitute t' subs) t subs)
               (Env.lookup n env)
 
-    go (ELam _ y bdy) = do
+    f (ELam _ y bdy) = do
         a  <- variable
         b  <- variable
         s1 <- unify t (TLam a b) subs
 
         principal bdy b (Env.insert y a env) s1
 
-    go (EApp _ e1 e2) = do
+    f (EApp _ e1 e2) = do
         a  <- variable
         s1 <- principal e1 (TLam a t) env subs
 
         principal e2 a env s1
 
-    go (ELet _ n inv bdy) = do
+    f (ELet _ n inv bdy) = do
         a  <- variable
         s1 <- principal inv a env subs
 
@@ -97,25 +97,29 @@ principal x t env subs = go x
 
         principal bdy bt (Env.extend n bt env) s1
 
-variable :: Check Int e Type
-variable = do
-    x <- get
-    put (x + 1)
-    return $ TVar [toEnum x]
-
-
 unify :: Type -> Type -> Sub -> Check s String Sub
 unify x y s = f (Sub.substitute x s) (Sub.substitute y s)
   where
     f (TVar nx) (TVar ny) | nx == ny =
         return s
+
     f (TVar n) _ | vs <- Env.typeVars y, not (Set.member n vs) =
         return (Sub.extend n y s)
+
     f _ (TVar _) =
         unify y x s
+
     f (TLam x1 y1) (TLam x2 y2) =
         unify x1 x2 =<< unify y1 y2 s
+
     f (TCon n1 ts1) (TCon n2 ts2) | n1 == n2 =
         foldrM (\(a, b) s' -> unify a b s') s (zip ts1 ts2)
+
     f a b =
         throw $ "Unable to unify:" ++ show (a, b)
+
+variable :: Check Int e Type
+variable = do
+    x <- get
+    put (x + 1)
+    return $ TVar [toEnum x]
