@@ -49,13 +49,16 @@ library
     exposed-modules:
 --        Text.EDE.Internal.Checker.Context
 --        Text.EDE.Internal.Checker.Env
+--        Text.EDE.Internal.Checker
+
         Text.EDE.Internal.Checker
       , Text.EDE.Internal.Checker.Monad
+      , Text.EDE.Internal.Types
+
       -- , Text.EDE.Internal.Lexer
       -- , Text.EDE.Internal.Lexer.Names
       -- , Text.EDE.Internal.Lexer.Tokens
       -- , Text.EDE.Internal.Parser
-      -- , Text.EDE.Internal.Types
 
     ghc-options:       -Wall
 
