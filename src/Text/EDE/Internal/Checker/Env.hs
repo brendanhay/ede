@@ -11,43 +11,40 @@
 module Text.EDE.Internal.Checker.Env
     ( Env
     , empty
-    , singleton
-    , depth
+    , insert
     , extend
     , lookup
+    , typeVars
     ) where
 
-import           Control.Monad
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
+import           Data.HashSet            (HashSet)
+import qualified Data.HashSet            as Set
 import qualified Prelude
 import           Prelude                 hiding (lookup)
 import           Text.EDE.Internal.Types
 
-data Env = Env
-    { envMap   :: HashMap String Type
-    , envStack :: [Type]
-    , envDepth :: !Int
-    , envPrim  :: String -> Maybe Type
-    }
+newtype Env = Env { envMap :: HashMap String (Type, HashSet String) }
 
 empty :: Env
-empty = Env Map.empty [] 0 (\_ -> Nothing)
+empty = Env Map.empty
 
-singleton :: Bind -> Env
-singleton = (`extend` empty)
+insert :: Bind -> Type -> Env -> Env
+insert (Bind b) t = Env . Map.insert b (t, Set.empty) . envMap
 
-depth :: Env -> Int
-depth = envDepth
+extend :: Bind -> Type -> Env -> Env
+extend (Bind b) t (Env m) = Env $
+    Map.insert b (t, typeVars t `Set.difference` set) m
+  where
+    set = Set.unions
+        . map (\(t', s) -> typeVars t' `Set.difference` s)
+        $ Map.elems m
 
-extend :: Bind -> Env -> Env
-extend (BNone   _) e = e
-extend (BName n t) e = e { envMap = Map.insert n t (envMap e) }
-extend (BAnon   t) e = e
-    { envStack = t : envStack e
-    , envDepth = envDepth e + 1
-    }
+lookup :: Bind -> Env -> Maybe (Type, HashSet String)
+lookup (Bind b) = Map.lookup b . envMap
 
-lookup :: Bound -> Env -> Maybe Type
-lookup (UName  n) e = Map.lookup n (envMap e) `mplus` envPrim e n
-lookup (UIndex i) e = Prelude.lookup i $ zip [0..] (envStack e)
+typeVars :: Type -> HashSet String
+typeVars (TVar n)    = Set.singleton n
+typeVars (TCon _ ts) = Set.unions $ map typeVars ts
+typeVars (TLam x y)  = typeVars x `Set.union` typeVars y

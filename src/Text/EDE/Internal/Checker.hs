@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- Module      : Text.EDE.Internal.Checker
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -10,106 +12,115 @@
 
 module Text.EDE.Internal.Checker where
 
+import           Control.Applicative
 import           Control.Monad
-import           Data.Monoid
-import           Text.EDE.Internal.Checker.Context (Context)
-import qualified Text.EDE.Internal.Checker.Context as Ctx
-import           Text.EDE.Internal.Checker.Env     (Env)
-import qualified Text.EDE.Internal.Checker.Env     as Env
+import           Data.Foldable                   (foldrM)
+import qualified Data.HashMap.Strict             as Map
+import qualified Data.HashSet                    as Set
+import           Text.EDE.Internal.Checker.Env   (Env)
+import qualified Text.EDE.Internal.Checker.Env   as Env
 import           Text.EDE.Internal.Checker.Monad
+import           Text.EDE.Internal.Checker.Sub   (Sub)
+import qualified Text.EDE.Internal.Checker.Sub   as Sub
 import           Text.EDE.Internal.Types
 
-data Error a
-    = ErrorUndefinedVar a Bound
-    | ErrorLetMistmatch a (Exp a) Bind Type
-      deriving (Show)
-
-data Result a = Result
-    { resTraces :: [String]
-    , resResult :: Either String (Exp a, Type)
-    }
-
-runChecker :: Exp a -> Env -> Result (Ann a)
-runChecker x env = Result undefined res
+typeOf :: Exp a -> Either String Type
+typeOf x = go >>= rename
   where
-    (_, res) = runCheck (mempty, 0, 0) $ undefined -- do
---        (ann, t, ctx) <- typeCheckExp x env Ctx.empty
+    go = evalCheck 0 $ do
+        a    <- variable
+        subs <- principal x a Env.empty Sub.empty
+        return $! Sub.substitute a subs
 
-    -- check :: Exp a
-    --       -> Env
-    --       -> Context
-    --       -> CheckM a String (Exp (Ann a), Type, Context)
+test :: Exp String
+test = ELet m "compose"
+    (ELam m "f"
+        (ELam m "g"
+            (ELam m "x"
+                (EApp m (EVar m "g") (EApp m (EVar m "f") (EVar m "x"))))))
+    (EVar m "compose")
+  where
+    m = "meta"
 
-    check (EVar a u) env ctx
-        | Just t <- Ctx.lookup u ctx = returnX a (\z -> EVar z u) t ctx
-        | Just t <- Env.lookup u env = returnX a (\z -> EVar z u) t ctx
-        | otherwise                  = throw $ ErrorUndefinedVar a u
+rename :: Type -> Either e Type
+rename = evalCheck (Map.empty, 'a') . go
+  where
+    go (TVar n)    = TVar . (:[]) <$> name n
+    go (TLam x y)  = liftM2 TLam (go x) (go y)
+    go (TCon n ts) = TCon n <$> mapM go ts
 
-    check (ELit a l) env ctx
-        | LText _ <- l = TText
-        | LBool _ <- l = TBool
-        | LNum  _ <- l = TNum
+    name n = do
+      (m, i) <- get
+      maybe (missing n i m) return (Map.lookup n m)
 
-    check l@(ELet a b x) env ctx = do
-        (bdy, bdyt, ctx1) <- check x env ctx
+    missing n i m = do
+        let j = toEnum (fromEnum i + 1)
+        put (Map.insert n i m, j)
+        return j
 
-        let ann = annotation l
-            bt  = typeOfBind b
+principal :: Exp a
+          -> Type
+          -> Env
+          -> Sub
+          -> Check Int String Sub
+principal x t env subs = go x
+  where
+    go (ELit _ l) = (\v -> unify v t subs) $
+        case l of
+            LText _ -> TCon "string"  []
+            LBool _ -> TCon "boolean" []
+            LNum  _ -> TCon "number"  []
 
-        -- Ensure the binding matches the reconstructed type.
-        when (not $ isBot bt) $
-             if equivT bt bdyt
-                 then return ()
-                 else throw $ ErrorLetMistmatch ann l b bdyt
+    go (EVar _ n) =
+        maybe (throw $ "Unable to find varible name: " ++ bindName n)
+              (\(t', _) -> unify (Sub.substitute t' subs) t subs)
+              (Env.lookup n env)
 
-        let bind        = replaceTypeOfBind bdyt b
-            (ctx2, pos) = markContext ctx1
-            ctx3        = pushType bind ctx2
+    go (ELam _ y bdy) = do
+        a  <- variable
+        b  <- variable
+        s1 <- unify t (TLam a b) subs
 
-            res = applyContext ctx3 bdyt
-            cut = popToPos pos ctx3
+        principal bdy b (Env.insert y a env) s1
 
-        returnX a (\z -> ELet z bind bdy) res cut
+    go (EApp _ e1 e2) = do
+        a  <- variable
+        s1 <- principal e1 (TLam a t) env subs
 
---     check (EApp a x y)
---         |
+        principal e2 a env s1
 
---     check (ECond a alts)
---         |
+    go (ELet _ n inv bdy) = do
+        a  <- variable
+        s1 <- principal inv a env subs
 
---     check (ECase a x alts)
---         |
+        let bt = Sub.substitute a s1
 
---     check (ELoop a b x malt)
---         |
+        principal bdy bt (Env.extend n bt env) s1
 
---     check (EIncl a b mbdy)
---         |
+variable :: Check Int e Type
+variable = do
+    x <- get
+    put (x + 1)
+    return $ TVar [toEnum x]
 
--- returnX :: a -> (Ann a -> Exp (Ann a)) -> Type -> Context -> Check a
-returnX a f t ctx = return (f $ Ann t a, t, ctx)
 
--- -- -- | Helper function for building the return value of checkExpM'
--- -- --   It builts the AnTEC annotation and attaches it to the new AST node,
--- -- --   as well as returning the current effect and closure in the appropriate
--- -- --   form as part of the tuple. 
--- -- returnX :: Ord n 
--- --         => a                            -- ^ Annotation for the returned expression.
--- --         -> (AnTEC a n 
--- --                 -> Exp (AnTEC a n) n)   -- ^ Fn to build the returned expression.
--- --         -> Type n                       -- ^ Type of expression.
--- --         -> TypeSum n                    -- ^ Effect sum of expression.
--- --         -> Set (TaggedClosure n)        -- ^ Closure of expression.
--- --         -> Context n                    -- ^ Input context.
--- --         -> CheckM a n 
--- --                 ( Exp (AnTEC a n) n     -- Annotated, checked expression.
--- --                 , Type n                -- Type of expression.       (id to above)
--- --                 , TypeSum n             -- Effect sum of expression. (id to above)
--- --                 , Set (TaggedClosure n) -- Closure of expression.    (id to above)
--- --                 , Context n)            -- Output context.
+unify :: Type -> Type -> Sub -> Check s String Sub
+unify x y s = f (Sub.substitute x s) (Sub.substitute y s)
+  where
+    f (TVar nx) (TVar ny) | nx == ny =
+        return s
 
--- -- returnX !a !f !t !es !cs !ctx
--- --  = let  e       = TSum es
--- --         c       = closureOfTaggedSet cs
--- --    in   return  (f (AnTEC t e c a)
--- --                 , t, es, cs, ctx)
+    f (TVar n) _ | vs <- Env.typeVars y, not (Set.member n vs) =
+        return (Sub.extend n y s)
+
+    f _ (TVar _) =
+        unify y x s
+
+    f (TLam x1 y1) (TLam x2 y2) =
+        unify x1 x2 =<< unify y1 y2 s
+
+    f (TCon n1 ts1) (TCon n2 ts2) | n1 == n2 =
+        foldrM (\(a, b) s' -> unify a b s') s (zip ts1 ts2)
+
+    f a b =
+        throw $ "Unable to unify:" ++ show (a, b)

@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards            #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -43,31 +44,22 @@ data Ann a = Ann
     , annTail :: a
     } deriving (Show)
 
-data Bind
-    = BNone !Type
-    | BName !String !Type
-    | BAnon !Type
-      deriving (Show)
-
-data Bound
-    = UName  !String
-    | UIndex !Int
-      deriving (Show)
-
 data Type
-    = TVar !Bound
-    | TApp !Type !Type
-    | TText
-    | TBool
-    | TNum
-    | TBot
-      deriving (Show)
+    = TVar !String
+    | TCon !String [Type]
+    | TLam !Type   !Type
+      deriving (Eq, Show)
+
+newtype Bind = Bind { bindName :: String }
+    deriving (Show, IsString)
 
 data Exp a
-    = EVar  !a !Bound
-    | ELit  !a !Lit
-    | ELet  !a !Bind    !(Exp a)
+    = ELit  !a !Lit
+    | EVar  !a !Bind
+    | ELam  !a !Bind    !(Exp a)
+    | ELet  !a !Bind    !(Exp a) !(Exp a)
     | EApp  !a !(Exp a) !(Exp a)
+
     | ECond !a [Alt a]
     | ECase !a !(Exp a) [Alt a]
     | ELoop !a !Bind    !(Exp a) (Maybe (Alt a))

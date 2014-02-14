@@ -17,18 +17,18 @@ data Check s e a = Check (s -> (s, Either e a))
 instance Functor (Check s e) where
     fmap = liftM
 
-instance Monad (Check s err) where
+instance Monad (Check s e) where
     return x      = Check $ \s -> (s, Right x)
     Check f >>= g = Check $ \s ->
         case f s of
             (s', Left  e) -> (s', Left e)
-            (s', Right x)  -> runCheck s' (g x)
+            (s', Right x) -> runCheck s' (g x)
 
 runCheck :: s -> Check s e a -> (s, Either e a)
 runCheck s (Check f) = f s
 
 evalCheck :: s -> Check s e a -> Either e a
-evalCheck s m = snd $ runCheck s m
+evalCheck s = snd . runCheck s
 
 throw :: e -> Check s e a
 throw e = Check $ \s -> (s, Left e)
