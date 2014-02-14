@@ -109,18 +109,13 @@ unify x y s = f (Sub.substitute x s) (Sub.substitute y s)
   where
     f (TVar nx) (TVar ny) | nx == ny =
         return s
-
     f (TVar n) _ | vs <- Env.typeVars y, not (Set.member n vs) =
         return (Sub.extend n y s)
-
     f _ (TVar _) =
         unify y x s
-
     f (TLam x1 y1) (TLam x2 y2) =
         unify x1 x2 =<< unify y1 y2 s
-
     f (TCon n1 ts1) (TCon n2 ts2) | n1 == n2 =
         foldrM (\(a, b) s' -> unify a b s') s (zip ts1 ts2)
-
     f a b =
         throw $ "Unable to unify:" ++ show (a, b)
