@@ -41,8 +41,8 @@ extend (Bind b) t (Env m) = Env $
         . map (\(t', s) -> typeVars t' `Set.difference` s)
         $ Map.elems m
 
-lookup :: Bind -> Env -> Maybe (Type, HashSet String)
-lookup (Bind b) = Map.lookup b . envMap
+lookup :: Bind -> Env -> Maybe Type
+lookup (Bind b) = fmap fst . Map.lookup b . envMap
 
 typeVars :: Type -> HashSet String
 typeVars (TVar n)    = Set.singleton n

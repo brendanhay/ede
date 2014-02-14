@@ -24,26 +24,24 @@ import           Text.EDE.Internal.Checker.Sub   (Sub)
 import qualified Text.EDE.Internal.Checker.Sub   as Sub
 import           Text.EDE.Internal.Types
 
-typeOf :: Exp a -> Either String Type
-typeOf x = go >>= rename
+--typeOf :: Exp a -> Either String (Exp (Ann a))
+typeOf x = go
   where
-    go = evalCheck 0 $ do
-        a    <- variable
-        subs <- principal x a Env.empty Sub.empty
-        return $! Sub.substitute a subs
+    go = evalCheck (State 0 Env.empty Sub.empty) $ do
+        a  <- variable
+        x' <- principal x a
+        subs <- _subs <$> get
+        return (x', Sub.substitute a subs)
 
 test :: Exp String
 test = ELet m "compose"
-    (ELam m "f"
-        (ELam m "g"
-            (ELam m "x"
-                (EApp m (EVar m "g") (EApp m (EVar m "f") (EVar m "x"))))))
+    (ELam m "f" (ELit m (LText "dsaas")))
     (EVar m "compose")
   where
     m = "meta"
 
-rename :: Type -> Either e Type
-rename = evalCheck (Map.empty, 'a') . go
+-- rename :: Type -> Either e Type
+rename = go
   where
     go (TVar n)    = TVar . (:[]) <$> name n
     go (TLam x y)  = liftM2 TLam (go x) (go y)
@@ -60,66 +58,89 @@ rename = evalCheck (Map.empty, 'a') . go
 
 principal :: Exp a
           -> Type
-          -> Env
-          -> Sub
-          -> Check Int String Sub
-principal x t env subs = f x
+          -> Check (State Int) (Exp (Ann a))
+principal x' t = f x'
   where
-    f (ELit _ l) = (\v -> unify v t subs) $
-        case l of
-            LText _ -> TCon "string"  []
-            LBool _ -> TCon "boolean" []
-            LNum  _ -> TCon "number"  []
+    f (ELit a l) = do
+        let t' = case l of
+                     LText _ -> TCon "string"  []
+                     LBool _ -> TCon "boolean" []
+                     LNum  _ -> TCon "number"  []
 
-    f (EVar _ n) =
-        maybe (throw $ "Unable to find varible name: " ++ bindName n)
-              (\(t', _) -> unify (Sub.substitute t' subs) t subs)
-              (Env.lookup n env)
+        unify t' t
 
-    f (ELam _ y bdy) = do
-        a  <- variable
-        b  <- variable
-        s1 <- unify t (TLam a b) subs
+        return $! ELit (Ann t' a) l
 
-        principal bdy b (Env.insert y a env) s1
+    f (EVar a n) = do
+        env  <- _env  <$> get
+        subs <- _subs <$> get
 
-    f (EApp _ e1 e2) = do
-        a  <- variable
-        s1 <- principal e1 (TLam a t) env subs
+        t'   <- maybe (throw $ "Unable to find varible name: " ++ bindName n)
+                return
+                (Env.lookup n env)
 
-        principal e2 a env s1
+        unify (Sub.substitute t' subs) t
 
-    f (ELet _ n inv bdy) = do
-        a  <- variable
-        s1 <- principal inv a env subs
+        return $! EVar (Ann t' a) n
 
-        let bt = Sub.substitute a s1
+    f (ELam a b bdy) = do
+        x <- variable
+        y <- variable
 
-        principal bdy bt (Env.extend n bt env) s1
+        unify t (TLam x y)
 
-unify :: Type -> Type -> Sub -> Check s String Sub
-unify x y s = f (Sub.substitute x s) (Sub.substitute y s)
+        with $ \env subs -> ((), Env.insert b x env, subs)
+
+        bdye <- principal bdy y
+
+        return $! ELam (Ann y a) b bdye
+
+    f (EApp a e1 e2) = do
+        x   <- variable
+        e1' <- principal e1 (TLam x t)
+        e2' <- principal e2 x
+
+        return $! EApp (Ann x a) e1' e2'
+
+    f (ELet a n inv bdy) = do
+        x    <- variable
+        inv' <- principal inv x
+
+        subs <- _subs <$> get
+
+        let bt = Sub.substitute x subs
+
+        with $ \env s -> ((), Env.extend n bt env, s)
+
+        bdy' <- principal bdy bt
+
+        return $! ELet (Ann bt a) n inv' bdy'
+
+unify :: Type -> Type -> Check (State s) ()
+unify t1 t2 = do
+    s <- _subs <$> get
+    f (Sub.substitute t1 s) (Sub.substitute t2 s)
   where
     f (TVar nx) (TVar ny) | nx == ny =
-        return s
+        return ()
 
-    f (TVar n) _ | vs <- Env.typeVars y, not (Set.member n vs) =
-        return (Sub.extend n y s)
+    f (TVar n) _ | vs <- Env.typeVars t2, not (Set.member n vs) =
+        with $ \env sub -> ((), env, Sub.extend n t2 sub)
 
     f _ (TVar _) =
-        unify y x s
+        unify t2 t1
 
     f (TLam x1 y1) (TLam x2 y2) =
-        unify x1 x2 =<< unify y1 y2 s
+        unify y1 y2 >> unify x1 x2
 
     f (TCon n1 ts1) (TCon n2 ts2) | n1 == n2 =
-        foldrM (\(a, b) s' -> unify a b s') s (zip ts1 ts2)
+        mapM_ (uncurry unify) (zip ts1 ts2)
 
     f a b =
         throw $ "Unable to unify:" ++ show (a, b)
 
-variable :: Check Int e Type
+variable :: Check (State Int) Type
 variable = do
-    x <- get
-    put (x + 1)
-    return $ TVar [toEnum x]
+    s <- get
+    put $! s { _state = _state s + 1 }
+    return $! TVar [toEnum $ _state s]
