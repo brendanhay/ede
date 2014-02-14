@@ -17,109 +17,88 @@ import           Control.Monad
 import           Data.Foldable                   (foldrM)
 import qualified Data.HashMap.Strict             as Map
 import qualified Data.HashSet                    as Set
-import           Text.EDE.Internal.Checker.Env   (Env)
-import qualified Text.EDE.Internal.Checker.Env   as Env
+import           Data.IORef
+import           Data.List                       (nub, (\\))
 import           Text.EDE.Internal.Checker.Monad
-import           Text.EDE.Internal.Checker.Sub   (Sub)
-import qualified Text.EDE.Internal.Checker.Sub   as Sub
 import           Text.EDE.Internal.Types
 
-typeOf :: Exp a -> Either String Type
-typeOf x = go >>= rename
-  where
-    go = evalCheck 0 $ do
-        a    <- variable
-        subs <- principal x a Env.empty Sub.empty
-        return $! Sub.substitute a subs
+data Expected a = Infer (IORef a) | Check a
 
-test :: Exp String
-test = ELet m "compose"
-    (ELam m "f"
-        (ELam m "g"
-            (ELam m "x"
-                (EApp m (EVar m "g") (EApp m (EVar m "f") (EVar m "x"))))))
-    (EVar m "compose")
-  where
-    m = "meta"
+typecheck :: Exp a -> Check Sigma
+typecheck e = do { ty <- inferSigma e
+                 ; zonkType ty }
 
-rename :: Type -> Either e Type
-rename = evalCheck (Map.empty, 'a') . go
-  where
-    go (TVar n)    = TVar . (:[]) <$> name n
-    go (TLam x y)  = liftM2 TLam (go x) (go y)
-    go (TCon n ts) = TCon n <$> mapM go ts
+-- tcRho, and its variants
 
-    name n = do
-      (m, i) <- get
-      maybe (missing n i m) return (Map.lookup n m)
+-- | Invariant: the Rho is always in weak-prenex form
+checkRho :: Exp a -> Rho -> Check ()
+checkRho expr ty = tcRho expr (Check ty)
 
-    missing n i m = do
-        let j = toEnum (fromEnum i + 1)
-        put (Map.insert n i m, j)
-        return j
+inferRho :: Exp a -> Check Rho
+inferRho expr = do
+    ref <- newTcRef (error "inferRho: empty result")
+    tcRho expr (Infer ref)
+    readTcRef ref
 
-principal :: Exp a
-          -> Type
-          -> Env
-          -> Sub
-          -> Check Int String Sub
-principal x t env subs = f x
-  where
-    f (ELit _ l) = (\v -> unify v t subs) $
-        case l of
-            LText _ -> TCon "string"  []
-            LBool _ -> TCon "boolean" []
-            LNum  _ -> TCon "number"  []
+-- | Invariant: if the second argument is (Check rho),
+-- then rho is in weak-prenex form
+tcRho :: Exp a -> Expected Rho -> Check ()
+tcRho (ELit _ _) exp_ty
+  = instSigma intType exp_ty
 
-    f (EVar _ n) =
-        maybe (throw $ "Unable to find varible name: " ++ bindName n)
-              (\(t', _) -> unify (Sub.substitute t' subs) t subs)
-              (Env.lookup n env)
+tcRho (EVar _ v) exp_ty
+  = do { v_sigma <- lookupVar v
+       ; instSigma v_sigma exp_ty }
 
-    f (ELam _ y bdy) = do
-        a  <- variable
-        b  <- variable
-        s1 <- unify t (TLam a b) subs
+tcRho (EApp _ fun arg) exp_ty
+  = do { fun_ty <- inferRho fun
+       ; (arg_ty, res_ty) <- unifyFun fun_ty
+       ; checkSigma arg arg_ty
+       ; instSigma res_ty exp_ty }
 
-        principal bdy b (Env.insert y a env) s1
+tcRho (ELam _ var body) (Check exp_ty)
+  = do { (var_ty, body_ty) <- unifyFun exp_ty
+       ; extendVarEnv var var_ty (checkRho body body_ty) }
 
-    f (EApp _ e1 e2) = do
-        a  <- variable
-        s1 <- principal e1 (TLam a t) env subs
+tcRho (ELam _ var body) (Infer ref)
+  = do { var_ty  <- newTyVarTy
+       ; body_ty <- extendVarEnv var var_ty (inferRho body)
+       ; writeTcRef ref (var_ty --> body_ty) }
 
-        principal e2 a env s1
+tcRho (ELet _ var rhs body) exp_ty
+  = do { var_ty <- inferSigma rhs
+       ; extendVarEnv var var_ty (tcRho body exp_ty) }
 
-    f (ELet _ n inv bdy) = do
-        a  <- variable
-        s1 <- principal inv a env subs
+-- tcRho (Ann body ann_ty) exp_ty
+--    = do { checkSigma body ann_ty
+--         ; instSigma ann_ty exp_ty }
 
-        let bt = Sub.substitute a s1
 
-        principal bdy bt (Env.extend n bt env) s1
+-- inferSigma and checkSigma
+inferSigma :: Exp a -> Check Sigma
+inferSigma e
+   = do { exp_ty <- inferRho e
+        ; env_tys <- getEnvTypes
+        ; env_tvs <- getMetaTyVars env_tys
+        ; res_tvs <- getMetaTyVars [exp_ty]
+        ; let forall_tvs = res_tvs \\ env_tvs
+        ; quantify forall_tvs exp_ty }
 
-unify :: Type -> Type -> Sub -> Check s String Sub
-unify x y s = f (Sub.substitute x s) (Sub.substitute y s)
-  where
-    f (TVar nx) (TVar ny) | nx == ny =
-        return s
+checkSigma :: Exp a -> Sigma -> Check ()
+checkSigma expr sigma
+  = do { (skol_tvs, rho) <- skolemise sigma
+       ; checkRho expr rho
+       ; env_tys <- getEnvTypes
+       ; esc_tvs <- getFreeTyVars (sigma : env_tys)
+       ; let bad_tvs = filter (`elem` esc_tvs) skol_tvs
+       ; check (null bad_tvs)
+               "Type not polymorphic enough" }
 
-    f (TVar n) _ | vs <- Env.typeVars y, not (Set.member n vs) =
-        return (Sub.extend n y s)
+-- Subsumption checking
 
-    f _ (TVar _) =
-        unify y x s
-
-    f (TLam x1 y1) (TLam x2 y2) =
-        unify x1 x2 =<< unify y1 y2 s
-
-    f (TCon n1 ts1) (TCon n2 ts2) | n1 == n2 =
-        foldrM (\(a, b) s' -> unify a b s') s (zip ts1 ts2)
-
-    f a b =
-        throw $ "Unable to unify:" ++ show (a, b)
-
-variable :: Check Int e Type
-variable = do
-    x <- get
-    put (x + 1)
-    return $ TVar [toEnum x]
+-- | Invariant: if the second argument is (Check rho),
+-- then rho is in weak-prenex form
+instSigma :: Sigma -> Expected Rho -> Check ()
+instSigma t1 (Check t2) = unify t1 t2
+instSigma t1 (Infer r)  = do { t1' <- instantiate t1
+                             ; writeTcRef r t1' }
