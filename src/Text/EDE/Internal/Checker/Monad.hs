@@ -54,7 +54,7 @@ import           Text.EDE.Internal.Types
 
 data Env = Env
     { envUniq :: Int                -- Unique supply
-    , envStack :: HashMap Int  (Maybe Tau)
+    , envStack :: HashMap Int  Tau
     , envVars  :: HashMap Name Sigma -- Type environment for term variables
     } deriving (Show)
 
@@ -96,18 +96,19 @@ with f = Check (second Right . swap . f)
 
 advance :: Check Int
 advance = with $ \s ->
-    let n = envUniq s
-    in (n, s { envUniq = n + 1, envStack = Map.insert n Nothing (envStack s) })
+    let n = envUniq s in (n, s { envUniq = n + 1 })
 
-stack :: Check (HashMap Int (Maybe Tau))
+stack :: Check (HashMap Int Tau)
 stack = envStack <$> get
 
 readTv :: TMeta -> Check (Maybe Tau)
-readTv (TM n) = join . Map.lookup n <$> stack
+readTv (TM n) = Map.lookup n <$> stack
 
 writeTv :: TMeta -> Tau -> Check ()
 writeTv (TM n) ty = with $ \s ->
-    ((), s { envStack = Map.insert n (Just ty) (envStack s) })
+    unsafePerformIO $ do
+        print $ "writeTv" ++ show (n, ty)
+        return ((), s { envStack = Map.insert n ty (envStack s) })
 
 environment :: Check (HashMap Name Sigma)
 environment = envVars <$> get
@@ -189,7 +190,7 @@ allBinders =
 getMetaTyVars :: [Type] -> Check [TMeta]
 getMetaTyVars tys = do
     tys' <- mapM zonkType tys
-    return (metaTvs tys')
+    return $ trace ("getMetaTyVars " ++ show tys') (metaTvs tys')
 
 -- | This function takes account of zonking, and returns a set
 -- (no duplicates) of free type variables
