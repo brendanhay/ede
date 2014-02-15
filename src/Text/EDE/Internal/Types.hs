@@ -45,7 +45,7 @@ instance Pretty Meta where
 data Ann a = Ann
     { annType :: Type
     , annTail :: a
-    }
+    } deriving (Show)
 
 type Sigma = Type
 -- newtype Sigma = Sigma { sigma :: Type }
@@ -64,6 +64,9 @@ data TMeta = TM Int TRef
 type TRef = IORef (Maybe Tau)
 -- 'Nothing' means the type variable is not substituted
 -- 'Just ty' means it has been substituted by 'ty'
+
+instance Show TMeta where
+    show (TM idx _) = "TM " ++ show idx
 
 instance Eq TMeta where
     (TM u1 _) == (TM u2 _) = u1 == u2
@@ -93,6 +96,7 @@ data Type
     | TCon    TCon        -- ^ Type constants
     | TVar    TVar        -- ^ Always bound by a ForAll
     | TMeta   TMeta
+      deriving (Show)
 
 infixr 4 -->
 (-->) :: Sigma -> Sigma -> Sigma
@@ -112,16 +116,21 @@ data Exp a
     --  EIncl !a !Name    (Maybe (Exp a))
       deriving (Show)
 
-data Alt a
-    = ACond    !(Exp a) !(Exp a)
-    | ADefault !(Exp a)
-      deriving (Show)
+-- data Alt a
+--     = ACond    !(Exp a) !(Exp a)
+--     | ADefault !(Exp a)
+--       deriving (Show)
 
 data Lit
     = LText !Text
     | LBool !Bool
     | LNum  !Scientific
       deriving (Show)
+
+literalType :: Lit -> Tau
+literalType (LText _) = TCon TText
+literalType (LBool _) = TCon TBool
+literalType (LNum  _) = TCon TNum
 
 -- type Env = [(TVar, Type)] -- TAU
 
@@ -178,7 +187,3 @@ freeTyVars tys = foldr (go []) [] tys
     go bound (TCon _)       acc = acc
     go bound (TFun arg res)   acc = go bound arg (go bound res acc)
     go bound (TForAll tvs ty) acc = go (tvs ++ bound) ty acc
-
-intType, boolType :: Tau
-intType  = TCon TNum
-boolType = TCon TBool

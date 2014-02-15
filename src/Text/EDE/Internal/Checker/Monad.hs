@@ -52,7 +52,7 @@ import           Data.List               (nub, (\\))
 import           Text.EDE.Internal.Types
 
 data Env = Env
-    { uniqs   :: IORef Int          -- Intue supply
+    { uniqs   :: IORef Int          -- Unique supply
     , var_env :: HashMap Name Sigma -- Type environment for term variables
     }
 
