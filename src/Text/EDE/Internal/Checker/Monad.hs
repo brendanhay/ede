@@ -190,7 +190,11 @@ allBinders =
 getMetaTyVars :: [Type] -> Check [TMeta]
 getMetaTyVars tys = do
     tys' <- mapM zonkType tys
-    return $ trace ("getMetaTyVars " ++ show tys') (metaTvs tys')
+    return . unsafePerformIO $ do
+        putStrLn "getMetaTyVars"
+        print (tys, tys')
+        print (metaTvs tys')
+        return (metaTvs tys')
 
 -- | This function takes account of zonking, and returns a set
 -- (no duplicates) of free type variables
