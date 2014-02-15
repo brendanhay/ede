@@ -65,6 +65,7 @@ library
     build-depends:
         aeson           >= 0.7
       , base            >= 4.6 && < 5
+      , containers
       , directory
       , filepath
       , parsec

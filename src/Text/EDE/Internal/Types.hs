@@ -13,7 +13,6 @@
 
 module Text.EDE.Internal.Types where
 
-import Data.IORef
 import Data.List                    (nub)
 import Data.Maybe
 import Data.Scientific              (Scientific)
@@ -58,23 +57,13 @@ type Rho = Type
 type Tau = Type
 --newtype Tau = Tau { tau :: Type }
 
--- | Can unify with any tau-type
-data TMeta = TM Int TRef
-
-type TRef = IORef (Maybe Tau)
--- 'Nothing' means the type variable is not substituted
--- 'Just ty' means it has been substituted by 'ty'
-
-instance Show TMeta where
-    show (TM idx _) = "TM " ++ show idx
-
-instance Eq TMeta where
-    (TM u1 _) == (TM u2 _) = u1 == u2
+newtype TMeta = TM Int
+    deriving (Eq, Show)
 
 data TVar
     = TBound  { tvarName :: String }
       -- ^ A type variable bound by a ForAll
-    | TSkolem { tvarName :: String, tvarUniq :: Int }
+    | TSkolem { tvarName :: String, tvarIndex :: Int }
       -- ^ A skolem constant; the String is
       -- just to improve error messages
       deriving (Show)
@@ -95,7 +84,7 @@ data Type
     | TFun    Type   Type -- ^ Function type
     | TCon    TCon        -- ^ Type constants
     | TVar    TVar        -- ^ Always bound by a ForAll
-    | TMeta   TMeta
+    | TMeta   TMeta       -- ^ Can unify with any tau-type
       deriving (Show)
 
 infixr 4 -->

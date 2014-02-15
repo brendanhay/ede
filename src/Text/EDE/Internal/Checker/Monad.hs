@@ -1,4 +1,6 @@
+{-# LANGUAGE BangPatterns            #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TupleSections            #-}
 
 -- Module      : Text.EDE.Internal.Checker.MOnad
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -12,8 +14,7 @@
 
 module Text.EDE.Internal.Checker.Monad
     ( Check
-    , runCheck
-    , lift
+    , evalCheck
     , throw
     , check
 
@@ -36,112 +37,108 @@ module Text.EDE.Internal.Checker.Monad
 
     , unify
     , unifyFun
-
-    -- Ref cells
-    , newTcRef
-    , readTcRef
-    , writeTcRef
     ) where
 
+import System.IO.Unsafe
+import Debug.Trace
+
 import           Control.Applicative
+import           Control.Arrow
 import           Control.Monad
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
 import           Data.IORef
 import           Data.List               (nub, (\\))
+import           Data.Tuple
 import           Text.EDE.Internal.Types
 
 data Env = Env
-    { uniqs   :: IORef Int          -- Unique supply
-    , var_env :: HashMap Name Sigma -- Type environment for term variables
-    }
+    { envUniq :: Int                -- Unique supply
+    , envStack :: HashMap Int  (Maybe Tau)
+    , envVars  :: HashMap Name Sigma -- Type environment for term variables
+    } deriving (Show)
 
-newtype Check a = Check { unTc :: Env -> IO (Either String a) }
+newtype Check a = Check { runCheck :: Env -> (Env, Either String a) }
 
 instance Functor Check where
     fmap = liftM
 
+instance Applicative Check where
+    (<*>) = ap
+    pure  = return
+
 instance Monad Check where
-    return x      = Check $ \_ -> return (Right x)
-    Check m >>= k = Check $ \env -> do
-        r <- m env
-        either (return . Left)
-               (\v -> unTc (k v) env)
-               r
+    return !x = Check $ \s -> (s, Right x)
+
+    (>>=) !m !k = Check $ \s ->
+        case runCheck m s of
+            (s', Left  e) -> (s', Left e)
+            (s', Right x) -> runCheck (k x) s'
 
 -- | Run type-check, given an initial environment.
-runCheck :: [(Name, Sigma)] -> Check a -> IO (Either String a)
-runCheck binds (Check c) = do
-    ref <- newIORef 0
-    c $ Env ref (Map.fromList binds)
-
--- | Lift a state transformer action into the typechecker monad
--- ignores the environment and always succeeds.
-lift :: IO a -> Check a
-lift = Check . const . fmap Right
+evalCheck :: [(Name, Sigma)] -> Check a -> Either String a
+evalCheck binds chk =
+    let (s, r) = runCheck chk $ Env 0 Map.empty (Map.fromList binds)
+    in unsafePerformIO $ print s >> return r
 
 throw :: String -> Check a
-throw = Check . const . return . Left
+throw e = Check $ \s -> (s, Left e)
 
 check :: Bool -> String -> Check ()
 check True  = const $ return ()
 check False = throw
 
+get :: Check Env
+get = Check $ \s -> (s, Right s)
 
-newTcRef :: a -> Check (IORef a)
-newTcRef v = lift (newIORef v)
+with :: (Env -> (a, Env)) -> Check a
+with f = Check (second Right . swap . f)
 
-readTcRef :: IORef a -> Check a
-readTcRef r = lift (readIORef r)
+advance :: Check Int
+advance = with $ \s ->
+    let n = envUniq s
+    in (n, s { envUniq = n + 1, envStack = Map.insert n Nothing (envStack s) })
 
-writeTcRef :: IORef a -> a -> Check ()
-writeTcRef r v = lift (writeIORef r v)
+stack :: Check (HashMap Int (Maybe Tau))
+stack = envStack <$> get
 
+readTv :: TMeta -> Check (Maybe Tau)
+readTv (TM n) = join . Map.lookup n <$> stack
 
--- Environment
+writeTv :: TMeta -> Tau -> Check ()
+writeTv (TM n) ty = with $ \s ->
+    ((), s { envStack = Map.insert n (Just ty) (envStack s) })
+
+environment :: Check (HashMap Name Sigma)
+environment = envVars <$> get
+-- getEnv :: Check (HashMap Name Sigma)
+-- getEnv = Check $ \env -> return $ Right (var_env env)
+
+-- | Get the types mentioned in the environment
+getEnvTypes :: Check [Type]
+getEnvTypes = Map.elems <$> environment
 
 extendVarEnv :: Name -> Sigma -> Check a -> Check a
-extendVarEnv var ty (Check m) = Check $ \env -> m (extend env)
-  where
-    extend env = env { var_env = Map.insert var ty (var_env env) }
-
-getEnv :: Check (HashMap Name Sigma)
-getEnv = Check $ \env -> return $ Right (var_env env)
+extendVarEnv var ty m = Check $ \s ->
+    runCheck m $ s { envVars = Map.insert var ty (envVars s) }
 
 lookupVar :: Name -> Check Sigma
 lookupVar n = do
-    env <- getEnv
+    env <- environment
     maybe (throw $ "Not in scope: " ++ n)
           return
           (Map.lookup n env)
 
--- Creating, reading, writing TMetas
+-- -- Creating, reading, writing TMetas
 
 newTyVarTy :: Check Tau
 newTyVarTy = TMeta <$> newMetaTVar
 
 newMetaTVar :: Check TMeta
-newMetaTVar = do
-    uniq <- newUnique
-    tref <- newTcRef Nothing
-    return $ TM uniq tref
+newMetaTVar = TM <$> advance
 
 newSkolemTVar :: TVar -> Check TVar
-newSkolemTVar tv = do
-    uniq <- newUnique
-    return $ TSkolem (tvarName tv) uniq
-
-readTv :: TMeta -> Check (Maybe Tau)
-readTv (TM _ ref) = readTcRef ref
-
-writeTv :: TMeta -> Tau -> Check ()
-writeTv (TM _ ref) ty = writeTcRef ref (Just ty)
-
-newUnique :: Check Int
-newUnique = Check $ \Env{..} -> do
-    uniq <- readIORef uniqs
-    writeIORef uniqs (uniq + 1)
-    return $ Right uniq
+newSkolemTVar tv = TSkolem (tvarName tv) <$> advance
 
 -- Instantiation
 
@@ -186,12 +183,6 @@ allBinders =
     ++ [TBound (x : show i) | i <- [1 :: Integer ..], x <- ['a'..'z']]
 
 -- Getting the free tyvars
-
--- | Get the types mentioned in the environment
-getEnvTypes :: Check [Type]
-getEnvTypes = do
-    env <- getEnv
-    return (Map.elems env)
 
 -- | This function takes account of zonking, and returns a set
 -- (no duplicates) of unbound meta-type variables

@@ -22,7 +22,7 @@ import           Data.List                       (nub, (\\))
 import           Text.EDE.Internal.Checker.Monad
 import           Text.EDE.Internal.Types
 
-data Expected a = Infer (IORef a) | Check a
+data Expected a = Infer | Check a
 
 typecheck :: Exp a -> Check Sigma
 typecheck e = do
@@ -32,18 +32,15 @@ typecheck e = do
 -- tcRho, and its variants
 
 -- | Invariant: the Rho is always in weak-prenex form
-checkRho :: Exp a -> Rho -> Check ()
+-- checkRho :: Exp a -> Rho -> Check ()
 checkRho expr ty = tcRho expr (Check ty)
 
 inferRho :: Exp a -> Check Rho
-inferRho expr = do
-    ref <- newTcRef (error "inferRho: empty result")
-    tcRho expr (Infer ref)
-    readTcRef ref
+inferRho expr = tcRho expr Infer
 
 -- | Invariant: if the second argument is (Check rho),
 -- then rho is in weak-prenex form
-tcRho :: Exp a -> Expected Rho -> Check ()
+-- tcRho :: Exp a -> Expected Rho -> Check ()
 tcRho (ELit _ l) exp_ty = instSigma (literalType l) exp_ty
 
 tcRho (EVar _ v) exp_ty = do
@@ -60,10 +57,10 @@ tcRho (ELam _ var body) (Check exp_ty) = do
     (var_ty, body_ty) <- unifyFun exp_ty
     extendVarEnv var var_ty (checkRho body body_ty)
 
-tcRho (ELam _ var body) (Infer ref) = do
+tcRho (ELam _ var body) Infer = do
     var_ty  <- newTyVarTy
     body_ty <- extendVarEnv var var_ty (inferRho body)
-    writeTcRef ref (var_ty --> body_ty)
+    return (var_ty --> body_ty)
 
 tcRho (ELet _ var rhs body) exp_ty = do
     var_ty <- inferSigma rhs
@@ -97,8 +94,6 @@ checkSigma expr sigma = do
 
 -- | Invariant: if the second argument is (Check rho),
 -- then rho is in weak-prenex form
-instSigma :: Sigma -> Expected Rho -> Check ()
-instSigma t1 (Check t2) = unify t1 t2
-instSigma t1 (Infer r)  = do
-    t1' <- instantiate t1
-    writeTcRef r t1'
+-- instSigma :: Sigma -> Expected Rho -> Check ()
+instSigma t1 (Check t2) = unify t1 t2 >> return t2
+instSigma t1 Infer  = instantiate t1
