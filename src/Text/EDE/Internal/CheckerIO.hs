@@ -10,9 +10,7 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Checker where
-
-import System.IO.Unsafe
+module Text.EDE.Internal.CheckerIO where
 
 import           Control.Applicative
 import           Control.Monad
@@ -21,12 +19,12 @@ import qualified Data.HashMap.Strict             as Map
 import qualified Data.HashSet                    as Set
 import           Data.IORef
 import           Data.List                       (nub, (\\))
-import           Text.EDE.Internal.Checker.Monad
-import           Text.EDE.Internal.Types
+import           Text.EDE.Internal.Checker.MonadIO
+import           Text.EDE.Internal.TypesIO
 
-data Expected a = Infer | Check a
+data Expected a = Infer (IORef a) | Check a
 
--- typecheck :: Exp a -> Check Sigma
+typecheck :: Exp a -> Check Sigma
 typecheck e = do
     ty <- inferSigma e
     zonkType ty
@@ -34,17 +32,18 @@ typecheck e = do
 -- tcRho, and its variants
 
 -- | Invariant: the Rho is always in weak-prenex form
--- checkRho :: Exp a -> Rho -> Check ()
+checkRho :: Exp a -> Rho -> Check ()
 checkRho expr ty = tcRho expr (Check ty)
 
--- inferRho :: Exp a -> Check Rho
-inferRho expr = tcRho expr Infer
-
-
+inferRho :: Exp a -> Check Rho
+inferRho expr = do
+    ref <- newTcRef (error "inferRho: empty result")
+    tcRho expr (Infer ref)
+    readTcRef ref
 
 -- | Invariant: if the second argument is (Check rho),
 -- then rho is in weak-prenex form
--- tcRho :: Exp a -> Expected Rho -> Check ()
+tcRho :: Exp a -> Expected Rho -> Check ()
 tcRho (ELit _ l) exp_ty = instSigma (literalType l) exp_ty
 
 tcRho (EVar _ v) exp_ty = do
@@ -54,40 +53,37 @@ tcRho (EVar _ v) exp_ty = do
 tcRho (EApp _ fun arg) exp_ty = do
     fun_ty <- inferRho fun
     (arg_ty, res_ty) <- unifyFun fun_ty
-
-    funExpr <- checkRho fun fun_ty
-
-    -- checkRho arg arg_ty
-    argExpr <- checkSigma arg arg_ty
-
-    t <- instSigma res_ty exp_ty
-
-    EApp (Ann t a) funExpr argExpr
+    checkSigma arg arg_ty
+    instSigma res_ty exp_ty
 
 tcRho (ELam _ var body) (Check exp_ty) = do
     (var_ty, body_ty) <- unifyFun exp_ty
     extendVarEnv var var_ty (checkRho body body_ty)
 
-tcRho (ELam _ var body) Infer = do
+tcRho (ELam _ var body) (Infer ref) = do
     var_ty  <- newTyVarTy
     body_ty <- extendVarEnv var var_ty (inferRho body)
-    return (var_ty --> body_ty)
+    writeTcRef ref (var_ty --> body_ty)
 
 tcRho (ELet _ var rhs body) exp_ty = do
     var_ty <- inferSigma rhs
     extendVarEnv var var_ty (tcRho body exp_ty)
 
--- inferSigma and checkSigma
--- inferSigma :: Exp a -> Check Sigma
-inferSigma e = do
-    exp_ty  <- inferRho e
-    env_tys <- getEnvTypes
-    env_tvs <- getMetaTyVars env_tys
-    res_tvs <- getMetaTyVars [exp_ty]
-    let forall_tvs = res_tvs \\ env_tvs
-    quantify forall_tvs exp_ty
+-- tcRho (Ann body ann_ty) exp_ty
+--      checkSigma body ann_ty
+--      instSigma ann_ty exp_ty }
 
--- checkSigma :: Exp a -> Sigma -> Check ()
+-- inferSigma and checkSigma
+inferSigma :: Exp a -> Check Sigma
+inferSigma e = do
+     exp_ty <- inferRho e
+     env_tys <- getEnvTypes
+     env_tvs <- getMetaTyVars env_tys
+     res_tvs <- getMetaTyVars [exp_ty]
+     let forall_tvs = res_tvs \\ env_tvs
+     quantify forall_tvs exp_ty
+
+checkSigma :: Exp a -> Sigma -> Check ()
 checkSigma expr sigma = do
     (skol_tvs, rho) <- skolemise sigma
     checkRho expr rho
@@ -101,6 +97,8 @@ checkSigma expr sigma = do
 
 -- | Invariant: if the second argument is (Check rho),
 -- then rho is in weak-prenex form
-instSigma :: Sigma -> Expected Rho -> Check Rho
-instSigma t1 (Check t2) = unify t1 t2 >> return t2
-instSigma t1 Infer  = instantiate t1
+instSigma :: Sigma -> Expected Rho -> Check ()
+instSigma t1 (Check t2) = unify t1 t2
+instSigma t1 (Infer r)  = do
+    t1' <- instantiate t1
+    writeTcRef r t1'

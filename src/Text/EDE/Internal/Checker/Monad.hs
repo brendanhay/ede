@@ -12,283 +12,213 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Checker.Monad
-    ( Check
-    , evalCheck
-    , throw
-    , check
+module Text.EDE.Internal.Checker.Monad where
 
-    -- Environment manipulation
-    , extendVarEnv
-    , lookupVar
-    , getEnvTypes
-    , getFreeTyVars
-    , getMetaTyVars
+import Control.Monad.Error
+import Control.Monad.Reader
+import Control.Monad.State
 
-    -- Types and unification
-    , newTyVarTy
-    , instantiate
-
-    , skolemise
-
-    , zonkType
-
-    , quantify
-
-    , unify
-    , unifyFun
-    ) where
-
-import System.IO.Unsafe
-import Debug.Trace
-
+import Data.Monoid
 import           Control.Applicative
 import           Control.Arrow
 import           Control.Monad
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
+import           Data.HashSet            (HashSet)
+import qualified Data.HashSet            as Set
 import           Data.IORef
 import           Data.List               (nub, (\\))
 import           Data.Tuple
 import           Text.EDE.Internal.Types
 
-data Env = Env
-    { envUniq :: Int                -- Unique supply
-    , envStack :: HashMap Int  Tau
-    , envVars  :: HashMap Name Sigma -- Type environment for term variables
-    } deriving (Show)
+-- data Env = Env
+--     { envUniq  :: Int                -- Unique supply
+--     , envStack :: HashMap Int  Tau
+--     , envVars  :: HashMap Name Sigma -- Type environment for term variables
+--     } deriving (Show)
 
-newtype Check a = Check { runCheck :: Env -> (Env, Either String a) }
+-- newtype Check a = Check { runCheck :: Env -> (Env, Either String a) }
 
-instance Functor Check where
-    fmap = liftM
+-- instance Functor Check where
+--     fmap = liftM
 
-instance Applicative Check where
-    (<*>) = ap
-    pure  = return
+-- instance Applicative Check where
+--     (<*>) = ap
+--     pure  = return
 
-instance Monad Check where
-    return !x = Check $ \s -> (s, Right x)
+-- instance Monad Check where
+--     return !x = Check $ \s -> (s, Right x)
 
-    (>>=) !m !k = Check $ \s ->
-        case runCheck m s of
-            (s', Left  e) -> (s', Left e)
-            (s', Right x) -> runCheck (k x) s'
+--     (>>=) !m !k = Check $ \s ->
+--         case runCheck m s of
+--             (s', Left  e) -> (s', Left e)
+--             (s', Right x) -> runCheck (k x) s'
 
--- | Run type-check, given an initial environment.
-evalCheck :: [(Name, Sigma)] -> Check a -> Either String a
-evalCheck binds chk =
-    let (s, r) = runCheck chk $ Env 0 Map.empty (Map.fromList binds)
-    in unsafePerformIO $ print s >> return r
+-- -- | Run type-check, given an initial environment.
+-- evalCheck :: Show a => HashMap Name Sigma -> Check a -> Either String a
+-- evalCheck binds chk = unsafePerformIO $ do
+--     let x = runCheck chk $ Env 0 Map.empty binds
+--     print x
+--     return $ snd x
 
-throw :: String -> Check a
-throw e = Check $ \s -> (s, Left e)
+-- throw :: String -> Check a
+-- throw e = Check $ \s -> (s, Left e)
 
-check :: Bool -> String -> Check ()
-check True  = const $ return ()
-check False = throw
+-- check :: Bool -> String -> Check ()
+-- check True  = const $ return ()
+-- check False = throw
 
-get :: Check Env
-get = Check $ \s -> (s, Right s)
+-- get :: Check Env
+-- get = Check $ \s -> (s, Right s)
 
-with :: (Env -> (a, Env)) -> Check a
-with f = Check (second Right . swap . f)
+-- with :: (Env -> (a, Env)) -> Check a
+-- with f = Check (second Right . swap . f)
 
-advance :: Check Int
-advance = with $ \s ->
-    let n = envUniq s in (n, s { envUniq = n + 1 })
 
-stack :: Check (HashMap Int Tau)
-stack = envStack <$> get
+class Types a where
+    ftv   :: a -> HashSet String
+    apply :: Subst -> a -> a
 
-readTv :: TMeta -> Check (Maybe Tau)
-readTv (TM n) = Map.lookup n <$> stack
+instance Types Type where
+    ftv (TVar n)     = Set.singleton n
+    ftv TNum         = Set.empty
+    ftv TBool        = Set.empty
+    ftv (TFun t1 t2) = ftv t1 <> ftv t2
 
-writeTv :: TMeta -> Tau -> Check ()
-writeTv (TM n) ty = with $ \s ->
-    unsafePerformIO $ do
-        print $ "writeTv" ++ show (n, ty)
-        return ((), s { envStack = Map.insert n ty (envStack s) })
+    apply s (TVar n) =
+        case Map.lookup n s of
+            Nothing -> TVar n
+            Just  t -> t
+    apply s (TFun t1 t2) = TFun (apply s t1) (apply s t2)
+    apply s t = t
 
-environment :: Check (HashMap Name Sigma)
-environment = envVars <$> get
--- getEnv :: Check (HashMap Name Sigma)
--- getEnv = Check $ \env -> return $ Right (var_env env)
+instance Types Scheme where
+    ftv     (Scheme vars t) = ftv t `Set.difference` Set.fromList vars
+    apply s (Scheme vars t) = Scheme vars $ apply (foldr Map.delete s vars) t
 
--- | Get the types mentioned in the environment
-getEnvTypes :: Check [Type]
-getEnvTypes = Map.elems <$> environment
+-- It will occasionally be useful to extend the Types methods to lists.
+instance Types a => Types [a] where
+    ftv   = Set.unions . map ftv
+    apply = map . apply
 
-extendVarEnv :: Name -> Sigma -> Check a -> Check a
-extendVarEnv var ty m = Check $ \s ->
-    runCheck m $ s { envVars = Map.insert var ty (envVars s) }
+-- Now we define substitutions, which are finite mappings from type variables to types.
+type Subst = HashMap String Type
 
-lookupVar :: Name -> Check Sigma
-lookupVar n = do
-    env <- environment
-    maybe (throw $ "Not in scope: " ++ n)
-          return
-          (Map.lookup n env)
+nullSubst :: Subst
+nullSubst = Map.empty
 
--- -- Creating, reading, writing TMetas
+composeSubst :: Subst -> Subst -> Subst
+composeSubst s1 s2 = Map.map (apply s1) s2 `Map.union` s1
 
-newTyVarTy :: Check Tau
-newTyVarTy = TMeta <$> newMetaTVar
+-- Type environments, called Γ in the text, are mappings from term variables
+-- to their respective type schemes.
+newtype TypeEnv = TypeEnv (HashMap String Scheme)
 
-newMetaTVar :: Check TMeta
-newMetaTVar = TM <$> advance
+-- We define several functions on type environments. The operation Γ\x removes the binding for
+-- x from Γ and is called remove.
+remove :: TypeEnv -> String -> TypeEnv
+remove (TypeEnv env) var = TypeEnv (Map.delete var env)
 
-newSkolemTVar :: TVar -> Check TVar
-newSkolemTVar tv = TSkolem (tvarName tv) <$> advance
+instance Types TypeEnv where
+    ftv (TypeEnv env) = ftv (Map.elems env)
+    apply s (TypeEnv env) = TypeEnv (Map.map (apply s) env)
 
--- Instantiation
+-- The function generalize abstracts a type over all type variables which are
+-- free in the type but not free in the given type environment.
+generalize :: TypeEnv -> Type -> Scheme
+generalize env t = Scheme (Set.toList $ ftv t `Set.difference` ftv env) t
 
--- | Instantiate the topmost for-alls of the argument type
--- with flexible type variables
-instantiate :: Sigma -> Check Rho
-instantiate (TForAll tvs ty) = do
-    tvs' <- mapM (\_ -> newMetaTVar) tvs
-    return (substTy tvs (map TMeta tvs') ty)
-instantiate ty = return ty
+data Scheme = Scheme [String] Type
 
--- | Performs deep skolemisation, retuning the
--- skolem constants and the skolemised type
-skolemise :: Sigma -> Check ([TVar], Rho)
-skolemise (TForAll tvs ty) = do -- Rule PRPOLY
-    sks1 <- mapM newSkolemTVar tvs
-    (sks2, ty') <- skolemise (substTy tvs (map TVar sks1) ty)
-    return (sks1 ++ sks2, ty')
-skolemise (TFun arg_ty res_ty) = do -- Rule PRFUN
-    (sks, res_ty') <- skolemise res_ty
-    return (sks, TFun arg_ty res_ty')
-skolemise ty =                   -- Rule PRMONO
-    return ([], ty)
+data TIEnv = TIEnv { }
 
--- Quantification
+data TIState = TIState
+    { tiSupply :: Int
+    , tiSubst  :: Subst
+    }
 
--- | Quantify over the specified type variables (all flexible)
-quantify :: [TMeta] -> Rho -> Check Sigma
-quantify tvs ty = do
-    mapM_ bind (tvs `zip` new_bndrs)   -- 'bind' is just a cunning way
-    ty' <- zonkType ty                 -- of doing the substitution
-    return (TForAll new_bndrs ty')
+type TI a = ErrorT String (ReaderT TIEnv (StateT TIState IO)) a
+
+runTI :: TI a -> IO (Either String a, TIState)
+runTI t = do
+    (res, st) <- runStateT (runReaderT (runErrorT t) initTIEnv) initTIState
+    return (res, st)
   where
-    used_bndrs = tyVarBndrs ty  -- Avoid quantified type variables in use
-    new_bndrs  = take (length tvs) (allBinders \\ used_bndrs)
-    bind (tv, name) = writeTv tv (TVar name)
+    initTIEnv   = TIEnv { }
+    initTIState = TIState { tiSupply = 0, tiSubst = Map.empty }
 
--- | a,b,..z, a1, b1,... z1, a2, b2,...
-allBinders :: [TVar]
-allBinders =
-       [TBound [x] | x <- ['a'..'z']]
-    ++ [TBound (x : show i) | i <- [1 :: Integer ..], x <- ['a'..'z']]
+newTyVar :: String -> TI Type
+newTyVar prefix = do
+    s <- get
+    put s { tiSupply = tiSupply s + 1 }
+    return (TVar (prefix ++ show (tiSupply s)))
 
--- Getting the free tyvars
+-- The instantiation function replaces all bound type variables in a type
+-- scheme with fresh type variables.
+instantiate :: Scheme -> TI Type
+instantiate (Scheme vars t) = do
+    nvars <- mapM (\_ -> newTyVar "a") vars
+    let s = Map.fromList (zip vars nvars)
+    return $ apply s t
 
--- | This function takes account of zonking, and returns a set
--- (no duplicates) of unbound meta-type variables
-getMetaTyVars :: [Type] -> Check [TMeta]
-getMetaTyVars tys = do
-    tys' <- mapM zonkType tys
-    return . unsafePerformIO $ do
-        putStrLn "getMetaTyVars"
-        print (tys, tys')
-        print (metaTvs tys')
-        return (metaTvs tys')
+-- This is the unification function for types. The function varBind attempts
+-- to bind a type variable to a type and return that binding as a subsitution,
+-- but avoids binding a variable to itself and performs the occurs check.
 
--- | This function takes account of zonking, and returns a set
--- (no duplicates) of free type variables
-getFreeTyVars :: [Type] -> Check [TVar]
-getFreeTyVars tys = do
-    tys' <- mapM zonkType tys
-    return (freeTyVars tys')
+mgu :: Type -> Type -> TI Subst
+mgu (TFun l r) (TFun l' r') = do
+    s1 <- mgu l l'
+    s2 <- mgu (apply s1 r) (apply s1 r')
+    return $ s1 `composeSubst` s2
+mgu (TVar u) t = varBind u t
+mgu t (TVar u) = varBind u t
+mgu TNum TNum  = return nullSubst
+mgu TBool TBool = return nullSubst
+mgu _ _ = throwError "doesn't unify"
 
--- Zonking
--- Eliminate any substitutions in the type
+varBind :: String -> Type -> TI Subst
+varBind u t
+    | t == TVar u = return nullSubst
+    | u `Set.member` ftv t = throwError $ "occur check fails: " ++ u ++ " vs. " ++ show t
+    | otherwise = return (Map.singleton u t)
 
-zonkType :: Type -> Check Type
-zonkType (TForAll ns ty) = do
-    ty' <- zonkType ty
-    return (TForAll ns ty')
-zonkType (TFun arg res) = do
-    arg' <- zonkType arg
-    res' <- zonkType res
-    return (TFun arg' res')
-zonkType (TCon tc) =
-    return (TCon tc)
-zonkType (TVar n) =
-    return (TVar n)
-zonkType (TMeta tv) = do    -- A mutable type variable
-    mb_ty <- readTv tv
-    case mb_ty of
-        Nothing -> return (TMeta tv)
-        Just ty -> do
-            ty' <- zonkType ty
-            writeTv tv ty' -- "Short out" multiple hops
-            return ty'
+-- Main type inference
 
--- Unification
+tiLit :: TypeEnv -> Lit -> TI (Subst, Type)
+tiLit _ (LNum _)  = return (nullSubst, TNum)
+tiLit _ (LBool _) = return (nullSubst, TBool)
 
-unify :: Tau -> Tau -> Check ()
+ti :: TypeEnv -> Exp a -> TI (Subst, Type)
+ti (TypeEnv env) (EVar _ n) =
+    case Map.lookup n env of
+        Nothing -> throwError $ "unbound variable: " ++ n
+        Just sigma -> do
+            t <- instantiate sigma
+            return (nullSubst,t)
+ti env (ELit _ l) = tiLit env l
+ti env (ELam _ n e) = do
+    tv <- newTyVar "a"
+    let TypeEnv env' = remove env n
+        env''        = TypeEnv (env' `Map.union` (Map.singleton n (Scheme [] tv)))
+    (s1,t1) <- ti env'' e
+    return (s1, TFun (apply s1 tv) t1)
+ti env (EApp _ e1 e2) = do
+    tv      <- newTyVar "a"
+    (s1,t1) <- ti env e1
+    (s2,t2) <- ti (apply s1 env) e2
+    s3      <- mgu (apply s2 t1) (TFun t2 tv)
+    return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
+ti env (ELet _ x e1 e2) = do
+    (s1,t1) <- ti env e1
+    let TypeEnv env' = remove env x
+        t'           = generalize (apply s1 env) t1
+        env''        = TypeEnv (Map.insert x t' env')
+    (s2,t2) <- ti (apply s1 env'') e2
+    return (s1 `composeSubst` s2, t2)
 
-unify ty1 ty2
-  | badType ty1 || badType ty2  -- Compiler error
-  = throw "Panic! Unexpected types in unification:"
---            vcat [ppr ty1, ppr ty2])
-
-unify (TVar tv1)  (TVar tv2)  | tv1 == tv2 = return ()
-unify (TMeta tv1) (TMeta tv2) | tv1 == tv2 = return ()
-
-unify (TMeta tv) ty = unifyVar tv ty
-unify ty (TMeta tv) = unifyVar tv ty
-
-unify (TFun arg1 res1) (TFun arg2 res2) = unify arg1 arg2 >> unify res1 res2
-
-unify (TCon tc1) (TCon tc2) | tc1 == tc2 = return ()
-
-unify ty1 ty2 = throw "Cannot unify types:" -- ++ show (ty1, ty2))
-
--- Invariant: tv1 is a flexible type variable
-unifyVar :: TMeta -> Tau -> Check ()
-unifyVar tv1 ty2 = do       -- Check whether tv1 is bound
-    mb_ty1 <- readTv tv1
-    case mb_ty1 of
-        Just ty1 -> unify ty1 ty2
-        Nothing  -> unifyUnboundVar tv1 ty2
-
--- Invariant: the flexible type variable tv1 is not bound
-unifyUnboundVar :: TMeta -> Tau -> Check ()
-unifyUnboundVar tv1 ty2@(TMeta tv2) = do
-    -- We know that tv1 /= tv2 (else the
-    -- top case in unify would catch it)
-    mb_ty2 <- readTv tv2
-    case mb_ty2 of
-        Just ty2' -> unify (TMeta tv1) ty2'
-        Nothing  -> writeTv tv1 ty2
-
-unifyUnboundVar tv1 ty2 = do
-    tvs2 <- getMetaTyVars [ty2]
-    if tv1 `elem` tvs2
-        then occursCheckErr tv1 ty2
-        else writeTv tv1 ty2
-
---      (arg,res) <- unifyFunTy fun
--- unifies 'fun' with '(arg -> res)'
-unifyFun :: Rho -> Check (Sigma, Rho)
-unifyFun (TFun arg res) = return (arg, res)
-unifyFun tau            = do
-    arg_ty <- newTyVarTy
-    res_ty <- newTyVarTy
-    unify tau (arg_ty --> res_ty)
-    return (arg_ty, res_ty)
-
--- Raise an occurs-check error
-occursCheckErr :: TMeta -> Tau -> Check ()
-occursCheckErr tv ty
-  = throw "Occurs check for"  -- <+> quotes (ppr tv) <+>
---            text "in:" <+> ppr ty)
-
--- | Tells which types should never be encountered during unification
-badType :: Tau -> Bool
-badType (TVar (TBound _)) = True
-badType _                 = False
+-- This is the main entry point to the type inferencer. It simply calls ti
+-- and applies the returned substitution to the returned type.
+typeInference :: HashMap String Scheme -> Exp a -> TI Type
+typeInference env e = do
+    (s, t) <- ti (TypeEnv env) e
+    return (apply s t)
