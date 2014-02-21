@@ -49,9 +49,9 @@ library
     exposed-modules:
 --        Text.EDE.Internal.Checker.Context
 --        Text.EDE.Internal.Checker.Env
---        Text.EDE.Internal.Checker
-
-        Text.EDE.Internal.Checker.Monad
+        Text.EDE.Internal.Checker
+      , Text.EDE.Internal.Checker.Monad
+      , Text.EDE.Internal.Checker.Subst
       , Text.EDE.Internal.Types
 
       -- , Text.EDE.Internal.Lexer

@@ -1,4 +1,6 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 -- Module      : Text.EDE.Internal.Checker
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -12,95 +14,120 @@
 
 module Text.EDE.Internal.Checker where
 
-import System.IO.Unsafe
-
 import           Control.Applicative
 import           Control.Monad
-import           Data.Foldable                   (foldrM)
-import qualified Data.HashMap.Strict             as Map
-import qualified Data.HashSet                    as Set
-import           Data.IORef
-import           Data.List                       (nub, (\\))
-import           Text.EDE.Internal.Checker.Monad
+import           Control.Monad.Error
+import qualified Data.HashSet            as Set
+import           Data.Monoid
+import           Data.Tuple
 import           Text.EDE.Internal.Types
 
-data Expected a = Infer | Check a
+-- Index unbound _type_ variables,
+-- int -> scheme, lookup,
 
--- typecheck :: Exp a -> Check Sigma
-typecheck e = do
-    ty <- inferSigma e
-    zonkType ty
+-- Unbound _value_ variables need to introduce an unbound type variable if they
+-- don't exist in the environment?
 
--- tcRho, and its variants
+type NameEnv v = [(Name, v)]
 
--- | Invariant: the Rho is always in weak-prenex form
--- checkRho :: Exp a -> Rho -> Check ()
-checkRho expr ty = tcRho expr (Check ty)
+type Env = [Value]
 
--- inferRho :: Exp a -> Check Rho
-inferRho expr = tcRho expr Infer
+iEval :: ITerm -> (NameEnv Value,Env) -> Value
+iEval (Ann  e _)  d = cEval e d
+iEval (Free  x)   d = case lookup x (fst d) of Nothing ->  (vfree x); Just v -> v
+iEval (Bound ii)  d = (snd d) !! ii
+iEval (e1 :@: e2) d = vapp (iEval e1 d) (cEval e2 d)
 
+vapp :: Value -> Value -> Value
+vapp (VLam f)     v = f v
+vapp (VNeutral n) v = VNeutral (NApp n v)
 
+cEval :: CTerm -> (NameEnv Value,Env) -> Value
+cEval (Inf ii) d = iEval ii d
+cEval (Lam e)  d = VLam (\ x -> cEval e (((\(e, d) -> (e,  (x : d))) d)))
 
--- | Invariant: if the second argument is (Check rho),
--- then rho is in weak-prenex form
--- tcRho :: Exp a -> Expected Rho -> Check ()
-tcRho (ELit _ l) exp_ty = instSigma (literalType l) exp_ty
+cKind :: Context -> Type -> Kind -> Result ()
+cKind g (TFree x) Star =
+    case lookup x g of
+        Just (HasKind Star) -> return ()
+        Nothing             -> throwError "unknown identifier"
+cKind g (Fun kk kk') Star = do
+    cKind g kk  Star
+    cKind g kk' Star
 
-tcRho (EVar _ v) exp_ty = do
-    v_sigma <- lookupVar v
-    instSigma v_sigma exp_ty
+iType0 :: Context -> ITerm -> Result Type
+iType0 = iType 0
 
-tcRho (EApp _ fun arg) exp_ty = do
-    fun_ty <- inferRho fun
-    (arg_ty, res_ty) <- unifyFun fun_ty
+iType :: Int -> Context -> ITerm -> Result Type
+iType ii g (Ann e ty) = do
+    cKind g ty Star
+    cType ii g e ty
+    return ty
+iType ii g (Free x) =
+    case lookup x g of
+        Just (HasType ty) -> return ty
+        Nothing           -> return $ TFree x -- throwError "unknown identifier"
+iType ii g (e1 :@: e2) = do
+    si <- iType ii g e1
+    case si of
+        Fun ty ty' -> do
+            cType ii g e2 ty
+            return ty'
+        _          -> throwError "illegal application"
 
-    funExpr <- checkRho fun fun_ty
+cType :: Int -> Context -> CTerm -> Type -> Result ()
+cType ii g (Inf e) ty = do
+    ty' <- iType ii g e
+    unless (ty == ty') (throwError "type mismatch")
+cType ii g (Lam e) (Fun ty ty') =
+    cType (ii + 1) ((Local ii, HasType ty) : g)
+    (cSubst 0 (Free (Local ii)) e) ty'
+cType ii g _ _ =
+    throwError "type mismatch"
 
-    -- checkRho arg arg_ty
-    argExpr <- checkSigma arg arg_ty
+type Result a = Either String a
 
-    t <- instSigma res_ty exp_ty
+iSubst :: Int -> ITerm -> ITerm -> ITerm
+iSubst ii r (Ann e ty)  = Ann (cSubst ii r e) ty
+iSubst ii r (Bound j)   = if ii == j then r else Bound j
+iSubst ii r (Free y)    = Free y
+iSubst ii r (e1 :@: e2) = iSubst ii r e1 :@: cSubst ii r e2
 
-    EApp (Ann t a) funExpr argExpr
+cSubst :: Int -> ITerm -> CTerm -> CTerm
+cSubst ii r (Inf e) = Inf (iSubst ii r e)
+cSubst ii r (Lam e) = Lam (cSubst (ii + 1) r e)
 
-tcRho (ELam _ var body) (Check exp_ty) = do
-    (var_ty, body_ty) <- unifyFun exp_ty
-    extendVarEnv var var_ty (checkRho body body_ty)
+-- quote0 :: Value -> CTerm
+-- quote0 = quote 0
 
-tcRho (ELam _ var body) Infer = do
-    var_ty  <- newTyVarTy
-    body_ty <- extendVarEnv var var_ty (inferRho body)
-    return (var_ty --> body_ty)
+-- quote :: Int -> Value -> CTerm
+-- quote ii (VLam f)     = Lam (quote (ii + 1) (f (vfree (Quote ii))))
+-- quote ii (VNeutral n) = Inf (neutralQuote ii n)
 
-tcRho (ELet _ var rhs body) exp_ty = do
-    var_ty <- inferSigma rhs
-    extendVarEnv var var_ty (tcRho body exp_ty)
+-- neutralQuote :: Int -> Neutral -> ITerm
+-- neutralQuote ii (NFree x)  = boundfree ii x
+-- neutralQuote ii (NApp n v) = neutralQuote ii n :@: quote ii v
 
--- inferSigma and checkSigma
--- inferSigma :: Exp a -> Check Sigma
-inferSigma e = do
-    exp_ty  <- inferRho e
-    env_tys <- getEnvTypes
-    env_tvs <- getMetaTyVars env_tys
-    res_tvs <- getMetaTyVars [exp_ty]
-    let forall_tvs = res_tvs \\ env_tvs
-    quantify forall_tvs exp_ty
+-- boundfree :: Int -> Name -> ITerm
+-- boundfree ii (Quote k) = Bound (ii - k - 1)
+-- boundfree ii x         = Free x
 
--- checkSigma :: Exp a -> Sigma -> Check ()
-checkSigma expr sigma = do
-    (skol_tvs, rho) <- skolemise sigma
-    checkRho expr rho
-    env_tys <- getEnvTypes
-    esc_tvs <- getFreeTyVars (sigma : env_tys)
-    let bad_tvs = filter (`elem` esc_tvs) skol_tvs
-    check (null bad_tvs)
-        "Type not polymorphic enough"
+id'     = Lam (Inf (Bound 0))
+const'  = Lam (Lam (Inf (Bound 1)))
+tfree a = TFree (Global a)
+free x  = Inf (Free (Global x))
 
--- Subsumption checking
+term1    = Free $ Global "y"
+term2    = Ann const' (Fun  (Fun (tfree "b") (tfree "b"))
+                           (Fun  (tfree "a")
+                                 (Fun (tfree "b") (tfree "b"))))
+          :@: id' :@: free "y"
 
--- | Invariant: if the second argument is (Check rho),
--- then rho is in weak-prenex form
-instSigma :: Sigma -> Expected Rho -> Check Rho
-instSigma t1 (Check t2) = unify t1 t2 >> return t2
-instSigma t1 Infer  = instantiate t1
+env1 = [(Global "y", HasType (tfree "a")),(Global "a", HasKind Star)]
+env2 = [(Global "b", HasKind Star)] ++ env1
+
+-- test_eval1 = quote0 (iEval term1 ([],[]))
+-- test_eval2 = quote0 (iEval term2 ([],[]))
+
+test_type1 = iType0 env1 term1
+test_type2 = iType0 env2 term2

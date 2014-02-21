@@ -1,36 +1,62 @@
+-----------------------------------------------------------------------------
+-- Thih:		Typing Haskell in Haskell, main program
+-- 
+-- Part of `Typing Haskell in Haskell', version of November 23, 2000
+-- Copyright (c) Mark P Jones and the Oregon Graduate Institute
+-- of Science and Technology, 1999-2000
+-- 
+-- This program is distributed as Free Software under the terms
+-- in the file "License" that is included in the distribution
+-- of this software, copies of which may be obtained from:
+--             http://www.cse.ogi.edu/~mpj/thih/
+-- 
+--
+-- This file contains all the text from the paper in one single file
+-- that can be loaded into Hugs for type checking.  No additional code
+-- is included.
+--
+-- Like other incarnations of this program, this version is generated
+-- automatically from the very same source code as the others.  Its
+-- *sole* purpose in life is to provide a quick way to check that the
+-- code in the paper is free from syntax and type errors.  If you
+-- actually want to run the program with real data, use the multiple
+-- file version.
+--
+-----------------------------------------------------------------------------
+
 module Text.EDE.Internal.TypingHaskellInHaskell where
 
-import Control.Monad (msum)
-import Data.List     (nub, (\\), intersect, union, partition)
+import Data.List(nub, (\\), intersect, union, partition)
+import Control.Monad(msum)
 
 -----------------------------------------------------------------------------
--- Id:          Identifiers
+-- Id:		Identifiers
 -----------------------------------------------------------------------------
 
-type Id = String
+type Id  = String
 
 enumId  :: Int -> Id
 enumId n = "v" ++ show n
 
 -----------------------------------------------------------------------------
--- Kind:                Kinds
+-- Kind:		Kinds
 -----------------------------------------------------------------------------
 
-data Kind = Star | Kfun Kind Kind
-             deriving Eq
+data Kind  = Star | Kfun Kind Kind
+             deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
--- Type:                Types
+-- Type:		Types
 -----------------------------------------------------------------------------
 
 data Type  = TVar Tyvar | TCon Tycon | TAp  Type Type | TGen Int
-             deriving Eq
+             deriving (Eq, Show)
 
 data Tyvar = Tyvar Id Kind
-             deriving Eq
+             deriving (Eq, Show)
 
 data Tycon = Tycon Id Kind
-             deriving Eq
+             deriving (Eq, Show)
 
 tUnit    = TCon (Tycon "()" Star)
 tChar    = TCon (Tycon "Char" Star)
@@ -69,7 +95,7 @@ instance HasKind Type where
                      (Kfun _ k) -> k
 
 -----------------------------------------------------------------------------
--- Subst:       Substitutions
+-- Subst:	Substitutions
 -----------------------------------------------------------------------------
 
 type Subst  = [(Tyvar, Type)]
@@ -109,7 +135,7 @@ merge s1 s2 = if agree then return (s1++s2) else fail "merge fails"
                    (map fst s1 `intersect` map fst s2)
 
 -----------------------------------------------------------------------------
--- Unify:       Unification
+-- Unify:	Unification
 -----------------------------------------------------------------------------
 
 mgu     :: Monad m => Type -> Type -> m Subst
@@ -140,14 +166,14 @@ match (TCon tc1) (TCon tc2)
 match t1 t2                 = fail "types do not match"
 
 -----------------------------------------------------------------------------
--- Pred:                Predicates
+-- Pred:		Predicates
 -----------------------------------------------------------------------------
 
 data Qual t = [Pred] :=> t
               deriving Eq
 
 data Pred   = IsIn Id Type
-              deriving Eq
+              deriving (Eq, Show)
 
 instance Types t => Types (Qual t) where
   apply s (ps :=> t) = apply s ps :=> apply s t
@@ -297,7 +323,7 @@ scEntail        :: ClassEnv -> [Pred] -> Pred -> Bool
 scEntail ce ps p = any (p `elem`) (map (bySuper ce) ps)
 
 -----------------------------------------------------------------------------
--- Scheme:      Type schemes
+-- Scheme:	Type schemes
 -----------------------------------------------------------------------------
 
 data Scheme = Forall [Kind] (Qual Type)
@@ -317,7 +343,7 @@ toScheme      :: Type -> Scheme
 toScheme t     = Forall [] ([] :=> t)
 
 -----------------------------------------------------------------------------
--- Assump:      Assumptions
+-- Assump:	Assumptions
 -----------------------------------------------------------------------------
 
 data Assump = Id :>: Scheme
@@ -331,7 +357,7 @@ find i []             = fail ("unbound identifier: " ++ i)
 find i ((i':>:sc):as) = if i==i' then return sc else find i as
 
 -----------------------------------------------------------------------------
--- TIMonad:     Type inference monad
+-- TIMonad:	Type inference monad
 -----------------------------------------------------------------------------
 
 newtype TI a = TI (Subst -> Int -> (Subst, Int, a))
@@ -378,15 +404,15 @@ instance Instantiate Pred where
   inst ts (IsIn c t) = IsIn c (inst ts t)
 
 -----------------------------------------------------------------------------
--- TIMain:      Type Inference Algorithm
+-- TIMain:	Type Inference Algorithm
 -----------------------------------------------------------------------------
--- Infer:       Basic definitions for type inference
+-- Infer:	Basic definitions for type inference
 -----------------------------------------------------------------------------
 
 type Infer e t = ClassEnv -> [Assump] -> e -> TI ([Pred], t)
 
 -----------------------------------------------------------------------------
--- Lit:         Literals
+-- Lit:		Literals
 -----------------------------------------------------------------------------
 
 data Literal = LitInt  Integer
@@ -403,7 +429,7 @@ tiLit (LitRat _)  = do v <- newTVar Star
                        return ([IsIn "Fractional" v], v)
 
 -----------------------------------------------------------------------------
--- Pat:         Patterns
+-- Pat:		Patterns
 -----------------------------------------------------------------------------
 
 data Pat        = PVar Id
@@ -598,18 +624,17 @@ tiSeq ti ce as (bs:bss) = do (ps,as')  <- ti ce as bs
                              return (ps++qs, as''++as')
 
 -----------------------------------------------------------------------------
--- TIProg:      Type Inference for Whole Programs
+-- TIProg:	Type Inference for Whole Programs
 -----------------------------------------------------------------------------
 
 type Program = [BindGroup]
 
 tiProgram :: ClassEnv -> [Assump] -> Program -> [Assump]
-tiProgram as bgs = runTI $
+tiProgram ce as bgs = runTI $
                       do (ps, as') <- tiSeq tiBindGroup ce as bgs
                          s         <- getSubst
                          rs        <- reduce ce (apply s ps)
                          s'        <- defaultSubst ce [] rs
                          return (apply (s'@@s) as')
-
 
 -----------------------------------------------------------------------------

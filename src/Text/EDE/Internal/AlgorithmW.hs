@@ -31,6 +31,7 @@ data Type    =  TVar String
              deriving (Eq, Ord)
 
 data Scheme  =  Scheme [String] Type
+
 class Types a where
     ftv    ::  a -> HashSet String
     apply  ::  Subst -> a -> a
@@ -240,7 +241,7 @@ test' e =
     do (res, _) <- runTI (bu Set.empty e)
        case res of
          Left err -> putStrLn $ "error: " ++ err
-         Right t  -> putStrLn $ show e ++ " :: " ++ show t
+         Right t  -> putStrLn $ show t
 
 data Constraint = CEquivalent Type Type
                 | CExplicitInstance Type Scheme
