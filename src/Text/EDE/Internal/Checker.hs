@@ -1,7 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
-
 -- Module      : Text.EDE.Internal.Checker
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -14,120 +10,121 @@
 
 module Text.EDE.Internal.Checker where
 
-import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.Error
-import qualified Data.HashSet            as Set
-import           Data.Monoid
-import           Data.Tuple
-import           Text.EDE.Internal.Types
+import Control.Monad (msum)
+import Data.List     (nub, (\\), intersect, union, partition)
 
--- Index unbound _type_ variables,
--- int -> scheme, lookup,
+tiLit :: Lit -> TI ([Pred], Type)
+tiLit (LInt  _) = do
+    v <- newTVar Star
+    return ([IsIn "Num" v], v)
+tiLit (LChar _) = return ([], tChar)
+tiLit (LStr  _) = return ([], tString)
+tiLit (LBool _) = return ([], tBool)
 
--- Unbound _value_ variables need to introduce an unbound type variable if they
--- don't exist in the environment?
+tiExpr :: ClassEnv -> [Assump] -> Exp -> TI ([Pred], Type)
+tiExpr ce as (Var i) = do
+    sc         <- find i as
+    (ps :=> t) <- freshInst sc
+    return (ps, t)
+tiExpr ce as (Const (i:>:sc)) = do
+    (ps :=> t) <- freshInst sc
+    return (ps, t)
+tiExpr ce as (Lit l) = do
+    (ps,t) <- tiLit l
+    return (ps, t)
+tiExpr ce as (Ap e f) = do
+    (ps,te) <- tiExpr ce as e
+    (qs,tf) <- tiExpr ce as f
+    t       <- newTVar Star
+    unify (tf `fn` t) te
+    return (ps++qs, t)
+tiExpr ce as (Let bg e) = do
+    (ps, as') <- tiBindGroup ce as bg
+    (qs, t)   <- tiExpr ce (as' ++ as) e
+    return (ps ++ qs, t)
 
-type NameEnv v = [(Name, v)]
 
-type Env = [Value]
+-----------------------------------------------------------------------------
+-- TIMonad:	Type inference monad
+-----------------------------------------------------------------------------
 
-iEval :: ITerm -> (NameEnv Value,Env) -> Value
-iEval (Ann  e _)  d = cEval e d
-iEval (Free  x)   d = case lookup x (fst d) of Nothing ->  (vfree x); Just v -> v
-iEval (Bound ii)  d = (snd d) !! ii
-iEval (e1 :@: e2) d = vapp (iEval e1 d) (cEval e2 d)
+newtype TI a = TI (Subst -> Int -> (Subst, Int, a))
 
-vapp :: Value -> Value -> Value
-vapp (VLam f)     v = f v
-vapp (VNeutral n) v = VNeutral (NApp n v)
+instance Monad TI where
+    return x = TI $ \s n -> (s,n,x)
+    TI f >>= g = TI $ \s n ->
+        case f s n of
+            (s',m,x) -> let TI gx = g x in gx s' m
 
-cEval :: CTerm -> (NameEnv Value,Env) -> Value
-cEval (Inf ii) d = iEval ii d
-cEval (Lam e)  d = VLam (\ x -> cEval e (((\(e, d) -> (e,  (x : d))) d)))
+runTI :: TI a -> a
+runTI (TI f) = x
+  where
+    (s,n,x) = f nullSubst 0
 
-cKind :: Context -> Type -> Kind -> Result ()
-cKind g (TFree x) Star =
-    case lookup x g of
-        Just (HasKind Star) -> return ()
-        Nothing             -> throwError "unknown identifier"
-cKind g (Fun kk kk') Star = do
-    cKind g kk  Star
-    cKind g kk' Star
+getSubst :: TI Subst
+getSubst = TI (\s n -> (s,n,s))
 
-iType0 :: Context -> ITerm -> Result Type
-iType0 = iType 0
+unify :: Type -> Type -> TI ()
+unify t1 t2 = do
+    s <- getSubst
+    u <- mgu (apply s t1) (apply s t2)
+    extSubst u
 
-iType :: Int -> Context -> ITerm -> Result Type
-iType ii g (Ann e ty) = do
-    cKind g ty Star
-    cType ii g e ty
-    return ty
-iType ii g (Free x) =
-    case lookup x g of
-        Just (HasType ty) -> return ty
-        Nothing           -> return $ TFree x -- throwError "unknown identifier"
-iType ii g (e1 :@: e2) = do
-    si <- iType ii g e1
-    case si of
-        Fun ty ty' -> do
-            cType ii g e2 ty
-            return ty'
-        _          -> throwError "illegal application"
+extSubst :: Subst -> TI ()
+extSubst s' = TI (\s n -> (s'@@s, n, ()))
 
-cType :: Int -> Context -> CTerm -> Type -> Result ()
-cType ii g (Inf e) ty = do
-    ty' <- iType ii g e
-    unless (ty == ty') (throwError "type mismatch")
-cType ii g (Lam e) (Fun ty ty') =
-    cType (ii + 1) ((Local ii, HasType ty) : g)
-    (cSubst 0 (Free (Local ii)) e) ty'
-cType ii g _ _ =
-    throwError "type mismatch"
+newTVar :: Kind -> TI Type
+newTVar k = TI (\s n -> let v = TVar (enumId n) k in (s, n+1, TVar v))
 
-type Result a = Either String a
+freshInst :: Scheme -> TI (Qual Type)
+freshInst (Forall ks qt) = do
+    ts <- mapM newTVar ks
+    return (inst ts qt)
 
-iSubst :: Int -> ITerm -> ITerm -> ITerm
-iSubst ii r (Ann e ty)  = Ann (cSubst ii r e) ty
-iSubst ii r (Bound j)   = if ii == j then r else Bound j
-iSubst ii r (Free y)    = Free y
-iSubst ii r (e1 :@: e2) = iSubst ii r e1 :@: cSubst ii r e2
+-----------------------------------------------------------------------------
+-- TIMain:	Type Inference Algorithm
+-----------------------------------------------------------------------------
+-- Infer:	Basic definitions for type inference
+-----------------------------------------------------------------------------
+-- type Infer e t = ClassEnv -> [Assump] -> e -> TI ([Pred], t)
+-----------------------------------------------------------------------------
 
-cSubst :: Int -> ITerm -> CTerm -> CTerm
-cSubst ii r (Inf e) = Inf (iSubst ii r e)
-cSubst ii r (Lam e) = Lam (cSubst (ii + 1) r e)
+type Ambiguity = (TVar, [Pred])
 
--- quote0 :: Value -> CTerm
--- quote0 = quote 0
+ambiguities :: ClassEnv -> [TVar] -> [Pred] -> [Ambiguity]
+ambiguities ce vs ps = [(v, filter (elem v . tv) ps) | v <- tv ps \\ vs]
 
--- quote :: Int -> Value -> CTerm
--- quote ii (VLam f)     = Lam (quote (ii + 1) (f (vfree (Quote ii))))
--- quote ii (VNeutral n) = Inf (neutralQuote ii n)
+numClasses :: [Id]
+numClasses = ["Num", "Integral", "Floating", "Fractional",
+               "Real", "RealFloat", "RealFrac"]
 
--- neutralQuote :: Int -> Neutral -> ITerm
--- neutralQuote ii (NFree x)  = boundfree ii x
--- neutralQuote ii (NApp n v) = neutralQuote ii n :@: quote ii v
+stdClasses :: [Id]
+stdClasses = ["Eq", "Ord", "Show", "Read", "Bounded", "Enum", "Ix",
+               "Functor", "Monad", "MonadPlus"] ++ numClasses
 
--- boundfree :: Int -> Name -> ITerm
--- boundfree ii (Quote k) = Bound (ii - k - 1)
--- boundfree ii x         = Free x
+candidates :: ClassEnv -> Ambiguity -> [Type]
+candidates ce (v, qs) = [ t' | let is = [ i | IsIn i t <- qs ]
+                                   ts = [ t | IsIn i t <- qs ],
+                               all ((TVar v)==) ts,
+                               any (`elem` numClasses) is,
+                               all (`elem` stdClasses) is,
+                               t' <- defaults ce,
+                               all (entail ce []) [ IsIn i t' | i <- is ] ]
 
-id'     = Lam (Inf (Bound 0))
-const'  = Lam (Lam (Inf (Bound 1)))
-tfree a = TFree (Global a)
-free x  = Inf (Free (Global x))
+withDefaults :: Monad m
+             => ([Ambiguity] -> [Type] -> a)
+             -> ClassEnv
+             -> [TVar]
+             -> [Pred]
+             -> m a
+withDefaults f ce vs ps
+    | any null tss = fail "cannot resolve ambiguity"
+    | otherwise = return (f vps (map head tss))
+      where vps = ambiguities ce vs ps
+            tss = map (candidates ce) vps
 
-term1    = Free $ Global "y"
-term2    = Ann const' (Fun  (Fun (tfree "b") (tfree "b"))
-                           (Fun  (tfree "a")
-                                 (Fun (tfree "b") (tfree "b"))))
-          :@: id' :@: free "y"
+defaultedPreds :: Monad m => ClassEnv -> [TVar] -> [Pred] -> m [Pred]
+defaultedPreds = withDefaults (\vps ts -> concat (map snd vps))
 
-env1 = [(Global "y", HasType (tfree "a")),(Global "a", HasKind Star)]
-env2 = [(Global "b", HasKind Star)] ++ env1
-
--- test_eval1 = quote0 (iEval term1 ([],[]))
--- test_eval2 = quote0 (iEval term2 ([],[]))
-
-test_type1 = iType0 env1 term1
-test_type2 = iType0 env2 term2
+defaultSubst :: Monad m => ClassEnv -> [TVar] -> [Pred] -> m Subst
+defaultSubst = withDefaults (\vps ts -> zip (map fst vps) ts)

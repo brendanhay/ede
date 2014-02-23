@@ -1,6 +1,10 @@
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -14,13 +18,18 @@
 
 module Text.EDE.Internal.Types where
 
+import           Control.Applicative
+import           Data.HashSet                 (HashSet)
+import qualified Data.HashSet                 as Set
+import           Data.Hashable                (Hashable)
 import           Data.List                    (nub)
 import           Data.Maybe
+import           Data.Monoid
 import           Data.Scientific              (Scientific)
 import           Data.String
 import           Data.Text                    (Text)
 import qualified Data.Text.Lazy               as LText
-import           Text.PrettyPrint.Leijen.Text
+import           Text.PrettyPrint.Leijen.Text hiding ((<$>), (<>))
 
 prettyString :: Pretty a => a -> String
 prettyString = show . renderCompact . pretty
@@ -43,91 +52,152 @@ instance Pretty Meta where
        <> pretty metaCol
        <> char ')'
 
--- data Ann a = Ann
---     { annType :: Type
---     , annTail :: a
---     } deriving (Show)
+newtype Id = Id String
 
-data ITerm
-    = Ann CTerm Type
-    | Bound Int
-    | Free Name
-    | ITerm :@: CTerm
-      deriving (Eq)
+enumId  :: Int -> Id
+enumId = mappend "v" . show
 
-instance Pretty ITerm where
-    pretty = iPrint 0 0
+data Lit
+    = LInt  Integer
+    | LChar Char
+    | LStr  String
+    | LBool Bool
 
-instance Show ITerm where
-    show = show . renderOneLine . pretty
+data Expr
+    = EVar Id
+    | ELit Lit
+    | EApp Exp Exp
+    | ELet Id  Exp Exp
 
-data CTerm
-    = Inf ITerm
-    | Lam CTerm
-     deriving (Eq)
+data Kind
+    = Star
+    | KFun Kind Kind
+      deriving (Show, Eq)
 
-instance Pretty CTerm where
-    pretty = cPrint 0 0
+data TVar = TV Id Kind
+    deriving (Eq, Show)
 
-instance Show CTerm where
-    show = show . renderOneLine . pretty
+data TCon = TC Id Kind
+    deriving (Eq, Show)
 
-data Name
-    = Global String
-    | Local Int
-    | Quote Int
-     deriving (Show, Eq)
+tChar   = TCon (TC "Char" Star)
+tBool   = TCon (TC "Bool" Star)
+tList   = TCon (TC "[]"   (KFun Star Star))
+tArrow  = TCon (TC "(->)" (KFun Star (KFun Star Star)))
+tTuple2 = TCon (TC "(,)"  (KFun Star (KFun Star Star)))
 
 data Type
-    = TFree Name
-    | Fun   Type Type
-      deriving (Eq)
+    = TVar TVar
+    | TCon TCon
+    | TApp Type Type
+    | TGen Int
+      deriving (Eq, Show)
 
-instance Pretty Type where
-    pretty = tPrint 0
+tString :: Type
+tString = list tChar
 
-instance Show Type where
-    show = show . renderOneLine . pretty
+infixr 4 (-->)
+(-->) :: Type -> Type -> Type
+(-->) a b = TApp (TApp tArrow a) b
 
-data Value
-    = VLam     (Value -> Value)
-    | VNeutral Neutral
+list :: Type -> Type
+list t = TApp tList t
 
-data Neutral
-    = NFree Name
-    | NApp  Neutral Value
+pair :: Type -> Type -> Type
+pair a b = TApp (TApp tTuple2 a) b
 
-vfree :: Name -> Value
-vfree n = VNeutral (NFree n)
+data Qual a = [Pred] :=> a
+    deriving (Eq)
 
-data Kind = Star
-    deriving (Show)
+data Pred = IsIn Id Type
+    deriving (Eq, Show)
 
-data Info
-    = HasKind Kind
-    | HasType Type
-      deriving (Show)
+type Instance = Qual Pred
+type Class    = ([Id], [Instance])
 
-type Context = [(Name, Info)]
+data Scheme = Forall [Kind] (Qual Type)
+    deriving (Eq)
 
-tPrint :: Int -> Type -> Doc
-tPrint p (TFree (Global s))  =  text $ LText.pack s
-tPrint p (Fun ty ty')        =  parensIf (p > 0) (sep [tPrint 0 ty <> text " ->", nest 2 (tPrint 0 ty')])
+quantify :: [TVar] -> Qual Type -> Scheme
+quantify vs qt = Forall ks (apply s qt)
+  where
+    vs' = [v | v <- tv qt, v `elem` vs]
+    ks  = map kind vs'
+    s   = zip vs' $ map TGen [0..]
 
-iPrint :: Int -> Int -> ITerm -> Doc
-iPrint p ii (Ann c ty)       =  parensIf (p > 1) (cPrint 2 ii c <> text " :: " <> tPrint 0 ty)
-iPrint p ii (Bound k)        =  text $ LText.pack (vars !! (ii - k - 1))
-iPrint p ii (Free (Global s))=  text $ LText.pack s
-iPrint p ii (i :@: c)        =  parensIf (p > 2) (sep [iPrint 2 ii i, nest 2 (cPrint 3 ii c)])
-iPrint p ii x                =  text $ LText.pack ("[" ++ show x ++ "]")
+toScheme :: Type -> Scheme
+toScheme t = Forall [] ([] :=> t)
 
-cPrint :: Int -> Int -> CTerm -> Doc
-cPrint p ii (Inf i)    = iPrint p ii i
-cPrint p ii (Lam c)    = parensIf (p > 0) (text "\\ " <> text (LText.pack $ vars !! ii) <> text " -> " <> cPrint 0 (ii + 1) c)
+data Assump = Id :>: Scheme
 
-vars :: [String]
-vars = [c : n | n <- "" : map show [1..], c <- ['x','y','z'] ++ ['a'..'w']]
+find :: Monad m => Id -> [Assump] -> m Scheme
+find i [] = fail ("unbound identifier: " ++ i)
+find i ((i':>:sc):as) = if i==i' then return sc else find i as
 
-parensIf :: Bool -> Doc -> Doc
-parensIf True  = parens
-parensIf False = id
+class HasKind a where
+    kind :: a -> Kind
+
+instance HasKind TVar where
+    kind (TV v k) = k
+
+instance HasKind TCon where
+    kind (TC v k) = k
+
+instance HasKind Type where
+    kind (TCon tc)  = kind tc
+    kind (TVar u)   = kind u
+    kind (TApp t _) =
+        case (kind t) of
+            (KFun _ k) -> k
+
+class Instantiate a where
+    inst :: [Type] -> a -> a
+
+instance Instantiate Type where
+    inst ts (TApp l r) = TApp (inst ts l) (inst ts r)
+    inst ts (TGen n)   = ts !! n
+    inst ts t          = t
+
+instance Instantiate a => Instantiate [a] where
+    inst ts = map (inst ts)
+
+instance Instantiate a => Instantiate (Qual a) where
+    inst ts (ps :=> t) = inst ts ps :=> inst ts t
+
+instance Instantiate Pred where
+    inst ts (IsIn c t) = IsIn c (inst ts t)
+
+class Types t where
+    apply :: Subst -> t -> t
+    tv :: t -> [TVar]
+
+instance Types Type where
+    apply s (TVar u) = case lookup u s of
+                         Just t  -> t
+                         Nothing -> TVar u
+    apply s (TApp l r) = TApp (apply s l) (apply s r)
+    apply s t = t
+
+    tv (TVar u) = [u]
+    tv (TApp l r) = tv l `union` tv r
+    tv t = []
+
+instance Types a => Types [a] where
+    apply s = map (apply s)
+    tv = nub . concat . map tv
+
+instance Types t => Types (Qual t) where
+    apply s (ps :=> t) = apply s ps :=> apply s t
+    tv (ps :=> t) = tv ps `union` tv t
+
+instance Types Pred where
+    apply s (IsIn i t) = IsIn i (apply s t)
+    tv (IsIn i t) = tv t
+
+instance Types Scheme where
+    apply s (Forall ks qt) = Forall ks (apply s qt)
+    tv (Forall ks qt) = tv qt
+
+instance Types Assump where
+    apply s (i :>: sc) = i :>: (apply s sc)
+    tv (i :>: sc) = tv sc

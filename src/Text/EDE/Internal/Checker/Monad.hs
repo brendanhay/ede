@@ -1,7 +1,4 @@
-{-# LANGUAGE BangPatterns            #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving            #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE TupleSections            #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- Module      : Text.EDE.Internal.Checker.Monad
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -15,17 +12,14 @@
 
 module Text.EDE.Internal.Checker.Monad where
 
-import           Control.Applicative
-import           Control.Monad
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as Map
-import           Data.Monoid
-import           Text.EDE.Internal.Types
+import Control.Applicative
+import Control.Monad
+import Text.EDE.Internal.Types
 
 data State = State
-    { stateUniq    :: Int
-    , stateUnbound :: HashMap Id Type
-    } deriving (Show)
+    -- { varNames  :: [Var]
+    -- , tvarNames :: [TVar]
+    -- } deriving (Show)
 
 newtype Check a = Check { runCheck :: State -> (State, Either String a) }
 
@@ -44,25 +38,29 @@ instance Monad Check where
             (s', Right x) -> runCheck (k x) s'
 
 evalCheck :: Check a -> Either String a
-evalCheck c = snd . runCheck c $ State (fromEnum 'a') mempty
+evalCheck c = snd . runCheck c $ State
+  --   { varNames  = map (Var . ('$':)) ns
+  --   , tvarNames = map (TypeVar . ('\'':)) ns
+  --   }
+  -- where
+  --   ns = [1..] >>= flip replicateM ['a'..'z']
 
 throw :: String -> Check a
 throw e = Check $ \s -> (s, Left e)
 
-next :: Check Type
-next = Check $ \s@State{..} ->
-    (s { stateUniq = stateUniq + 1 }, Right $ TVar [toEnum stateUniq])
+-- -- | Create a fresh variable
+-- freshVar :: Check Var
+-- freshVar = do
+--     v:vs <- varNames <$> get
+--     modify $ \s -> s { varNames = vs }
+--     return v
 
-unbound :: Id -> Check Type
-unbound k = do
-    s <- get
-    case Map.lookup k $ stateUnbound s of
-        Just t  -> return t
-        Nothing -> do
-            t  <- next
-            s' <- get
-            put s' { stateUnbound = Map.insert k t $ stateUnbound s' }
-            return t
+-- -- | Create a fresh type variable
+-- freshTVar :: Check TVar
+-- freshTVar = do
+--     v:vs <- tvarNames <$> get
+--     modify $ \s -> s { tvarNames = vs }
+--     return v
 
 get :: Check State
 get = Check $ \s -> (s, Right s)
