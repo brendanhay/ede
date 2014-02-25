@@ -10,28 +10,47 @@
 
 module Text.EDE.Internal.Checker.Class where
 
+import           Control.Monad
+import           Data.HashMap.Strict                    (HashMap)
+import qualified Data.HashMap.Strict                    as Map
+import           Text.EDE.Internal.Checker.Substitution
+import           Text.EDE.Internal.Checker.Unification
+import           Text.EDE.Internal.Types
+
+type Instance = Qual Pred
+type Class    = ([Id], [Instance])
+
 data ClassEnv = ClassEnv
     { classes  :: Id -> Maybe Class
     , defaults :: [Type]
     }
 
+-- These functions are intended to be used only in cases where it is known
+-- that the class i is defined in the environment ce.
 super :: ClassEnv -> Id -> [Id]
-super ce i = case classes ce i of Just (is, its) -> is
+super ce i =
+    case classes ce i of
+        Just (is, its) -> is
 
-instances :: ClassEnv -> Id -> [Inst]
-instances ce i = case classes ce i of Just (is, its) -> its
+instances :: ClassEnv -> Id -> [Instance]
+instances ce i =
+    case classes ce i of
+        Just (is, its) -> its
 
 defined :: Maybe a -> Bool
 defined (Just x) = True
-defined Nothing = False
+defined Nothing  = False
 
 modify :: ClassEnv -> Id -> Class -> ClassEnv
-modify ce i c = ce{classes = \j -> if i==j then Just c
-                                           else classes ce j}
+modify ce i c = ce
+    { classes = \j -> if i == j then Just c else classes ce j
+    }
 
 initialEnv :: ClassEnv
-initialEnv = ClassEnv { classes = \i -> fail "class not defined",
-                         defaults = [tInteger, tDouble] }
+initialEnv = ClassEnv
+    { classes  = \i -> fail "class not defined"
+    , defaults = [tInteger]
+    }
 
 type EnvTransformer = ClassEnv -> Maybe ClassEnv
 
@@ -42,63 +61,55 @@ infixr 5 <:>
 
 addClass :: Id -> [Id] -> EnvTransformer
 addClass i is ce
- | defined (classes ce i) = fail "class already defined"
- | any (not . defined . classes ce) is = fail "superclass not defined"
- | otherwise = return (modify ce i (is, []))
+    | defined (classes ce i) = fail "class already defined"
+    | any (not . defined . classes ce) is = fail "superclass not defined"
+    | otherwise = return (modify ce i (is, []))
 
 addPreludeClasses :: EnvTransformer
 addPreludeClasses = addCoreClasses <:> addNumClasses
 
 addCoreClasses ::   EnvTransformer
-addCoreClasses =   addClass "Eq" []
-                <:> addClass "Ord" ["Eq"]
-                <:> addClass "Show" []
-                <:> addClass "Read" []
-                <:> addClass "Bounded" []
-                <:> addClass "Enum" []
-                <:> addClass "Functor" []
-                <:> addClass "Monad" []
+addCoreClasses =
+        addClass "Eq" []
+    <:> addClass "Ord" ["Eq"]
+    <:> addClass "Show" []
+    <:> addClass "Read" []
+    <:> addClass "Bounded" []
+    <:> addClass "Enum" []
+    <:> addClass "Functor" []
+    <:> addClass "Monad" []
 
 addNumClasses ::   EnvTransformer
-addNumClasses =   addClass "Num" ["Eq", "Show"]
-                <:> addClass "Real" ["Num", "Ord"]
-                <:> addClass "Fractional" ["Num"]
-                <:> addClass "Integral" ["Real", "Enum"]
-                <:> addClass "RealFrac" ["Real", "Fractional"]
-                <:> addClass "Floating" ["Fractional"]
-                <:> addClass "RealFloat" ["RealFrac", "Floating"]
+addNumClasses =
+        addClass "Num" ["Eq", "Show"]
+    <:> addClass "Real" ["Num", "Ord"]
+    <:> addClass "Fractional" ["Num"]
+    <:> addClass "Integral" ["Real", "Enum"]
+    <:> addClass "RealFrac" ["Real", "Fractional"]
+    <:> addClass "Floating" ["Fractional"]
+    <:> addClass "RealFloat" ["RealFrac", "Floating"]
 
 addInst :: [Pred] -> Pred -> EnvTransformer
 addInst ps p@(IsIn i _) ce
- | not (defined (classes ce i)) = fail "no class for instance"
- | any (overlap p) qs = fail "overlapping instance"
- | otherwise = return (modify ce i c)
-   where its = insts ce i
-         qs = [ q | (_ :=> q) <- its ]
-         c = (super ce i, (ps:=>p) : its)
+    | not (defined (classes ce i)) = fail "no class for instance"
+    | any (overlap p) qs = fail "overlapping instance"
+    | otherwise = return (modify ce i c)
+  where
+    its = instances ce i
+    qs  = [q | (_ :=> q) <- its]
+    c   = (super ce i, (ps:=>p) : its)
 
 overlap :: Pred -> Pred -> Bool
 overlap p q = defined (mguPred p q)
 
-exampleInsts ::  EnvTransformer
-exampleInsts =   addPreludeClasses
-             <:> addInst [] (IsIn "Ord" tUnit)
-             <:> addInst [] (IsIn "Ord" tChar)
-             <:> addInst [] (IsIn "Ord" tInt)
-             <:> addInst [IsIn "Ord" (TVar (TVar "a" Star)),
-                          IsIn "Ord" (TVar (TVar "b" Star))]
-                         (IsIn "Ord" (pair (TVar (TVar "a" Star))
-                                           (TVar (TVar "b" Star))))
-
-
 -- Entailment
 
 bySuper :: ClassEnv -> Pred -> [Pred]
-bySuper ce p@(IsIn i t)
- = p : concat [ bySuper ce (IsIn i' t) | i' <- super ce i ]
+bySuper ce p@(IsIn i t) =
+    p : concat [bySuper ce (IsIn i' t) | i' <- super ce i]
 
 byInst :: ClassEnv -> Pred -> Maybe [Pred]
-byInst ce p@(IsIn i t) = msum [ tryInst it | it <- insts ce i ]
+byInst ce p@(IsIn i t) = msum [tryInst it | it <- instances ce i]
   where
     tryInst (ps :=> h) = do
         u <- matchPred h p

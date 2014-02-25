@@ -10,42 +10,45 @@
 
 module Text.EDE.Internal.Checker.Ambiguity where
 
-type Ambiguity = (TVar, [Pred])
+import Text.EDE.Internal.Checker.Class
+import Text.EDE.Internal.Types
 
-ambiguities :: ClassEnv -> [TVar] -> [Pred] -> [Ambiguity]
-ambiguities ce vs ps = [(v, filter (elem v . tv) ps) | v <- tv ps \\ vs]
+-- type Ambiguity = (TVar, [Pred])
 
-numClasses :: [Id]
-numClasses = ["Num", "Integral", "Floating", "Fractional",
-               "Real", "RealFloat", "RealFrac"]
+-- ambiguities :: ClassEnv -> [TVar] -> [Pred] -> [Ambiguity]
+-- ambiguities ce vs ps = [(v, filter (elem v . tv) ps) | v <- tv ps \\ vs]
 
-stdClasses :: [Id]
-stdClasses = ["Eq", "Ord", "Show", "Read", "Bounded", "Enum", "Ix",
-               "Functor", "Monad", "MonadPlus"] ++ numClasses
+-- numClasses :: [Id]
+-- numClasses = ["Num", "Integral", "Floating", "Fractional",
+--                "Real", "RealFloat", "RealFrac"]
 
-candidates :: ClassEnv -> Ambiguity -> [Type]
-candidates ce (v, qs) = [ t' | let is = [ i | IsIn i t <- qs ]
-                                   ts = [ t | IsIn i t <- qs ],
-                               all ((TVar v)==) ts,
-                               any (`elem` numClasses) is,
-                               all (`elem` stdClasses) is,
-                               t' <- defaults ce,
-                               all (entail ce []) [ IsIn i t' | i <- is ] ]
+-- stdClasses :: [Id]
+-- stdClasses = ["Eq", "Ord", "Show", "Read", "Bounded", "Enum", "Ix",
+--                "Functor", "Monad", "MonadPlus"] ++ numClasses
 
-withDefaults :: Monad m
-             => ([Ambiguity] -> [Type] -> a)
-             -> ClassEnv
-             -> [TVar]
-             -> [Pred]
-             -> m a
-withDefaults f ce vs ps
-    | any null tss = fail "cannot resolve ambiguity"
-    | otherwise = return (f vps (map head tss))
-      where vps = ambiguities ce vs ps
-            tss = map (candidates ce) vps
+-- candidates :: ClassEnv -> Ambiguity -> [Type]
+-- candidates ce (v, qs) = [ t' | let is = [ i | IsIn i t <- qs ]
+--                                    ts = [ t | IsIn i t <- qs ],
+--                                all ((TVar v)==) ts,
+--                                any (`elem` numClasses) is,
+--                                all (`elem` stdClasses) is,
+--                                t' <- defaults ce,
+--                                all (entail ce []) [ IsIn i t' | i <- is ] ]
 
-defaultedPreds :: Monad m => ClassEnv -> [TVar] -> [Pred] -> m [Pred]
-defaultedPreds = withDefaults (\vps ts -> concat (map snd vps))
+-- withDefaults :: Monad m
+--              => ([Ambiguity] -> [Type] -> a)
+--              -> ClassEnv
+--              -> [TVar]
+--              -> [Pred]
+--              -> m a
+-- withDefaults f ce vs ps
+--     | any null tss = fail "cannot resolve ambiguity"
+--     | otherwise = return (f vps (map head tss))
+--       where vps = ambiguities ce vs ps
+--             tss = map (candidates ce) vps
 
-defaultSubst :: Monad m => ClassEnv -> [TVar] -> [Pred] -> m Subst
-defaultSubst = withDefaults (\vps ts -> zip (map fst vps) ts)
+-- defaultedPreds :: Monad m => ClassEnv -> [TVar] -> [Pred] -> m [Pred]
+-- defaultedPreds = withDefaults (\vps ts -> concat (map snd vps))
+
+-- defaultSubst :: Monad m => ClassEnv -> [TVar] -> [Pred] -> m Subst
+-- defaultSubst = withDefaults (\vps ts -> zip (map fst vps) ts)

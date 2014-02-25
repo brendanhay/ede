@@ -47,15 +47,18 @@ library
     hs-source-dirs:    src
 
     exposed-modules:
---        Text.EDE.Internal.Checker.Context
---        Text.EDE.Internal.Checker.Env
-        Text.EDE.Internal.Checker
---      , Text.EDE.Internal.Types
-
-      -- , Text.EDE.Internal.Lexer
-      -- , Text.EDE.Internal.Lexer.Names
-      -- , Text.EDE.Internal.Lexer.Tokens
-      -- , Text.EDE.Internal.Parser
+        Text.EDE
+      , Text.EDE.Internal.Checker
+      , Text.EDE.Internal.Checker.Ambiguity
+      , Text.EDE.Internal.Checker.Class
+      , Text.EDE.Internal.Checker.Monad
+      , Text.EDE.Internal.Checker.Substitution
+      , Text.EDE.Internal.Checker.Unification
+      , Text.EDE.Internal.Lexer
+      , Text.EDE.Internal.Lexer.Names
+      , Text.EDE.Internal.Lexer.Tokens
+      , Text.EDE.Internal.Parser
+      , Text.EDE.Internal.Types
 
     ghc-options:       -Wall
 

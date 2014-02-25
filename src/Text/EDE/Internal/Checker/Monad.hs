@@ -14,12 +14,15 @@ module Text.EDE.Internal.Checker.Monad where
 
 import Control.Applicative
 import Control.Monad
+import Data.Monoid
+import Text.EDE.Internal.Checker.Substitution
+import Text.EDE.Internal.Checker.Unification
 import Text.EDE.Internal.Types
 
 data State = State
-    -- { varNames  :: [Var]
-    -- , tvarNames :: [TVar]
-    -- } deriving (Show)
+    { substitutions :: Subst
+    , supply        :: [Kind -> TVar]
+    }
 
 newtype Check a = Check { runCheck :: State -> (State, Either String a) }
 
@@ -31,36 +34,35 @@ instance Applicative Check where
     pure  = return
 
 instance Monad Check where
-    return !x   = Check $ \s -> (s, Right x)
+    return !x = Check $ \s -> (s, Right x)
+    fail   !e = Check $ \s -> (s, Left e)
+
     (>>=) !m !k = Check $ \s ->
         case runCheck m s of
             (s', Left  e) -> (s', Left e)
             (s', Right x) -> runCheck (k x) s'
 
 evalCheck :: Check a -> Either String a
-evalCheck c = snd . runCheck c $ State
-  --   { varNames  = map (Var . ('$':)) ns
-  --   , tvarNames = map (TypeVar . ('\'':)) ns
-  --   }
-  -- where
-  --   ns = [1..] >>= flip replicateM ['a'..'z']
+evalCheck c = snd . runCheck c $
+    State mempty (map (\i k -> TV [i] k) $ cycle ['a'..'z'])
 
-throw :: String -> Check a
-throw e = Check $ \s -> (s, Left e)
+unify :: Type -> Type -> Check ()
+unify t1 t2 = do
+    s' <- gets substitutions
+    u  <- mgu (apply s' t1) (apply s' t2)
+    modify $ \s -> s { substitutions = u <> s' }
 
--- -- | Create a fresh variable
--- freshVar :: Check Var
--- freshVar = do
---     v:vs <- varNames <$> get
---     modify $ \s -> s { varNames = vs }
---     return v
+freshTVar :: Kind -> Check Type
+freshTVar k = do
+    f:fs <- gets supply
+    modify $ \s -> s { supply = fs }
+    return $ TVar (f k)
 
--- -- | Create a fresh type variable
--- freshTVar :: Check TVar
--- freshTVar = do
---     v:vs <- tvarNames <$> get
---     modify $ \s -> s { tvarNames = vs }
---     return v
+freshInst :: Scheme -> Check (Qual Type)
+freshInst (Forall ks qt) = (`inst` qt) <$> mapM freshTVar ks
+
+gets :: (State -> a) -> Check a
+gets = (`fmap` get)
 
 get :: Check State
 get = Check $ \s -> (s, Right s)

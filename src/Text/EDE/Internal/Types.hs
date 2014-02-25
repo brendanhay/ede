@@ -22,21 +22,17 @@ import           Control.Applicative
 import           Data.HashSet                 (HashSet)
 import qualified Data.HashSet                 as Set
 import           Data.Hashable                (Hashable)
-import           Data.List                    (nub)
+import           Data.List                    (union)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Scientific              (Scientific)
 import           Data.String
 import           Data.Text                    (Text)
 import qualified Data.Text.Lazy               as LText
-import           Text.PrettyPrint.Leijen.Text hiding ((<$>), (<>))
-
-prettyString :: Pretty a => a -> String
-prettyString = show . renderCompact . pretty
 
 data Meta = Meta
     { metaName :: String
-    , metaLine :: Int
+    , metaRow  :: Int
     , metaCol  :: Int
     } deriving (Eq)
 
@@ -52,51 +48,79 @@ instance Pretty Meta where
        <> pretty metaCol
        <> char ')'
 
-newtype Id = Id String
-
-enumId  :: Int -> Id
-enumId = mappend "v" . show
+type Id = String
 
 data Lit
     = LInt  Integer
     | LChar Char
     | LStr  String
     | LBool Bool
+      deriving (Show)
 
 data Expr
     = EVar Id
     | ELit Lit
-    | EApp Exp Exp
-    | ELet Id  Exp Exp
+    | EApp Expr Expr
+    | ELet Id   Expr Expr
+      deriving (Show)
 
 data Kind
     = Star
     | KFun Kind Kind
-      deriving (Show, Eq)
+      deriving (Eq)
+
+instance Show Kind where
+    show = prettyShow
+
+instance Pretty Kind where
+    pretty Star       = text "*"
+    pretty (KFun x y) = parens $ pretty x <+> "->" <+> pretty y
 
 data TVar = TV Id Kind
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show TVar where
+    show = prettyShow
+
+instance Pretty TVar where
+    pretty (TV v _) = text v
 
 data TCon = TC Id Kind
-    deriving (Eq, Show)
+    deriving (Eq)
 
-tChar   = TCon (TC "Char" Star)
-tBool   = TCon (TC "Bool" Star)
-tList   = TCon (TC "[]"   (KFun Star Star))
-tArrow  = TCon (TC "(->)" (KFun Star (KFun Star Star)))
-tTuple2 = TCon (TC "(,)"  (KFun Star (KFun Star Star)))
+instance Show TCon where
+    show = prettyShow
+
+instance Pretty TCon where
+    pretty (TC c _) = text c
+
+tInteger = TCon (TC "Int"  Star)
+tChar    = TCon (TC "Char" Star)
+tBool    = TCon (TC "Bool" Star)
+tList    = TCon (TC "[]"   (KFun Star Star))
+tArrow   = TCon (TC "(->)" (KFun Star (KFun Star Star)))
+tTuple2  = TCon (TC "(,)"  (KFun Star (KFun Star Star)))
 
 data Type
     = TVar TVar
     | TCon TCon
     | TApp Type Type
     | TGen Int
-      deriving (Eq, Show)
+      deriving (Eq)
+
+instance Show Type where
+    show = prettyShow
+
+instance Pretty Type where
+    pretty (TVar v)   = pretty v
+    pretty (TCon c)   = pretty c
+    pretty (TApp l r) = paren $ pretty l <+> "->" <+> pretty r
+    pretty (TGen n)   = paren $ int n
 
 tString :: Type
 tString = list tChar
 
-infixr 4 (-->)
+infixr 4 -->
 (-->) :: Type -> Type -> Type
 (-->) a b = TApp (TApp tArrow a) b
 
@@ -109,30 +133,34 @@ pair a b = TApp (TApp tTuple2 a) b
 data Qual a = [Pred] :=> a
     deriving (Eq)
 
-data Pred = IsIn Id Type
-    deriving (Eq, Show)
+instance Pretty t => Pretty (Qual t) where
+    pretty (ps :=> t) = (pretty ps <+> text "=>") $$ nest 2 (pretty t)
 
-type Instance = Qual Pred
-type Class    = ([Id], [Instance])
+data Pred = IsIn Id Type
+    deriving (Eq)
+
+instance Pretty Pred where
+    pretty (IsIn i t) = text "isIn1" <+> text ("c" ++ i) <+> pretty t
 
 data Scheme = Forall [Kind] (Qual Type)
     deriving (Eq)
 
-quantify :: [TVar] -> Qual Type -> Scheme
-quantify vs qt = Forall ks (apply s qt)
-  where
-    vs' = [v | v <- tv qt, v `elem` vs]
-    ks  = map kind vs'
-    s   = zip vs' $ map TGen [0..]
+instance Pretty Scheme where
+    pretty (Forall ks qt) = (text "forall" <+> pretty ks <+> ".") $$ nest 2 (pretty qt)
 
 toScheme :: Type -> Scheme
 toScheme t = Forall [] ([] :=> t)
 
 data Assump = Id :>: Scheme
 
+instance Pretty Assump where
+    pretty (i :>: s) = (fromString i <+> ":>:") $$ nest 2 (pprint s)
+
 find :: Monad m => Id -> [Assump] -> m Scheme
 find i [] = fail ("unbound identifier: " ++ i)
-find i ((i':>:sc):as) = if i==i' then return sc else find i as
+find i ((i' :>: sc) : as)
+    | i == i'   = return sc
+    | otherwise = find i as
 
 class HasKind a where
     kind :: a -> Kind
@@ -167,37 +195,5 @@ instance Instantiate a => Instantiate (Qual a) where
 instance Instantiate Pred where
     inst ts (IsIn c t) = IsIn c (inst ts t)
 
-class Types t where
-    apply :: Subst -> t -> t
-    tv :: t -> [TVar]
-
-instance Types Type where
-    apply s (TVar u) = case lookup u s of
-                         Just t  -> t
-                         Nothing -> TVar u
-    apply s (TApp l r) = TApp (apply s l) (apply s r)
-    apply s t = t
-
-    tv (TVar u) = [u]
-    tv (TApp l r) = tv l `union` tv r
-    tv t = []
-
-instance Types a => Types [a] where
-    apply s = map (apply s)
-    tv = nub . concat . map tv
-
-instance Types t => Types (Qual t) where
-    apply s (ps :=> t) = apply s ps :=> apply s t
-    tv (ps :=> t) = tv ps `union` tv t
-
-instance Types Pred where
-    apply s (IsIn i t) = IsIn i (apply s t)
-    tv (IsIn i t) = tv t
-
-instance Types Scheme where
-    apply s (Forall ks qt) = Forall ks (apply s qt)
-    tv (Forall ks qt) = tv qt
-
-instance Types Assump where
-    apply s (i :>: sc) = i :>: (apply s sc)
-    tv (i :>: sc) = tv sc
+prettyShow :: Pretty a => a -> String
+prettyShow = show . renderOneLine . pretty
