@@ -24,7 +24,7 @@ data Token = Token
     } deriving (Eq)
 
 instance Show Token where
-    show = prettyString
+    show = prettyShow
 
 instance Pretty Token where
     pretty Token{..} = pretty tokenPos <+> pretty tokenTok

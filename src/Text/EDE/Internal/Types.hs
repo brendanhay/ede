@@ -18,7 +18,7 @@
 
 module Text.EDE.Internal.Types where
 
-import           Control.Applicative
+-- import           Control.Applicative
 import           Data.HashSet                 (HashSet)
 import qualified Data.HashSet                 as Set
 import           Data.Hashable                (Hashable)
@@ -29,6 +29,7 @@ import           Data.Scientific              (Scientific)
 import           Data.String
 import           Data.Text                    (Text)
 import qualified Data.Text.Lazy               as LText
+import           Text.PrettyPrint.Leijen.Text hiding ((<>), list)
 
 data Meta = Meta
     { metaName :: String
@@ -37,13 +38,13 @@ data Meta = Meta
     } deriving (Eq)
 
 instance Show Meta where
-    show = prettyString
+    show = prettyShow
 
 instance Pretty Meta where
     pretty Meta{..} =
           fromString metaName
        <> char '('
-       <> pretty metaLine
+       <> pretty metaRow
        <> char ','
        <> pretty metaCol
        <> char ')'
@@ -57,11 +58,11 @@ data Lit
     | LBool Bool
       deriving (Show)
 
-data Expr
+data Exp
     = EVar Id
     | ELit Lit
-    | EApp Expr Expr
-    | ELet Id   Expr Expr
+    | EApp Exp Exp
+    | ELet Id   Exp Exp
       deriving (Show)
 
 data Kind
@@ -83,7 +84,7 @@ instance Show TVar where
     show = prettyShow
 
 instance Pretty TVar where
-    pretty (TV v _) = text v
+    pretty (TV v _) = fromString v
 
 data TCon = TC Id Kind
     deriving (Eq)
@@ -92,7 +93,7 @@ instance Show TCon where
     show = prettyShow
 
 instance Pretty TCon where
-    pretty (TC c _) = text c
+    pretty (TC c _) = fromString c
 
 tInteger = TCon (TC "Int"  Star)
 tChar    = TCon (TC "Char" Star)
@@ -114,8 +115,8 @@ instance Show Type where
 instance Pretty Type where
     pretty (TVar v)   = pretty v
     pretty (TCon c)   = pretty c
-    pretty (TApp l r) = paren $ pretty l <+> "->" <+> pretty r
-    pretty (TGen n)   = paren $ int n
+    pretty (TApp l r) = parens $ pretty l <+> "->" <+> pretty r
+    pretty (TGen n)   = parens $ int n
 
 tString :: Type
 tString = list tChar
@@ -140,7 +141,7 @@ data Pred = IsIn Id Type
     deriving (Eq)
 
 instance Pretty Pred where
-    pretty (IsIn i t) = text "isIn1" <+> text ("c" ++ i) <+> pretty t
+    pretty (IsIn i t) = text "isIn1" <+> fromString ("c" ++ i) <+> pretty t
 
 data Scheme = Forall [Kind] (Qual Type)
     deriving (Eq)
@@ -154,7 +155,7 @@ toScheme t = Forall [] ([] :=> t)
 data Assump = Id :>: Scheme
 
 instance Pretty Assump where
-    pretty (i :>: s) = (fromString i <+> ":>:") $$ nest 2 (pprint s)
+    pretty (i :>: s) = (fromString i <+> ":>:") $$ nest 2 (pretty s)
 
 find :: Monad m => Id -> [Assump] -> m Scheme
 find i [] = fail ("unbound identifier: " ++ i)
@@ -197,3 +198,6 @@ instance Instantiate Pred where
 
 prettyShow :: Pretty a => a -> String
 prettyShow = show . renderOneLine . pretty
+
+($$) :: Doc -> Doc -> Doc
+($$) x y = align (x <$> y)
