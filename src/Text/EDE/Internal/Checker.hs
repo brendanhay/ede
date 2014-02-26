@@ -21,37 +21,45 @@ infixr 4 -->
 (-->) a b = TApp (TApp tarrow a) b
 
 preludeClasses :: ClassEnv
-preludeClasses = fromJust $ addPreludeClasses initialEnv
+preludeClasses = fromJust $
+    (  addClass "Eq" []
+   <:> addClass "Monoid" []
+   <:> addInst [] (IsIn "Monoid" ttext)
+    ) initialEnv
 
 preludeFuns :: [Assump]
 preludeFuns =
     [ "=="      :>: Forall [Star] ([IsIn "Eq" (TGen 0)] :=> (TGen 0 --> TGen 0 --> tbool))
     , "mappend" :>: Forall [Star] ([IsIn "Monoid" (TGen 0)] :=> (TGen 0 --> TGen 0 --> TGen 0))
+    , "text"    :>: Forall [Star] ([] :=> ttext)
     ]
 
-tiExp :: ClassEnv -> [Assump] -> Exp -> Check ([Pred], Type)
-tiExp ce as (EVar i) = do
-    sc         <- find i as
-    (ps :=> t) <- freshInst sc
-    return (ps, t)
-tiExp ce as (ELit l) = do
-    (ps, t)    <- tiLit l
-    return (ps, t)
-tiExp ce as (EApp e f) = do
-    (ps, te)   <- tiExp ce as e
-    (qs, tf)   <- tiExp ce as f
-    t          <- freshTVar Star
+tiExp :: Exp -> Check (Qual Type)
+tiExp (EVar i) = do
+    ms <- find i
+    maybe (global i)
+          instantiate
+          ms
+tiExp (ELit l) = do
+    tiLit l
+tiExp (EApp e f) = do
+    ps :=> te <- tiExp e
+    qs :=> tf <- tiExp f
+    t         <- local Star
     unify (tf --> t) te
-    return (ps ++ qs, t)
+    return $ (ps ++ qs) :=> t
 -- tiExp ce as (ELet bg e) = do
 --     (ps, as')  <- tiBindGroup ce as bg
 --     (qs, t)    <- tiExp ce (as' ++ as) e
 --     return (ps ++ qs, t)
 
-tiLit :: Lit -> Check ([Pred], Type)
+tiLit :: Lit -> Check (Qual Type)
 tiLit (LNum  _) = do
-    v <- freshTVar Star
-    return ([IsIn "Num" v], v)
-tiLit (LChar _) = return ([], tchar)
-tiLit (LText _) = return ([], ttext)
-tiLit (LBool _) = return ([], tbool)
+    v <- local Star
+    return $ [IsIn "Num" v] :=> v
+tiLit (LChar _) = return $ [] :=> tchar
+tiLit (LText _) = return $ [] :=> ttext
+tiLit (LBool _) = return $ [] :=> tbool
+
+-- introduce :: Monad m => Id -> Scheme -> m 
+-- introduce i sc 

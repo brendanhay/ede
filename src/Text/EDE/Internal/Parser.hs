@@ -41,10 +41,10 @@ runParser :: (Token -> String)
 runParser f name parser = Parsec.runParser parser (ParserState f name) name
 
 pDoc :: Parser Exp
-pDoc = app $ pFragM <|> pIdentM <|> pExpM
+pDoc = f $ pFragM <|> pIdentM <|> pExpM
   where
-    app :: Parser (Exp, Meta) -> Parser Exp
-    app p = do
+    f :: Parser (Exp, Meta) -> Parser Exp
+    f p = do
         (x, _) <- p
         xs     <- map fst <$> many1 p <|> return []
         return $ foldl' (\a e -> eapp [evar "mappend", a, e]) x xs
@@ -66,7 +66,7 @@ pFragM = do
 pIdentM :: Parser (Exp, Meta)
 pIdentM = do
     (_, m) <- pTokM KIdentL
-    v      <- pVar <* pTok KIdentR
+    (v, _) <- pAtomM <* pTok KIdentR
     return (v, m)
 
 pExp :: Parser Exp
@@ -155,12 +155,12 @@ pAppM p = do
 pAtomM :: Parser (Exp, Meta)
 pAtomM = choice
     [ -- (EXP)
-      -- do (_, m) <- pTokM KParenL
-      --    t      <- pExp <* pTok KParenR
-      --    return (t, m)
+      do (_, m) <- pTokM KParenL
+         t      <- pExp <* pTok KParenR
+         return (t, m)
 
       -- literals
-      do (l, m) <- pLitM
+    , do (l, m) <- pLitM
          return (elit l, m)
 
       -- variables
@@ -186,6 +186,8 @@ pLitM :: Parser (Lit, Meta)
 pLitM = try bool <|> literal
   where
     bool = first LBool <$> pTokMaybeM h <?> "a boolean"
+
+    char = pTok
 
     literal = do
         (l, m) <- pTokMaybeM f <?> "a string or numeric literal"

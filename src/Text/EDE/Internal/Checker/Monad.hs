@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns    #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- Module      : Text.EDE.Internal.Checker.Monad
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -12,16 +13,22 @@
 
 module Text.EDE.Internal.Checker.Monad where
 
-import Control.Applicative
-import Control.Monad
-import Data.Monoid
-import Text.EDE.Internal.Checker.Substitution
-import Text.EDE.Internal.Checker.Unification
-import Text.EDE.Internal.Types
+import           Control.Applicative
+import           Control.Monad
+import           Data.HashMap.Strict                    (HashMap)
+import qualified Data.HashMap.Strict                    as Map
+import           Data.Monoid
+import           Text.EDE.Internal.Checker.Class        (ClassEnv)
+import           Text.EDE.Internal.Checker.Substitution
+import           Text.EDE.Internal.Checker.Unification
+import           Text.EDE.Internal.Types
 
 data State = State
-    { substitutions :: Subst
-    , supply        :: [Kind -> TVar]
+    { classes :: ClassEnv
+    , globals :: HashMap Id Scheme
+    , locals  :: HashMap Id Scheme
+    , substs  :: Subst
+    , supply  :: [Kind -> TVar]
     }
 
 newtype Check a = Check { runCheck :: State -> (State, Either String a) }
@@ -42,24 +49,52 @@ instance Monad Check where
             (s', Left  e) -> (s', Left e)
             (s', Right x) -> runCheck (k x) s'
 
-evalCheck :: Check a -> Either String a
-evalCheck c = snd . runCheck c $
-    State mempty (map (\i k -> TV [i] k) $ cycle ['a'..'z'])
+evalCheck :: ClassEnv -> [Assump] -> Check a -> Either String a
+evalCheck ce as c = snd . runCheck c $ State
+    { classes = ce
+    , globals = Map.fromList [(i, s) | i :>: s <- as]
+    , locals  = mempty
+    , substs  = mempty
+    , supply  = map (\i k -> TV [i] k) (cycle ['a'..'z'])
+    }
 
-unify :: Type -> Type -> Check ()
-unify t1 t2 = do
-    s' <- gets substitutions
-    u  <- mgu (apply s' t1) (apply s' t2)
-    modify $ \s -> s { substitutions = u <> s' }
+find :: Id -> Check (Maybe Scheme)
+find i = Map.lookup i <$> gets locals
 
-freshTVar :: Kind -> Check Type
-freshTVar k = do
-    f:fs <- gets supply
+-- | Extend the local environment with new assumptions.
+extend :: [Assump] -> Check a -> Check a
+extend as c = Check $ \s@State{..} ->
+    (s, evalCheck classes [i :>: s | (i, s) <- Map.toList globals] c)
+
+-- | Introduce a global variable, or refine an existing one.
+global :: Id -> Check (Qual Type)
+global i = do
+    gs <- gets globals
+    -- FIXME: compare supplied scheme with existing
+    -- unify
+    case Map.lookup i gs of
+        Just (Forall _ q) -> return q
+        Nothing           -> do
+             v <- local Star
+             let q = [] :=> v
+             modify $ \s -> s { globals = Map.insert i (Forall [] q) gs }
+             return q
+
+-- | Introduce a unique local variable.
+local :: Kind -> Check Type
+local k = do
+    f : fs <- gets supply
     modify $ \s -> s { supply = fs }
     return $ TVar (f k)
 
-freshInst :: Scheme -> Check (Qual Type)
-freshInst (Forall ks qt) = (`inst` qt) <$> mapM freshTVar ks
+instantiate :: Scheme -> Check (Qual Type)
+instantiate (Forall ks qt) = (`inst` qt) <$> mapM local ks
+
+unify :: Type -> Type -> Check ()
+unify t1 t2 = do
+    s' <- gets substs
+    u  <- mgu (apply s' t1) (apply s' t2)
+    modify $ \s -> s { substs = u <> s' }
 
 gets :: (State -> a) -> Check a
 gets = (`fmap` get)

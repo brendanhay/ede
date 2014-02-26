@@ -13,10 +13,6 @@
 
 module Text.EDE.Internal.Types where
 
-import           Data.HashSet                 (HashSet)
-import qualified Data.HashSet                 as Set
-import           Data.Hashable                (Hashable)
-import           Data.List                    (union)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Scientific
@@ -30,10 +26,7 @@ data Meta = Meta
     { metaName :: String
     , metaRow  :: Int
     , metaCol  :: Int
-    } deriving (Eq)
-
-instance Show Meta where
-    show = prettyShow
+    } deriving (Eq, Show)
 
 instance Pretty Meta where
     pretty Meta{..} =
@@ -51,9 +44,7 @@ data Pat
     | PVar Id           -- ^ x
     | PLit Lit          -- ^ 123
     | PCon Assump [Pat] -- ^ ?
-
-instance Show Pat where
-    show = prettyShow
+      deriving (Show)
 
 instance Pretty Pat where
     pretty PWildcard   = char '_'
@@ -62,9 +53,7 @@ instance Pretty Pat where
     pretty (PCon a ps) = pretty a <+> prettyList ps
 
 data Alt = Alt Pat Exp
-
-instance Show Alt where
-    show = prettyShow
+    deriving (Show)
 
 instance Pretty Alt where
     pretty (Alt p e) = pretty p <+> "=" <+> pretty e
@@ -74,9 +63,7 @@ data Lit
     | LChar Char
     | LText Text
     | LBool Bool
-
-instance Show Lit where
-    show = prettyShow
+      deriving (Show)
 
 instance Pretty Lit where
     pretty (LNum s) = text (LText.toLazyText bld)
@@ -93,9 +80,7 @@ data Exp
     | ELit Lit
     | ELet Id  [Alt] Exp
     | EApp Exp Exp
-
-instance Show Exp where
-    show = prettyShow
+      deriving (Show)
 
 instance Pretty Exp where
     pretty (EVar n)       = fromString n
@@ -155,29 +140,20 @@ eif = flip (foldr branch)
 data Kind
     = Star
     | KFun Kind Kind
-      deriving (Eq)
-
-instance Show Kind where
-    show = prettyShow
+      deriving (Eq, Show)
 
 instance Pretty Kind where
     pretty Star       = text "*"
     pretty (KFun x y) = parens $ pretty x <+> "->" <+> pretty y
 
 data TVar = TV Id Kind
-      deriving (Eq)
-
-instance Show TVar where
-    show = prettyShow
+      deriving (Eq, Show)
 
 instance Pretty TVar where
     pretty (TV v _) = fromString v
 
 data TCon = TC Id Kind
-      deriving (Eq)
-
-instance Show TCon where
-    show = prettyShow
+      deriving (Eq, Show)
 
 instance Pretty TCon where
     pretty (TC c _) = fromString c
@@ -187,10 +163,7 @@ data Type
     | TCon TCon
     | TApp Type Type
     | TGen Int
-      deriving (Eq)
-
-instance Show Type where
-    show = prettyShow
+      deriving (Eq, Show)
 
 instance Pretty Type where
     pretty (TVar v)   = pretty v
@@ -215,28 +188,19 @@ pair :: Type -> Type -> Type
 pair a b = (ttuple2 `TApp` a) `TApp` b
 
 data Qual a = [Pred] :=> a
-      deriving (Eq)
-
-instance Pretty a => Show (Qual a) where
-    show = prettyShow
+    deriving (Eq, Show)
 
 instance Pretty a => Pretty (Qual a) where
     pretty (ps :=> t) = (pretty ps <+> text "=>") $$ nest 2 (pretty t)
 
 data Pred = IsIn Id Type
-      deriving (Eq)
-
-instance Show Pred where
-    show = prettyShow
+    deriving (Eq, Show)
 
 instance Pretty Pred where
-    pretty (IsIn i t) = text "isIn1" <+> fromString ('c' : i) <+> pretty t
+    pretty (IsIn i t) = fromString i <+> pretty t
 
 data Scheme = Forall [Kind] (Qual Type)
-      deriving (Eq)
-
-instance Show Scheme where
-    show = prettyShow
+    deriving (Eq, Show)
 
 instance Pretty Scheme where
     pretty (Forall ks qt) = (text "forall" <+> pretty ks <+> ".") $$ nest 2 (pretty qt)
@@ -248,34 +212,26 @@ false = "false" :>: Forall [] ([] :=> tbool)
 true  = "true"  :>: Forall [] ([] :=> tbool)
 
 data Assump = Id :>: Scheme
-
-instance Show Assump where
-    show = prettyShow
+    deriving (Show)
 
 instance Pretty Assump where
     pretty (i :>: s) = (fromString i <+> ":>:") $$ nest 2 (pretty s)
 
-find :: Monad m => Id -> [Assump] -> m Scheme
-find i [] = fail ("unbound identifier: " ++ i)
-find i ((i' :>: sc) : as)
-    | i == i'   = return sc
-    | otherwise = find i as
-
 class HasKind a where
-    kind :: a -> Kind
+    kind :: a -> Maybe Kind
 
 instance HasKind TVar where
-    kind (TV v k) = k
+    kind (TV v k) = Just k
 
 instance HasKind TCon where
-    kind (TC v k) = k
+    kind (TC v k) = Just k
 
 instance HasKind Type where
-    kind (TCon tc)  = kind tc
-    kind (TVar u)   = kind u
-    kind (TApp t _) =
-        case kind t of
-            (KFun _ k) -> k
+    kind (TCon tc)                  = kind tc
+    kind (TVar u)                   = kind u
+    kind (TApp t _)
+        | Just (KFun _ k) <- kind t = Just k
+    kind _                          = Nothing
 
 class Instantiate a where
     inst :: [Type] -> a -> a
