@@ -17,6 +17,7 @@ import           Control.Arrow
 import           Control.Monad
 import           Data.Foldable           (foldl')
 import           Data.Functor.Identity
+import           Data.List               (intersperse)
 import qualified Data.Text               as Text
 import           Prelude                 hiding (show)
 import           Safe                    (readMay)
@@ -40,13 +41,21 @@ runParser :: (Token -> String)
 runParser f name parser = Parsec.runParser parser (ParserState f name) name
 
 pDoc :: Parser Exp
-pDoc = fst <$> pAppM (pFragM <|> pExpM)
+pDoc = app $ pFragM <|> pIdentM <|> pExpM
+  where
+    app :: Parser (Exp, Meta) -> Parser Exp
+    app p = do
+        (x, _) <- p
+        xs     <- map fst <$> many1 p <|> return []
+        return $ foldl' (\a e -> eapp [evar "mappend", a, e]) x xs
+        -- alternative associativty:
+        -- return $ foldr (\e a -> eapp [evar "mappend", a, e]) x xs
 
 pFragM :: Parser (Exp, Meta)
 pFragM = do
     (c, m) <- pTokMaybeM f <?> "a fragment"
     cs     <- manyTill (pTokMaybeM f) (try . lookAhead $ void (pTokMaybeM g) <|> eof)
-    return (ELit m (LText . Text.pack $ c : map fst cs), m)
+    return (elit (LText . Text.pack $ c : map fst cs), m)
   where
     f (KFrag c) = Just c
     f _         = Nothing
@@ -54,75 +63,81 @@ pFragM = do
     g (KFrag _) = Nothing
     g _         = Just ()
 
+pIdentM :: Parser (Exp, Meta)
+pIdentM = do
+    (_, m) <- pTokM KIdentL
+    v      <- pVar <* pTok KIdentR
+    return (v, m)
+
 pExp :: Parser Exp
 pExp = fst <$> pExpM
 
 pExpM :: Parser (Exp, Meta)
 pExpM = choice
     [ -- assign <name> = <exp>
-      try $ do
-        (_, m) <- pTokM KSectionL
-        n      <- pTok  KAssign *> pVar
-        b      <- pTok  (KOp "=") *> pExp <* pTok KSectionR
-        return (ELet m (UName n) b, m)
+      -- try $ do
+      --   (_, m) <- pTokM KSectionL
+      --   n      <- pTok  KAssign *> pId
+      --   b      <- pTok  (KOp "=") *> pExp <* pTok KSectionR
+      --   return (elet n b, m)
 
-      -- capture <name> ...
-    , try $ do
-        (_, m) <- pTokM KSectionL
-        n      <- pTok  KCapture *> pVar
-        b      <- pTok  KSectionR *> pExp <* pSection KEndCapture
-        return (ELet m (UName n) b, m)
+    --   -- capture <name> ...
+    -- , try $ do
+    --     (_, m) <- pTokM KSectionL
+    --     n      <- pTok  KCapture *> pId
+    --     b      <- pTok  KSectionR *> pExp <* pSection KEndCapture
+    --     return (ELet m (UName n) b, m)
 
-      -- if [<alt>]
-    , try $ do
-        (_, m) <- pTokM KSectionL
-        s      <- pTok  KIf *> pExp
-        c      <- pTok  KSectionR *> pExp
-        as     <- pAlts KElseIf KEndIf
-        return (ECond m (ACond s c : as), m)
+    --   -- if [<alt>]
+    -- , try $ do
+    --     (_, m) <- pTokM KSectionL
+    --     s      <- pTok  KIf *> pExp
+    --     c      <- pTok  KSectionR *> pExp
+    --     as     <- pAlts KElseIf KEndIf
+    --     return (ECond m (ACond s c : as), m)
 
-      -- case <exp> [<alt>]
-    , try $ do
-        (_, m) <- pTokM KSectionL
-        s      <- pTok  KCase *> pExp <* pTok KSectionR
-        as     <- pAlts KWhen KEndCase
-        return (ECase m s as, m)
+    --   -- case <exp> [<alt>]
+    -- , try $ do
+    --     (_, m) <- pTokM KSectionL
+    --     s      <- pTok  KCase *> pExp <* pTok KSectionR
+    --     as     <- pAlts KWhen KEndCase
+    --     return (ECase m s as, m)
 
-      -- for <name> in <exp>
-    , try $ do
-        (_, m) <- pTokM KSectionL
-        n      <- pTok  KFor *> pVar
-        s      <- pTok  KIn  *> pExp <* pTok KSectionR
-        ma     <- optionMaybe (pDefault KEndCase)
-        return (ELoop m (UName n) s ma, m)
+    --   -- for <name> in <exp>
+    -- , try $ do
+    --     (_, m) <- pTokM KSectionL
+    --     n      <- pTok  KFor *> pId
+    --     s      <- pTok  KIn  *> pExp <* pTok KSectionR
+    --     ma     <- optionMaybe (pDefault KEndCase)
+    --     return (ELoop m (UName n) s ma, m)
 
-      -- include <exp> [with <exp>]
-    , try $ do
-         (_, m) <- pTokM KSectionL
-         n      <- pTok  KInclude *> pVar
-         mw     <- optionMaybe (pTok KWith >> pExp) <* pTok KSectionR
-         return (EIncl m (UName n) mw, m)
+    --   -- include <exp> [with <exp>]
+    -- , try $ do
+    --      (_, m) <- pTokM KSectionL
+    --      n      <- pTok  KInclude *> pId
+    --      mw     <- optionMaybe (pTok KWith >> pExp) <* pTok KSectionR
+    --      return (EIncl m (UName n) mw, m)
 
       -- APP1 APP2
-    , pAppM pAtomM
+      pAppM pAtomM
     ] <?> "an expression"
 
-pAlts :: TokAtom -> TokAtom -> Parser [Alt]
-pAlts begin end = (<?> "an alternate expression") $
-        try pCons
-    <|> try ((:[]) <$> pDefault end)
-    <|> pEnd
-  where
-    pCons = do
-        s <- (pTok KSectionL >> pTok begin) *> pExp <* pTok KSectionR
-        c <- pExp
-        (ACond s c :) <$> pAlts begin end
+-- pAlts :: TokAtom -> TokAtom -> Parser [Alt]
+-- pAlts begin end = (<?> "an alternate expression") $
+--         try pCons
+--     <|> try ((:[]) <$> pDefault end)
+--     <|> pEnd
+--   where
+--     pCons = do
+--         s <- (pTok KSectionL >> pTok begin) *> pExp <* pTok KSectionR
+--         c <- pExp
+--         (Alt s c :) <$> pAlts begin end
 
-    pEnd = pSection end >> return []
+--     pEnd = pSection end >> return []
 
-pDefault :: TokAtom -> Parser Alt
-pDefault end = ADefault <$> (pSection KElse *> pExp <* pSection end)
-    <?> "an else expression"
+-- pDefault :: TokAtom -> Parser Alt
+-- pDefault end = ADefault <$> (pSection KElse *> pExp <* pSection end)
+--     <?> "an else expression"
 
 pSection :: TokAtom -> Parser ()
 pSection k = do
@@ -134,33 +149,35 @@ pSection k = do
 pAppM :: Parser (Exp, Meta) -> Parser (Exp, Meta)
 pAppM p = do
     (x, m) <- p
-    res    <- choice
-        [ foldl' (\y (z, n) -> EApp n y z) x <$> many1 p
-        , return x
-        ]
+    res    <- choice [eapp . (x:) . map fst <$> many1 p, return x]
     return (res, m)
 
 pAtomM :: Parser (Exp, Meta)
 pAtomM = choice
     [ -- (EXP)
-      do (_, m) <- pTokM KParenL
-         t      <- pExp <* pTok KParenR
-         return (t, m)
+      -- do (_, m) <- pTokM KParenL
+      --    t      <- pExp <* pTok KParenR
+      --    return (t, m)
 
       -- literals
-    , do (l, m) <- pLitM
-         return (ELit m l, m)
+      do (l, m) <- pLitM
+         return (elit l, m)
 
       -- variables
-    , do (v, m) <- pVarM
-         return (EVar m (UName v), m)
+    , pVarM
     ]
 
-pVar :: Parser String
+pVar :: Parser Exp
 pVar = fst <$> pVarM
 
-pVarM :: Parser (String, Meta)
-pVarM = pTokMaybeM f <?> "a variable"
+pVarM :: Parser (Exp, Meta)
+pVarM = first evar <$> pIdM
+
+pId :: Parser Id
+pId = fst <$> pIdM
+
+pIdM :: Parser (Id, Meta)
+pIdM = pTokMaybeM f <?> "a variable"
   where
     f (KPrim (KVar n)) = Just n
     f _                = Nothing

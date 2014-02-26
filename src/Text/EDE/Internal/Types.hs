@@ -19,10 +19,11 @@ import           Data.Hashable                (Hashable)
 import           Data.List                    (union)
 import           Data.Maybe
 import           Data.Monoid
-import           Data.Scientific              (Scientific)
+import           Data.Scientific
 import           Data.String
 import           Data.Text                    (Text)
 import qualified Data.Text.Lazy               as LText
+import qualified Data.Text.Lazy.Builder       as LText
 import           Text.PrettyPrint.Leijen.Text hiding ((<>), list)
 
 data Meta = Meta
@@ -50,27 +51,73 @@ data Pat
     | PVar Id           -- ^ x
     | PLit Lit          -- ^ 123
     | PCon Assump [Pat] -- ^ ?
-      deriving (Show)
+
+instance Show Pat where
+    show = prettyShow
+
+instance Pretty Pat where
+    pretty PWildcard   = char '_'
+    pretty (PVar i)    = fromString i
+    pretty (PLit l)    = pretty l
+    pretty (PCon a ps) = pretty a <+> prettyList ps
 
 data Alt = Alt Pat Exp
-    deriving (Show)
 
-data Bind = Bind Id [Alt]
-    deriving (Show)
+instance Show Alt where
+    show = prettyShow
+
+instance Pretty Alt where
+    pretty (Alt p e) = pretty p <+> "=" <+> pretty e
 
 data Lit
-    = LInt  Integer
+    = LNum  Scientific
     | LChar Char
-    | LStr  String
+    | LText Text
     | LBool Bool
-      deriving (Show)
+
+instance Show Lit where
+    show = prettyShow
+
+instance Pretty Lit where
+    pretty (LNum s) = text (LText.toLazyText bld)
+      where
+        bld | base10Exponent s == 0 = formatScientificBuilder Fixed (Just 0) s
+            | otherwise             = scientificBuilder s
+
+    pretty (LChar c) = squotes (char c)
+    pretty (LText t) = dquotes (text $ LText.fromStrict t)
+    pretty (LBool b) = bool b
 
 data Exp
     = EVar Id
     | ELit Lit
-    | ELet Bind Exp
-    | EApp Exp  Exp
-      deriving (Show)
+    | ELet Id  [Alt] Exp
+    | EApp Exp Exp
+
+instance Show Exp where
+    show = prettyShow
+
+instance Pretty Exp where
+    pretty (EVar n)       = fromString n
+    pretty (ELit l)       = pretty l
+    pretty (EApp e1 e2)   = pprApp $ EApp e1 e2
+    pretty (ELet v rhs b) = sep
+        [ "let {"
+        , nest 2 (fromString v <+> "=" <+> pretty rhs <+> char '}')
+        , "in"
+        , pretty b
+        ]
+
+pprApp :: Exp -> Doc
+pprApp e = go e []
+  where
+    go (EApp e1 e2) es = go e1 (e2:es)
+    go e' es           = pprParendTerm e' <+> sep (map pprParendTerm es)
+
+    pprParendTerm :: Exp -> Doc
+    pprParendTerm e@(EVar _) = pretty e
+    pprParendTerm e@(ELit _) = pretty e
+    pprParendTerm e          = parens (pretty e)
 
 evar :: Id -> Exp
 evar = EVar
@@ -79,13 +126,26 @@ elit :: Lit -> Exp
 elit = ELit
 
 elet :: Id -> [Alt] -> Exp -> Exp
-elet n as = ELet (Bind n as)
+elet = ELet
 
 eapp :: [Exp] -> Exp
 eapp = foldl1 EApp
 
+-- | let _lambda p = e in _lambda
+eabs :: Pat -> Exp -> Exp
+eabs p e = elet "_lambda" [Alt p e] (evar "_lambda")
+
+-- | \_for -> foldMap (\p -> e) _for
+efor :: Pat -> Exp -> Exp
+efor p e = eabs (PVar "_for") $ eapp [evar "foldMap", eabs p e, evar "_for"]
+
+-- \meta current ->
+--     let pat  = current
+--     in  exp
+
+-- | let _case as in _case p
 ecase :: Exp -> [Alt] -> Exp
-ecase p as = elet "_case" as $ eapp [evar "_case", p]
+ecase p as = elet "_case" as (eapp [evar "_case", p])
 
 eif :: [(Exp, Exp)] -> Exp -> Exp
 eif = flip (foldr branch)
@@ -105,7 +165,7 @@ instance Pretty Kind where
     pretty (KFun x y) = parens $ pretty x <+> "->" <+> pretty y
 
 data TVar = TV Id Kind
-    deriving (Eq)
+      deriving (Eq)
 
 instance Show TVar where
     show = prettyShow
@@ -114,7 +174,7 @@ instance Pretty TVar where
     pretty (TV v _) = fromString v
 
 data TCon = TC Id Kind
-    deriving (Eq)
+      deriving (Eq)
 
 instance Show TCon where
     show = prettyShow
@@ -138,28 +198,24 @@ instance Pretty Type where
     pretty (TApp l r) = parens $ pretty l <+> "->" <+> pretty r
     pretty (TGen n)   = parens $ int n
 
-infixr 4 -->
-(-->) :: Type -> Type -> Type
-(-->) a b = TApp (TApp tarrow a) b
+tnumber  = TCon (TC "Number" Star)
+tchar    = TCon (TC "Char"   Star)
+tbool    = TCon (TC "Bool"   Star)
+tlist    = TCon (TC "[]"     (KFun Star Star))
+tarrow   = TCon (TC "(->)"   (KFun Star (KFun Star Star)))
+ttuple2  = TCon (TC "(,)"    (KFun Star (KFun Star Star)))
 
-tinteger = TCon (TC "Int"  Star)
-tchar    = TCon (TC "Char" Star)
-tbool    = TCon (TC "Bool" Star)
-tlist    = TCon (TC "[]"   (KFun Star Star))
-tarrow   = TCon (TC "(->)" (KFun Star (KFun Star Star)))
-ttuple2  = TCon (TC "(,)"  (KFun Star (KFun Star Star)))
-
-tstring :: Type
-tstring = list tchar
+ttext :: Type
+ttext = list tchar
 
 list :: Type -> Type
-list t = tlist --> t
+list = TApp tlist
 
 pair :: Type -> Type -> Type
-pair a b = (ttuple2 --> a) --> b
+pair a b = (ttuple2 `TApp` a) `TApp` b
 
 data Qual a = [Pred] :=> a
-    deriving (Eq)
+      deriving (Eq)
 
 instance Pretty a => Show (Qual a) where
     show = prettyShow
@@ -168,7 +224,7 @@ instance Pretty a => Pretty (Qual a) where
     pretty (ps :=> t) = (pretty ps <+> text "=>") $$ nest 2 (pretty t)
 
 data Pred = IsIn Id Type
-    deriving (Eq)
+      deriving (Eq)
 
 instance Show Pred where
     show = prettyShow
@@ -177,7 +233,7 @@ instance Pretty Pred where
     pretty (IsIn i t) = text "isIn1" <+> fromString ('c' : i) <+> pretty t
 
 data Scheme = Forall [Kind] (Qual Type)
-    deriving (Eq)
+      deriving (Eq)
 
 instance Show Scheme where
     show = prettyShow
