@@ -41,24 +41,21 @@ class Types t where
     tv :: t -> [TVar]
 
 instance Types Type where
-    apply (Subst s) (TVar u) =
-        case lookup u s of
-            Just t  -> t
-            Nothing -> TVar u
-    apply s (TApp l r) = TApp (apply s l) (apply s r)
-    apply s t = t
+    apply (Subst s) (TVar u) = fromMaybe (TVar u) $ lookup u s
+    apply s (TApp l r)       = apply s l --> apply s r
+    apply s t                = t
 
-    tv (TVar u) = [u]
+    tv (TVar u)   = [u]
     tv (TApp l r) = tv l `union` tv r
-    tv t = []
+    tv t          = []
 
 instance Types a => Types [a] where
     apply s = map (apply s)
-    tv = nub . concat . map tv
+    tv      = nub . concatMap tv
 
 instance Types t => Types (Qual t) where
     apply s (ps :=> t) = apply s ps :=> apply s t
-    tv (ps :=> t) = tv ps `union` tv t
+    tv (ps :=> t)      = tv ps `union` tv t
 
 instance Types Pred where
     apply s (IsIn i t) = IsIn i (apply s t)
@@ -66,8 +63,8 @@ instance Types Pred where
 
 instance Types Scheme where
     apply s (Forall ks qt) = Forall ks (apply s qt)
-    tv (Forall ks qt) = tv qt
+    tv (Forall ks qt)      = tv qt
 
 instance Types Assump where
-    apply s (i :>: sc) = i :>: (apply s sc)
-    tv (i :>: sc) = tv sc
+    apply s (i :>: sc) = i :>: apply s sc
+    tv (i :>: sc)      = tv sc

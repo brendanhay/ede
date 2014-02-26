@@ -1,10 +1,5 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -85,7 +80,7 @@ elit :: Lit -> Exp
 elit = ELit
 
 elet :: Id -> [Alt] -> Exp -> Exp
-elet n as x = ELet (Bind n as) x
+elet n as = ELet (Bind n as)
 
 eapp :: [Exp] -> Exp
 eapp = foldl1 EApp
@@ -93,8 +88,10 @@ eapp = foldl1 EApp
 ecase :: Exp -> [Alt] -> Exp
 ecase p as = elet "_case" as $ eapp [evar "_case", p]
 
-eif :: Exp -> Exp -> Exp -> Exp
-eif p t f = ecase p [Alt (PCon true []) t, Alt (PCon false []) f]
+eif :: [(Exp, Exp)] -> Exp -> Exp
+eif = flip (foldr eif)
+  where
+    eif (p, t) f = ecase p [Alt (PCon true []) t, Alt (PCon false []) f]
 
 data Kind
     = Star
@@ -178,7 +175,7 @@ instance Show Pred where
     show = prettyShow
 
 instance Pretty Pred where
-    pretty (IsIn i t) = text "isIn1" <+> fromString ("c" ++ i) <+> pretty t
+    pretty (IsIn i t) = text "isIn1" <+> fromString ('c' : i) <+> pretty t
 
 data Scheme = Forall [Kind] (Qual Type)
     deriving (Eq)
@@ -192,8 +189,8 @@ instance Pretty Scheme where
 scheme :: Type -> Scheme
 scheme t = Forall [] ([] :=> t)
 
-false = "false" :>: (Forall [] ([] :=> tbool))
-true  = "true"  :>: (Forall [] ([] :=> tbool))
+false = "false" :>: Forall [] ([] :=> tbool)
+true  = "true"  :>: Forall [] ([] :=> tbool)
 
 data Assump = Id :>: Scheme
 
@@ -222,7 +219,7 @@ instance HasKind Type where
     kind (TCon tc)  = kind tc
     kind (TVar u)   = kind u
     kind (TApp t _) =
-        case (kind t) of
+        case kind t of
             (KFun _ k) -> k
 
 class Instantiate a where

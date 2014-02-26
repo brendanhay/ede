@@ -49,7 +49,7 @@ modify ce i c = ce
 initialEnv :: ClassEnv
 initialEnv = ClassEnv
     { classes  = \i -> fail "class not defined"
-    , defaults = [tInteger]
+    , defaults = [tinteger]
     }
 
 type EnvTransformer = ClassEnv -> Maybe ClassEnv
