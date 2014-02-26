@@ -51,6 +51,19 @@ instance Pretty Meta where
 
 type Id = String
 
+data Pat
+    = PWildcard         -- ^ _
+    | PVar Id           -- ^ x
+    | PLit Lit          -- ^ 123
+    | PCon Assump [Pat] -- ^ ?
+      deriving (Show)
+
+data Alt = Alt Pat Exp
+    deriving (Show)
+
+data Bind = Bind Id [Alt]
+    deriving (Show)
+
 data Lit
     = LInt  Integer
     | LChar Char
@@ -61,9 +74,27 @@ data Lit
 data Exp
     = EVar Id
     | ELit Lit
-    | EApp Exp Exp
-    | ELet Id   Exp Exp
+    | ELet Bind Exp
+    | EApp Exp  Exp
       deriving (Show)
+
+evar :: Id -> Exp
+evar = EVar
+
+elit :: Lit -> Exp
+elit = ELit
+
+elet :: Id -> [Alt] -> Exp -> Exp
+elet n as x = ELet (Bind n as) x
+
+eapp :: [Exp] -> Exp
+eapp = foldl1 EApp
+
+ecase :: Exp -> [Alt] -> Exp
+ecase p as = elet "_case" as $ eapp [evar "_case", p]
+
+eif :: Exp -> Exp -> Exp -> Exp
+eif p t f = ecase p [Alt (PCon true []) t, Alt (PCon false []) f]
 
 data Kind
     = Star
@@ -95,13 +126,6 @@ instance Show TCon where
 instance Pretty TCon where
     pretty (TC c _) = fromString c
 
-tInteger = TCon (TC "Int"  Star)
-tChar    = TCon (TC "Char" Star)
-tBool    = TCon (TC "Bool" Star)
-tList    = TCon (TC "[]"   (KFun Star Star))
-tArrow   = TCon (TC "(->)" (KFun Star (KFun Star Star)))
-tTuple2  = TCon (TC "(,)"  (KFun Star (KFun Star Star)))
-
 data Type
     = TVar TVar
     | TCon TCon
@@ -118,27 +142,40 @@ instance Pretty Type where
     pretty (TApp l r) = parens $ pretty l <+> "->" <+> pretty r
     pretty (TGen n)   = parens $ int n
 
-tString :: Type
-tString = list tChar
-
 infixr 4 -->
 (-->) :: Type -> Type -> Type
-(-->) a b = TApp (TApp tArrow a) b
+(-->) a b = TApp (TApp tarrow a) b
+
+tinteger = TCon (TC "Int"  Star)
+tchar    = TCon (TC "Char" Star)
+tbool    = TCon (TC "Bool" Star)
+tlist    = TCon (TC "[]"   (KFun Star Star))
+tarrow   = TCon (TC "(->)" (KFun Star (KFun Star Star)))
+ttuple2  = TCon (TC "(,)"  (KFun Star (KFun Star Star)))
+
+tstring :: Type
+tstring = list tchar
 
 list :: Type -> Type
-list t = TApp tList t
+list t = tlist --> t
 
 pair :: Type -> Type -> Type
-pair a b = TApp (TApp tTuple2 a) b
+pair a b = (ttuple2 --> a) --> b
 
 data Qual a = [Pred] :=> a
     deriving (Eq)
 
-instance Pretty t => Pretty (Qual t) where
+instance Pretty a => Show (Qual a) where
+    show = prettyShow
+
+instance Pretty a => Pretty (Qual a) where
     pretty (ps :=> t) = (pretty ps <+> text "=>") $$ nest 2 (pretty t)
 
 data Pred = IsIn Id Type
     deriving (Eq)
+
+instance Show Pred where
+    show = prettyShow
 
 instance Pretty Pred where
     pretty (IsIn i t) = text "isIn1" <+> fromString ("c" ++ i) <+> pretty t
@@ -146,13 +183,22 @@ instance Pretty Pred where
 data Scheme = Forall [Kind] (Qual Type)
     deriving (Eq)
 
+instance Show Scheme where
+    show = prettyShow
+
 instance Pretty Scheme where
     pretty (Forall ks qt) = (text "forall" <+> pretty ks <+> ".") $$ nest 2 (pretty qt)
 
-toScheme :: Type -> Scheme
-toScheme t = Forall [] ([] :=> t)
+scheme :: Type -> Scheme
+scheme t = Forall [] ([] :=> t)
+
+false = "false" :>: (Forall [] ([] :=> tbool))
+true  = "true"  :>: (Forall [] ([] :=> tbool))
 
 data Assump = Id :>: Scheme
+
+instance Show Assump where
+    show = prettyShow
 
 instance Pretty Assump where
     pretty (i :>: s) = (fromString i <+> ":>:") $$ nest 2 (pretty s)
