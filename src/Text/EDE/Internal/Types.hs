@@ -13,7 +13,6 @@
 
 module Text.EDE.Internal.Types where
 
--- import           Control.Applicative
 import           Data.HashSet                 (HashSet)
 import qualified Data.HashSet                 as Set
 import           Data.Hashable                (Hashable)
@@ -89,9 +88,9 @@ ecase :: Exp -> [Alt] -> Exp
 ecase p as = elet "_case" as $ eapp [evar "_case", p]
 
 eif :: [(Exp, Exp)] -> Exp -> Exp
-eif = flip (foldr eif)
+eif = flip (foldr branch)
   where
-    eif (p, t) f = ecase p [Alt (PCon true []) t, Alt (PCon false []) f]
+    branch (p, t) f = ecase p [Alt (PCon true []) t, Alt (PCon false []) f]
 
 data Kind
     = Star
