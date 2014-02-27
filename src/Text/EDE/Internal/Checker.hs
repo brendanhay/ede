@@ -10,11 +10,13 @@
 
 module Text.EDE.Internal.Checker where
 
-import Control.Monad
-import Data.Maybe
-import Text.EDE.Internal.Checker.Class
-import Text.EDE.Internal.Checker.Monad
-import Text.EDE.Internal.Types
+import           Control.Monad
+import           Data.HashMap.Strict             (HashMap)
+import qualified Data.HashMap.Strict             as Map
+import           Data.Maybe
+import           Text.EDE.Internal.Checker.Class
+import           Text.EDE.Internal.Checker.Monad
+import           Text.EDE.Internal.Types
 
 infixr 4 -->
 (-->) :: Type -> Type -> Type
@@ -27,19 +29,17 @@ preludeClasses = fromJust $
    <:> addInst [] (IsIn "Monoid" ttext)
     ) initialEnv
 
-preludeFuns :: [Assump]
-preludeFuns =
-    [ "=="      :>: Forall [Star] ([IsIn "Eq" (TGen 0)] :=> (TGen 0 --> TGen 0 --> tbool))
-    , "mappend" :>: Forall [Star] ([IsIn "Monoid" (TGen 0)] :=> (TGen 0 --> TGen 0 --> TGen 0))
-    , "text"    :>: Forall [Star] ([] :=> ttext)
+preludeFuns :: HashMap Id Scheme
+preludeFuns = Map.fromList
+    [ ("==",      Forall [Star] $ [IsIn "Eq" (TGen 0)] :=> (TGen 0 --> TGen 0 --> tbool))
+    , ("mappend", Forall [Star] $ [IsIn "Monoid" (TGen 0)] :=> (TGen 0 --> TGen 0 --> TGen 0))
+    , ("text",    Forall [Star] $ [] :=> ttext)
     ]
 
 tiExp :: Exp -> Check (Qual Type)
 tiExp (EVar i) = do
     ms <- find i
-    maybe (global i >>= instantiate)
-          instantiate
-          ms
+    instantiate ms
 tiExp (ELit l) = do
     tiLit l
 tiExp (EApp e f) = do

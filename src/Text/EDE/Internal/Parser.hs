@@ -47,9 +47,9 @@ pDoc = f $ pFragM <|> pIdentM <|> pExpM
     f p = do
         (x, _) <- p
         xs     <- map fst <$> many1 p <|> return []
-        return $ foldl' (\a e -> eapp [evar "mappend", a, e]) x xs
+        return $ foldl' (\a e -> eapp [ebound "mappend", a, e]) x xs
         -- alternative associativty:
-        -- return $ foldr (\e a -> eapp [evar "mappend", a, e]) x xs
+        -- return $ foldr (\e a -> eapp [ebound "mappend", a, e]) x xs
 
 pFragM :: Parser (Exp, Meta)
 pFragM = do
@@ -164,14 +164,16 @@ pAtomM = choice
          return (elit l, m)
 
       -- variables
-    , pVarM
+    , pFreeM
     ]
 
-pVar :: Parser Exp
-pVar = fst <$> pVarM
+pBound, pFree :: Parser Exp
+pBound = fst <$> pBoundM
+pFree  = fst <$> pFreeM
 
-pVarM :: Parser (Exp, Meta)
-pVarM = first evar <$> pIdM
+pBoundM, pFreeM :: Parser (Exp, Meta)
+pBoundM = first ebound <$> pIdM
+pFreeM  = first efree  <$> pIdM
 
 pId :: Parser Id
 pId = fst <$> pIdM

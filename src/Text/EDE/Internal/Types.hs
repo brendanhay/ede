@@ -40,17 +40,19 @@ instance Pretty Meta where
 type Id = String
 
 data Pat
-    = PWildcard         -- ^ _
-    | PVar Id           -- ^ x
-    | PLit Lit          -- ^ 123
-    | PCon Assump [Pat] -- ^ ?
+    = PWildcard
+    | PVar Id
+    | PLit Lit
+    | PCon Id Scheme [Pat]
       deriving (Show)
 
 instance Pretty Pat where
-    pretty PWildcard   = char '_'
-    pretty (PVar i)    = fromString i
-    pretty (PLit l)    = pretty l
-    pretty (PCon a ps) = pretty a <+> prettyList ps
+    pretty PWildcard     = char '_'
+    pretty (PVar i)      = fromString i
+    pretty (PLit l)      = pretty l
+    pretty (PCon i s ps) = ann <+> prettyList ps
+      where
+        ann = (fromString i <+> "::") $$ nest 2 (pretty s)
 
 data Alt = Alt Pat Exp
     deriving (Show)
@@ -75,15 +77,24 @@ instance Pretty Lit where
     pretty (LText t) = dquotes (text $ LText.fromStrict t)
     pretty (LBool b) = bool b
 
+data Var
+    = Bound Id
+    | Free  Id
+      deriving (Show)
+
+instance Pretty Var where
+    pretty (Bound i) = fromString i
+    pretty (Free  i) = fromString i
+
 data Exp
-    = EVar Id
+    = EVar Var
     | ELit Lit
     | ELet Id  [Alt] Exp
     | EApp Exp Exp
       deriving (Show)
 
 instance Pretty Exp where
-    pretty (EVar n)       = fromString n
+    pretty (EVar v)       = pretty v
     pretty (ELit l)       = pretty l
     pretty (EApp e1 e2)   = pprApp $ EApp e1 e2
     pretty (ELet v rhs b) = sep
@@ -104,8 +115,9 @@ pprApp e = go e []
     pprParendTerm e@(ELit _) = pretty e
     pprParendTerm e          = parens (pretty e)
 
-evar :: Id -> Exp
-evar = EVar
+ebound, efree :: Id -> Exp
+ebound = EVar . Bound
+efree  = EVar . Free
 
 elit :: Lit -> Exp
 elit = ELit
@@ -118,24 +130,30 @@ eapp = foldl1 EApp
 
 -- | let _lambda p = e in _lambda
 eabs :: Pat -> Exp -> Exp
-eabs p e = elet "_lambda" [Alt p e] (evar "_lambda")
+eabs p e = elet "_lambda" [Alt p e] (ebound "_lambda")
 
 -- | \_for -> foldMap (\p -> e) _for
 efor :: Pat -> Exp -> Exp
-efor p e = eabs (PVar "_for") $ eapp [evar "foldMap", eabs p e, evar "_for"]
-
+efor p e = eabs (PVar "_for") $ eapp [ebound "foldMap", eabs p e, ebound "_for"]
 -- \meta current ->
 --     let pat  = current
 --     in  exp
 
 -- | let _case as in _case p
 ecase :: Exp -> [Alt] -> Exp
-ecase p as = elet "_case" as (eapp [evar "_case", p])
+ecase p as = elet "_case" as (eapp [ebound "_case", p])
 
 eif :: [(Exp, Exp)] -> Exp -> Exp
 eif = flip (foldr branch)
   where
-    branch (p, t) f = ecase p [Alt (PCon true []) t, Alt (PCon false []) f]
+    branch (p, t) f = ecase p [Alt true t, Alt false f]
+
+true, false :: Pat
+true  = PCon "true"  (Forall [] ([] :=> tbool)) []
+false = PCon "false" (Forall [] ([] :=> tbool)) []
+
+-- scheme :: Type -> Scheme
+-- scheme t = Forall [] ([] :=> t)
 
 data Kind
     = Star
@@ -191,6 +209,7 @@ data Qual a = [Pred] :=> a
     deriving (Eq, Show)
 
 instance Pretty a => Pretty (Qual a) where
+    pretty ([] :=> t) = pretty t
     pretty (ps :=> t) = (prettyList ps <+> text "=>") $$ nest 2 (pretty t)
 
 data Pred = IsIn Id Type
@@ -198,25 +217,14 @@ data Pred = IsIn Id Type
 
 instance Pretty Pred where
     pretty (IsIn i t) = fromString i <+> pretty t
-    prettyList        = tupled . map pretty
+    prettyList []     = mempty
+    prettyList ps     = encloseSep lparen rparen ", " $ map pretty ps
 
 data Scheme = Forall [Kind] (Qual Type)
     deriving (Eq, Show)
 
 instance Pretty Scheme where
     pretty (Forall ks qt) = (text "forall" <+> pretty ks <+> ".") $$ nest 2 (pretty qt)
-
-scheme :: Type -> Scheme
-scheme t = Forall [] ([] :=> t)
-
-false = "false" :>: Forall [] ([] :=> tbool)
-true  = "true"  :>: Forall [] ([] :=> tbool)
-
-data Assump = Id :>: Scheme
-    deriving (Show)
-
-instance Pretty Assump where
-    pretty (i :>: s) = (fromString i <+> ":>:") $$ nest 2 (pretty s)
 
 class HasKind a where
     kind :: a -> Maybe Kind

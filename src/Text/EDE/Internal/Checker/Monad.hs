@@ -17,6 +17,7 @@ import           Control.Applicative
 import           Control.Monad
 import           Data.HashMap.Strict                    (HashMap)
 import qualified Data.HashMap.Strict                    as Map
+import           Data.Maybe
 import           Data.Monoid
 import           Text.EDE.Internal.Checker.Class        (ClassEnv)
 import           Text.EDE.Internal.Checker.Substitution
@@ -49,36 +50,42 @@ instance Monad Check where
             (s', Left  e) -> (s', Left e)
             (s', Right x) -> runCheck (k x) s'
 
-evalCheck :: ClassEnv -> [Assump] -> Check a -> Either String a
+evalCheck :: ClassEnv -> HashMap Id Scheme -> Check a -> Either String a
 evalCheck ce as c = snd . runCheck c $ State
     { classes = ce
-    , globals = Map.fromList [(i, s) | i :>: s <- as]
-    , locals  = mempty
+    , globals = mempty
+    , locals  = as
     , substs  = mempty
     , supply  = map (\i k -> TV [i] k) (cycle ['a'..'z'])
     }
 
-find :: Id -> Check (Maybe Scheme)
-find i = Map.lookup i <$> gets locals
+find :: Var -> Check Scheme
+find v = f v =<< gets locals
+  where
+    f (Bound i) ls =
+        maybe (error $ "unbound identifier: " ++ i)
+              return
+              (Map.lookup i ls)
+    f (Free i) ls =
+        error " not implemeneted "
 
 -- | Extend the local environment with new assumptions.
-extend :: [Assump] -> Check a -> Check a
-extend as c = Check $ \s@State{..} ->
-    (s, evalCheck classes [i :>: s | (i, s) <- Map.toList globals] c)
+extend :: HashMap Id Scheme -> Check a -> Check a
+extend as c = Check $ \s@State{..} -> (s, evalCheck classes globals c)
 
--- | Introduce a global variable, or refine an existing one.
-global :: Id -> Check Scheme
-global i = do
-    gs <- gets globals
-    -- FIXME: compare supplied scheme with existing
-    -- unify
-    case Map.lookup i gs of
-        Just x -> return x
-        Nothing           -> do
-             v <- local Star
-             let q = (Forall [Star] $ [] :=> v)
-             modify $ \s -> s { globals = Map.insert i q gs }
-             return q
+-- -- | Introduce a global variable, or refine an existing one.
+-- global :: Id -> Check Scheme
+-- global i = do
+--     gs <- gets globals
+--     -- FIXME: compare supplied scheme with existing
+--     -- unify
+--     case Map.lookup i gs of
+--         Just x -> return x
+--         Nothing           -> do
+--              v <- local Star
+--              let q = (Forall [Star] $ [] :=> v)
+--              modify $ \s -> s { globals = Map.insert i q gs }
+--              return q
 
 -- | Introduce a unique local variable.
 local :: Kind -> Check Type

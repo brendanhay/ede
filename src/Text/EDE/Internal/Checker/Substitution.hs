@@ -65,6 +65,6 @@ instance Types Scheme where
     apply s (Forall ks qt) = Forall ks (apply s qt)
     tv (Forall ks qt)      = tv qt
 
-instance Types Assump where
-    apply s (i :>: sc) = i :>: apply s sc
-    tv (i :>: sc)      = tv sc
+-- instance Types (HashMap Id Scheme) where
+--     apply s (i :>: sc) = i :>: apply s sc
+--     tv (i :>: sc)      = tv sc
