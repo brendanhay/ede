@@ -67,17 +67,17 @@ extend as c = Check $ \s@State{..} ->
     (s, evalCheck classes [i :>: s | (i, s) <- Map.toList globals] c)
 
 -- | Introduce a global variable, or refine an existing one.
-global :: Id -> Check (Qual Type)
+global :: Id -> Check Scheme
 global i = do
     gs <- gets globals
     -- FIXME: compare supplied scheme with existing
     -- unify
     case Map.lookup i gs of
-        Just (Forall _ q) -> return q
+        Just x -> return x
         Nothing           -> do
              v <- local Star
-             let q = [] :=> v
-             modify $ \s -> s { globals = Map.insert i (Forall [] q) gs }
+             let q = (Forall [Star] $ [] :=> v)
+             modify $ \s -> s { globals = Map.insert i q gs }
              return q
 
 -- | Introduce a unique local variable.

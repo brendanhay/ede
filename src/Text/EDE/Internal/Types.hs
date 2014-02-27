@@ -191,13 +191,14 @@ data Qual a = [Pred] :=> a
     deriving (Eq, Show)
 
 instance Pretty a => Pretty (Qual a) where
-    pretty (ps :=> t) = (pretty ps <+> text "=>") $$ nest 2 (pretty t)
+    pretty (ps :=> t) = (prettyList ps <+> text "=>") $$ nest 2 (pretty t)
 
 data Pred = IsIn Id Type
     deriving (Eq, Show)
 
 instance Pretty Pred where
     pretty (IsIn i t) = fromString i <+> pretty t
+    prettyList        = tupled . map pretty
 
 data Scheme = Forall [Kind] (Qual Type)
     deriving (Eq, Show)

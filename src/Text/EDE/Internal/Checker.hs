@@ -37,7 +37,7 @@ preludeFuns =
 tiExp :: Exp -> Check (Qual Type)
 tiExp (EVar i) = do
     ms <- find i
-    maybe (global i)
+    maybe (global i >>= instantiate)
           instantiate
           ms
 tiExp (ELit l) = do
