@@ -217,6 +217,7 @@ data Pred = IsIn Id Type
 
 instance Pretty Pred where
     pretty (IsIn i t) = fromString i <+> pretty t
+
     prettyList []     = mempty
     prettyList ps     = encloseSep lparen rparen ", " $ map pretty ps
 
