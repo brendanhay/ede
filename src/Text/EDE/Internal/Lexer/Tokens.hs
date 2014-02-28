@@ -21,10 +21,7 @@ import Text.PrettyPrint.Leijen.Text
 data Token = Token
     { tokenTok :: Tok
     , tokenPos :: Meta
-    } deriving (Eq)
-
-instance Show Token where
-    show = prettyShow
+    } deriving (Eq, Show)
 
 instance Pretty Token where
     pretty Token{..} = pretty tokenPos <+> pretty tokenTok
@@ -38,7 +35,7 @@ data Tok
     | KFrag Char
     | KAtom !TokAtom
     | KPrim !TokPrim
-      deriving (Eq)
+      deriving (Eq, Show)
 
 instance Pretty Tok where
     pretty t = case t of
@@ -53,16 +50,12 @@ data TokAtom
     | KSectionR
     | KIdentL
     | KIdentR
-
     | KParenL
     | KParenR
     | KComma
-
     | KOp !String
-
     | KTrue
     | KFalse
-
     | KElse
     | KIf
     | KElseIf
@@ -80,9 +73,10 @@ data TokAtom
     | KEndCapture
     | KRaw
     | KEndRaw
-      deriving (Eq)
+      deriving (Eq, Show)
 
 data TokFamily = Symbol | Keyword
+    deriving (Show)
 
 instance Pretty TokFamily where
     pretty Symbol  = "symbol"
@@ -128,7 +122,7 @@ instance Pretty TokAtom where
 data TokPrim
     = KVar !String
     | KLit !TokLit
-      deriving (Eq)
+      deriving (Eq, Show)
 
 instance Pretty TokPrim where
     pretty (KVar n) = "variable" <+> dquotes (pretty n)
@@ -137,7 +131,7 @@ instance Pretty TokPrim where
 data TokLit
     = KText !String
     | KNum  !String
-      deriving (Eq)
+      deriving (Eq, Show)
 
 instance Pretty TokLit where
     pretty (KText s) = dquotes $ pretty s

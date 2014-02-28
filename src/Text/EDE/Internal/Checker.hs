@@ -31,18 +31,19 @@ preludeClasses = fromJust $
 
 preludeFuns :: HashMap Id Scheme
 preludeFuns = Map.fromList
-    [ ("==",      Forall [Star] $ [IsIn "Eq" (TGen 0)] :=> (TGen 0 --> TGen 0 --> tbool))
-    , ("mappend", Forall [Star] $ [IsIn "Monoid" (TGen 0)] :=> (TGen 0 --> TGen 0 --> TGen 0))
-    , ("text",    Forall [Star] $ [] :=> ttext)
+    [ ("==",       Forall [Star] $ [IsIn "Eq" (TGen 0)] :=> (TGen 0 --> TGen 0 --> tbool))
+    , ("mappend",  Forall [Star] $ [IsIn "Monoid" (TGen 0)] :=> (TGen 0 --> TGen 0 --> TGen 0))
+    , ("subtract", Forall [Star] $ [IsIn "Num" (TGen 0)] :=> (TGen 0 --> TGen 0 --> TGen 0))
+    , ("text",     Forall [Star] $ [] :=> ttext)
     ]
 
 tiExp :: Exp -> Check (Qual Type)
-tiExp (EVar i) = do
+tiExp as (EVar i) = do
     ms <- find i
     instantiate ms
-tiExp (ELit l) = do
+tiExp as (ELit l) = do
     tiLit l
-tiExp (EApp e f) = do
+tiExp as (EApp e f) = do
     ps :=> te <- tiExp e
     qs :=> tf <- tiExp f
     t         <- local Star

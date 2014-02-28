@@ -260,8 +260,11 @@ instance Instantiate a => Instantiate (Qual a) where
 instance Instantiate Pred where
     inst ts (IsIn c t) = IsIn c (inst ts t)
 
-prettyShow :: Pretty a => a -> String
-prettyShow = show . renderOneLine . pretty
+pp :: Pretty a => a -> IO ()
+pp = putStrLn . 
+
+ps :: Pretty a => a -> String
+ps = show . renderOneLine . pretty
 
 ($$) :: Doc -> Doc -> Doc
 ($$) x y = align (x <$> y)
