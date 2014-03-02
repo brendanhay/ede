@@ -44,7 +44,7 @@ data Ann a = Ann
 instance HasMeta a => HasMeta (Ann a) where
     meta = meta . annTail
 
-type Id = String
+type Id = Text
 
 newtype Var = Var Id
     -- = Bound Id

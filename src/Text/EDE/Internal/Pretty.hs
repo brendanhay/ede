@@ -29,6 +29,7 @@ module Text.EDE.Internal.Pretty
     ) where
 
 import           Data.String
+import           Data.Text                    (Text)
 import qualified Data.Text.Lazy               as LText
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.Leijen.Text hiding (Pretty(..), list)
@@ -59,6 +60,9 @@ instance (Pretty a, Pretty b) => Pretty (a, b) where
 instance (Pretty a, Pretty b, Pretty c) => Pretty (a, b, c) where
     pretty _ (a, b, c) = tupled [pretty 0 a, pretty 0 b, pretty 0 c]
 
+instance Pretty Text where
+    pretty _ = text . LText.fromStrict
+
 instance Pretty Meta where
     pretty _ Meta{..} =
           fromString metaName
@@ -74,7 +78,7 @@ instance Pretty Lit where
     pretty _ (LBool b) = bool b
 
 instance Pretty Var where
-    pretty _ (Var v) = fromString v
+    pretty d (Var v) = pretty d v
 
 instance Pretty (Exp a) where
     pretty d expr = case expr of
@@ -92,7 +96,7 @@ instance Pretty (Exp a) where
         appPrec = 10
 
 instance Pretty TVar where
-    pretty _ (TypeVar v) = fromString v
+    pretty d (TypeVar v) = pretty d v
 
 instance Pretty (Type a) where
     pretty d ty = case ty of

@@ -12,10 +12,11 @@
 
 module Text.EDE.Internal.Checker.Monad where
 
-import Control.Monad
-import Debug.Trace
-import Text.EDE.Internal.Pretty
-import Text.EDE.Internal.Types
+import           Control.Monad
+import qualified Data.Text                as Text
+import           Debug.Trace
+import           Text.EDE.Internal.Pretty
+import           Text.EDE.Internal.Types
 
 data CheckState = CheckState
     { varNames  :: [Var]
@@ -40,8 +41,8 @@ instance Monad Check where
 
 evalCheck :: Bool -> Check a -> Either String a
 evalCheck t c = fmap snd . unCheck c $ CheckState
-    { varNames  = map (Var . ('$':)) namelist
-    , tvarNames = map TypeVar namelist
+    { varNames  = map (Var . Text.pack . ('$':)) namelist
+    , tvarNames = map (TypeVar . Text.pack) namelist
     , indent    = 0
     , tracing   = t
     }

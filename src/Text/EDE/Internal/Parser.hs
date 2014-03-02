@@ -17,9 +17,10 @@ import           Control.Arrow
 import           Control.Monad
 import           Data.Foldable           (foldl')
 import           Data.List               (intersperse)
-import qualified Data.Text               as Text
 import           Data.Text               (Text)
+import qualified Data.Text               as Text
 import qualified Data.Text.Read          as Read
+import           Data.Tuple
 import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Lexer
 import qualified Text.Parsec             as Parsec
@@ -174,27 +175,22 @@ runParser f name parser = Parsec.runParser parser (ParserState f name) name
 -- pBoundM = first ebound <$> pIdM
 -- pFreeM  = first efree  <$> pIdM
 
--- pId :: Parser Id
--- pId = fst <$> pIdM
-
--- pIdM :: Parser (Id, Meta)
--- pIdM = pTokMaybeM f <?> "a variable"
---   where
---     f (KPrim (KVar n)) = Just n
---     f _                = Nothing
+pVar :: Parser (Exp Meta)
+pVar = uncurry evar <$> pCapture KIdent
 
 pLiteral :: Parser (Exp Meta)
 pLiteral = choice
-    [ try string  <?> "a string"
+    [ try text    <?> "a string"
     , try boolean <?> "a boolean"
     , integer     <?> "an integer"
     ]
   where
-    string  = uncurry etext <$> pCapture KText
+    text = uncurry etext <$> pCapture KText
 
     boolean = true <|> false
-    true    = (`ebool` True)  <$> pAtom KTrue
-    false   = (`ebool` False) <$> pAtom KFalse
+
+    true  = (`ebool` True)  <$> pAtom KTrue
+    false = (`ebool` False) <$> pAtom KFalse
 
     integer = do
         (m, txt) <- pCapture KNum
