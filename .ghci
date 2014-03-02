@@ -7,6 +7,6 @@ import           Data.Text                       (Text)
 import qualified Data.Text.Lazy                  as LText
 import qualified Data.Text.Lazy.Builder          as LText
 import qualified Data.Text.Lazy.IO               as LText
-import           Text.EDE.Internal.Chcker
-import           Text.EDE.Internal.Checker.Monad
+import           Text.EDE.Internal.Lexer
+import           Text.EDE.Internal.Checker
 import           Text.EDE.Internal.Types
