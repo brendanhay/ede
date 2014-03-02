@@ -1,116 +1,77 @@
-{-# LANGUAGE BangPatterns    #-}
-{-# LANGUAGE RecordWildCards #-}
-
--- Module      : Text.EDE.Internal.Checker.Monad
--- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
--- License     : This Source Code Form is subject to the terms of
---               the Mozilla Public License, v. 2.0.
---               A copy of the MPL can be found in the LICENSE file or
---               you can obtain it at http://mozilla.org/MPL/2.0/.
--- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
--- Stability   : experimental
--- Portability : non-portable (GHC extensions)
+{-# LANGUAGE BangPatterns #-}
 
 module Text.EDE.Internal.Checker.Monad where
 
-import           Control.Applicative
-import           Control.Monad
-import           Data.HashMap.Strict                    (HashMap)
-import qualified Data.HashMap.Strict                    as Map
-import           Data.Maybe
-import           Data.Monoid
-import           Text.EDE.Internal.Checker.Class        (ClassEnv)
-import           Text.EDE.Internal.Checker.Substitution
-import           Text.EDE.Internal.Checker.Unification
-import           Text.EDE.Internal.Types
+import Control.Monad
+import Debug.Trace
+
+import Text.EDE.Internal.Pretty
+import Text.EDE.Internal.Types
 
 data State = State
-    { classes :: ClassEnv
-    , globals :: HashMap Id Scheme
-    , locals  :: HashMap Id Scheme
-    , substs  :: Subst
-    , supply  :: [Kind -> TVar]
+    { varNames  :: [Var]
+    , tvarNames :: [TVar]
+    , indent    :: !Int
+    , tracing   :: !Bool
     }
 
-newtype Check a = Check { runCheck :: State -> Either String (State, a) }
+newtype Check a = Check { unCheck :: State -> Either String (State, a) }
 
 instance Functor Check where
     fmap = liftM
 
-instance Applicative Check where
-    (<*>) = ap
-    pure  = return
-
 instance Monad Check where
-    return !x = Check $ \s -> (s, Right x)
-    fail   !e = Check $ \s -> (s, Left e)
+    fail   !e = Check $ const (Left e)
+    return !x = Check $ \s -> Right (s, x)
 
     (>>=) !m !k = Check $ \s ->
-        case runCheck m s of
-            (s', Left  e) -> (s', Left e)
-            (s', Right x) -> runCheck (k x) s'
+        case unCheck m s of
+            Left  e       -> Left e
+            Right (s', x) -> unCheck (k x) s'
 
-evalCheck :: ClassEnv -> HashMap Id Scheme -> Check a -> Either String a
-evalCheck ce as c = snd . runCheck c $ State
-    { classes = ce
-    , globals = mempty
-    , locals  = as
-    , substs  = mempty
-    , supply  = map (\i k -> TV [i] k) (cycle ['a'..'z'])
+evalCheck :: Bool -> Check a -> Either String a
+evalCheck t c = fmap snd . unCheck c $ State
+    { varNames  = map (Var . ('$':)) namelist
+    , tvarNames = map TypeVar namelist
+    , indent    = 0
+    , tracing   = t
     }
-
-find :: Var -> Check Scheme
-find v = f v =<< gets locals
   where
-    f (Bound i) ls =
-        maybe (error $ "unbound identifier: " ++ i)
-              return
-              (Map.lookup i ls)
-    f (Free i) ls =
-        error " not implemeneted "
+    namelist = [1..] >>= (`replicateM` ['a'..'z'])
 
--- | Extend the local environment with new assumptions.
-extend :: HashMap Id Scheme -> Check a -> Check a
-extend as c = Check $ \s@State{..} -> (s, evalCheck classes globals c)
+-- | Create a fresh variable
+freshVar :: Check Var
+freshVar = do
+    v:vs <- gets varNames
+    modify $ \s -> s {varNames = vs}
+    return v
 
--- -- | Introduce a global variable, or refine an existing one.
--- global :: Id -> Check Scheme
--- global i = do
---     gs <- gets globals
---     -- FIXME: compare supplied scheme with existing
---     -- unify
---     case Map.lookup i gs of
---         Just x -> return x
---         Nothing           -> do
---              v <- local Star
---              let q = (Forall [Star] $ [] :=> v)
---              modify $ \s -> s { globals = Map.insert i q gs }
---              return q
+-- | Create a fresh type variable
+freshTVar :: Check TVar
+freshTVar = do
+    v:vs <- gets tvarNames
+    modify $ \s -> s {tvarNames = vs}
+    return v
 
--- | Introduce a unique local variable.
-local :: Kind -> Check Type
-local k = do
-    f : fs <- gets supply
-    modify $ \s -> s { supply = fs }
-    return $ TVar (f k)
-
-instantiate :: Scheme -> Check (Qual Type)
-instantiate (Forall ks qt) = (`inst` qt) <$> mapM local ks
-
-unify :: Type -> Type -> Check ()
-unify t1 t2 = do
-    s' <- gets substs
-    u  <- mgu (apply s' t1) (apply s' t2)
-    modify $ \s -> s { substs = u <> s' }
+-- | Print some debugging info
+traceNS :: (Pretty a, Pretty b) => String -> a -> Check b -> Check b
+traceNS f args x = do
+    p <- gets tracing
+    if not p
+        then do
+            res <- x
+            return res
+        else do
+            ilevel <- gets indent
+            let ind = replicate (ilevel * 3) ' '
+            trace (ind ++ f ++ pp args) $ do
+                modify $ \s -> s {indent = ilevel + 1}
+                res <- x
+                modify $ \s -> s {indent = ilevel}
+                trace (ind ++ "=" ++ pp res) $ return res
 
 gets :: (State -> a) -> Check a
-gets = (`fmap` get)
-
-get :: Check State
-get = Check $ \s -> (s, Right s)
-
-put :: State -> Check ()
-put s = modify (const s)
+gets f = Check $ \s -> Right (s, f s)
 
 modify :: (State -> State) -> Check ()
-modify f = Check $ \s -> (f s, Right ())
+modify f = Check $ \s -> Right (f s, ())
