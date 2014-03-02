@@ -15,7 +15,10 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Lexer (tokenise) where
+module Text.EDE.Internal.Lexer
+     ( tokenise
+     , module Text.EDE.Internal.Lexer.Tokens
+     ) where
 
 import           Control.Monad
 import           Data.Text                      (Text)
@@ -53,11 +56,15 @@ $dquoted     = \0-\255 # [\"\n]
              | 0[oO] @octal
              | 0[xX] @hexadecimal
 
-@expr_start  = "{{" | "{%"
-@expr_end    = "}}" | "%}"
+@identl      = "{{"
+@identr      = "}}"
 
-@comm_start  = "{-"
-@comm_end    = "-}"
+@sectionl    = "{%"
+@sectionr    = "{%"
+@sectionws   = $white+
+
+@commentl    = "{-"
+@commentr    = "-}"
 
 @unary       = "-"  | "+"  | "!"
 @logical     = "&&" | "||"
@@ -68,13 +75,16 @@ tokens :-
 
 $newline               { atom KNewLine }
 
-<0> @expr_start        { atom KExpL `andBegin` (fromIntegral expr) }
-<0> @comm_start        { begin comm }
-<0> $whitespace+       { capture KWhiteSpace }
-<0> $fragment+         { capture KFrag }
+<frag> @identl         { atom KIdentL `andBegin` expr }
+<frag> @sectionl       { atom KSectionL `andBegin` expr }
+<frag> @commentl       { begin comm }
 
-<expr> @expr_end       { atom KExpR `andBegin` (fromIntegral 0) }
-<expr> $white+         { skip }
+<frag> $whitespace+    { capture KWhiteSpace }
+<frag> $fragment+      { capture KFrag }
+
+<expr> @identr         { atom KIdentR `andBegin` frag }
+<expr> @sectionr       { atom KSectionR `andBegin` frag }
+<expr> @sectionws      { skip }
 <expr> @sign? @number  { capture KNum }
 <expr> $letter $ident+ { capture KIdent }
 <expr> \" @string* \"  { capture KText }
@@ -105,12 +115,15 @@ $newline               { atom KNewLine }
 <expr> "raw"           { atom KRaw }
 <expr> "endraw"        { atom KEndRaw }
 
-<expr> \(              { atom KParenL  }
+<expr> \(              { atom KParenL }
 <expr> \)              { atom KParenR }
+<expr> \[              { atom KBracketL }
+<expr> \]              { atom KBracketR }
+<expr> \.              { atom KDot }
 <expr> \,              { atom KComma }
-<expr> \,              { atom KComma }
+<expr> \_              { atom KUnderscore }
 
-<comm> @comm_end       { begin 0 }
+<comm> @commentr       { begin frag }
 <comm> .               { skip }
 
 {
@@ -128,18 +141,18 @@ move (Meta src l c) '\t' = Meta src  l      (((c + 7) `div` 8) * 8 + 1)
 move (Meta src l c) '\n' = Meta src (l + 1) 1
 move (Meta src l c) _    = Meta src  l      (c + 1)
 
-data AlexInput = Input
+data AlexInput = AlexInput
     { inpMeta :: Meta
     , inpLast :: {-# UNPACK #-} !Char
     , inpText :: {-# UNPACK #-} !Text
     } deriving (Show)
 
-data State = State
+data AlexState = AlexState
     { stateInput :: AlexInput
     , stateCode  :: Int
     }
 
-newtype Alex a = Alex { unAlex :: State -> Either String (State, a) }
+newtype Alex a = Alex { unAlex :: AlexState -> Either String (AlexState, a) }
 
 instance Monad Alex where
     fail   !e = Alex $ const (Left e)
@@ -153,12 +166,12 @@ instance Monad Alex where
 runAlex :: String -> Text -> Alex a -> Either String a
 runAlex src txt (Alex f) = snd `fmap` f state
   where
-    state = State
+    state = AlexState
         { stateInput = input
-        , stateCode  = 0
+        , stateCode  = frag
         }
 
-    input = Input
+    input = AlexInput
         { inpMeta = start src
         , inpLast = '\n'
         , inpText = txt
@@ -207,9 +220,9 @@ andBegin :: (AlexInput -> Int -> Alex a) -> Int -> AlexInput -> Int -> Alex a
 (a `andBegin` c) inp len = setCode c >> a inp len
 
 alexGetByte :: Num a => AlexInput -> Maybe (a, AlexInput)
-alexGetByte (Input p _ t)
+alexGetByte (AlexInput p _ t)
     | Text.null t = Nothing
-    | otherwise   = Just $! (c2w c, Input (move p c) c cs)
+    | otherwise   = Just $! (c2w c, AlexInput (move p c) c cs)
   where
     (c, cs) = (Text.unsafeHead t, Text.unsafeTail t)
 

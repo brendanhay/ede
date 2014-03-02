@@ -40,11 +40,17 @@ data Capture
       deriving (Eq, Show)
 
 data Atom
-    = KExpL
-    | KExpR
+    = KIdentL
+    | KIdentR
+    | KSectionL
+    | KSectionR
     | KParenL
     | KParenR
+    | KBracketL
+    | KBracketR
+    | KDot
     | KComma
+    | KUnderscore
 
     | KNewLine
     | KEOF

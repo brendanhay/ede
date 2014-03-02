@@ -17,14 +17,14 @@ import Debug.Trace
 import Text.EDE.Internal.Pretty
 import Text.EDE.Internal.Types
 
-data State = State
+data CheckState = CheckState
     { varNames  :: [Var]
     , tvarNames :: [TVar]
     , indent    :: !Int
     , tracing   :: !Bool
     }
 
-newtype Check a = Check { unCheck :: State -> Either String (State, a) }
+newtype Check a = Check { unCheck :: CheckState -> Either String (CheckState, a) }
 
 instance Functor Check where
     fmap = liftM
@@ -39,7 +39,7 @@ instance Monad Check where
             Right (s', x) -> unCheck (k x) s'
 
 evalCheck :: Bool -> Check a -> Either String a
-evalCheck t c = fmap snd . unCheck c $ State
+evalCheck t c = fmap snd . unCheck c $ CheckState
     { varNames  = map (Var . ('$':)) namelist
     , tvarNames = map TypeVar namelist
     , indent    = 0
@@ -79,8 +79,8 @@ traceNS f args x = do
                 modify $ \s -> s {indent = ilevel}
                 trace (ind ++ "=" ++ pp res) $ return res
 
-gets :: (State -> a) -> Check a
+gets :: (CheckState -> a) -> Check a
 gets f = Check $ \s -> Right (s, f s)
 
-modify :: (State -> State) -> Check ()
+modify :: (CheckState -> CheckState) -> Check ()
 modify f = Check $ \s -> Right (f s, ())
