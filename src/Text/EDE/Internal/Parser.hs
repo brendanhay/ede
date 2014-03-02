@@ -191,10 +191,10 @@ pLiteral = choice
     ]
   where
     string  = uncurry etext <$> pCapture KText
-    boolean = true <|> false
 
-    true  = (`ebool` True)  <$> pAtom KTrue
-    false = (`ebool` False) <$> pAtom KFalse
+    boolean = true <|> false
+    true    = (`ebool` True)  <$> pAtom KTrue
+    false   = (`ebool` False) <$> pAtom KFalse
 
     integer = do
         (m, txt) <- pCapture KNum
