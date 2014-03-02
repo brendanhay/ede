@@ -22,6 +22,7 @@ import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
 import qualified Data.Text.Unsafe               as Text
 import           Text.EDE.Internal.Lexer.Tokens
+import           Text.EDE.Internal.Types
 }
 
 $whitespace  = [\ \t\b\xa0]
@@ -65,83 +66,78 @@ $dquoted     = \0-\255 # [\"\n]
 
 tokens :-
 
-$newline               { lexeme LNewLine }
+$newline               { atom KNewLine }
 
-<0> @expr_start        { lexeme LExpL `andBegin` (fromIntegral expr) }
+<0> @expr_start        { atom KExpL `andBegin` (fromIntegral expr) }
 <0> @comm_start        { begin comm }
-<0> $whitespace+       { atom AWhiteSpace }
-<0> $fragment+         { atom AFrag }
+<0> $whitespace+       { capture KWhiteSpace }
+<0> $fragment+         { capture KFrag }
 
-<expr> @expr_end       { lexeme LExpR `andBegin` (fromIntegral 0) }
+<expr> @expr_end       { atom KExpR `andBegin` (fromIntegral 0) }
 <expr> $white+         { skip }
-<expr> @sign? @number  { atom ANum }
-<expr> $letter $ident+ { atom AIdent }
-<expr> \" @string* \"  { atom AText }
+<expr> @sign? @number  { capture KNum }
+<expr> $letter $ident+ { capture KIdent }
+<expr> \" @string* \"  { capture KText }
 
-<expr> @unary          { atom AOp }
-<expr> @logical        { atom AOp }
-<expr> @equality       { atom AOp }
-<expr> @relational     { atom AOp }
+<expr> @unary          { capture KOp }
+<expr> @logical        { capture KOp }
+<expr> @equality       { capture KOp }
+<expr> @relational     { capture KOp }
 
-<expr> "true"          { lexeme LTrue }
-<expr> "false"         { lexeme LFalse }
-<expr> "else"          { lexeme LElse }
-<expr> "if"            { lexeme LIf }
-<expr> "elif"          { lexeme LElseIf }
-<expr> "elsif"         { lexeme LElseIf }
-<expr> "endif"         { lexeme LEndIf }
-<expr> "case"          { lexeme LCase }
-<expr> "when"          { lexeme LWhen }
-<expr> "endcase"       { lexeme LEndCase }
-<expr> "for"           { lexeme LFor }
-<expr> "in"            { lexeme LIn }
-<expr> "endfor"        { lexeme LEndFor }
-<expr> "include"       { lexeme LInclude }
-<expr> "with"          { lexeme LWith }
-<expr> "assign"        { lexeme LAssign }
-<expr> "capture"       { lexeme LCapture }
-<expr> "endcapture"    { lexeme LEndCapture }
-<expr> "raw"           { lexeme LRaw }
-<expr> "endraw"        { lexeme LEndRaw }
+<expr> "true"          { atom KTrue }
+<expr> "false"         { atom KFalse }
+<expr> "else"          { atom KElse }
+<expr> "if"            { atom KIf }
+<expr> "elif"          { atom KElseIf }
+<expr> "elsif"         { atom KElseIf }
+<expr> "endif"         { atom KEndIf }
+<expr> "case"          { atom KCase }
+<expr> "when"          { atom KWhen }
+<expr> "endcase"       { atom KEndCase }
+<expr> "for"           { atom KFor }
+<expr> "in"            { atom KIn }
+<expr> "endfor"        { atom KEndFor }
+<expr> "include"       { atom KInclude }
+<expr> "with"          { atom KWith }
+<expr> "assign"        { atom KAssign }
+<expr> "capture"       { atom KCapture }
+<expr> "endcapture"    { atom KEndCapture }
+<expr> "raw"           { atom KRaw }
+<expr> "endraw"        { atom KEndRaw }
 
-<expr> \(              { lexeme LParenL  }
-<expr> \)              { lexeme LParenR }
-<expr> \,              { lexeme LComma }
-<expr> \,              { lexeme LComma }
+<expr> \(              { atom KParenL  }
+<expr> \)              { atom KParenR }
+<expr> \,              { atom KComma }
+<expr> \,              { atom KComma }
 
 <comm> @comm_end       { begin 0 }
 <comm> .               { skip }
 
 {
+capture :: Capture -> AlexInput -> Int -> Alex Token
+capture k inp len = return $ TC (inpMeta inp) k (Text.take len $ inpText inp)
+
 atom :: Atom -> AlexInput -> Int -> Alex Token
-atom a (AlexInput _ _ s) n = return $ Atom 0 0 a (Text.take n s)
+atom k inp _ = return $ TA (inpMeta inp) k
 
-lexeme :: Lexeme -> AlexInput -> Int -> Alex Token
-lexeme l (AlexInput _ _ _) _ = return $ Lexeme 0 0 l
+start :: String -> Meta
+start src = Meta src 1 1
 
-data AlexPosn = AlexPn !Int !Int !Int
-    deriving (Eq,Show)
+move :: Meta -> Char -> Meta
+move (Meta src l c) '\t' = Meta src  l      (((c + 7) `div` 8) * 8 + 1)
+move (Meta src l c) '\n' = Meta src (l + 1) 1
+move (Meta src l c) _    = Meta src  l      (c + 1)
 
-start :: AlexPosn
-start = AlexPn 0 1 1
-
-move :: AlexPosn -> Char -> AlexPosn
-move (AlexPn a l c) '\t' = AlexPn (a + 1)  l      (((c + 7) `div` 8) * 8 + 1)
-move (AlexPn a l c) '\n' = AlexPn (a + 1) (l + 1) 1
-move (AlexPn a l c) _    = AlexPn (a + 1)  l      (c + 1)
-
-data State = State
-    { stPos   :: AlexPosn
-    , stText  :: Text
-    , stLast  :: Char
-    , stCode  :: Int
-    }
-
-data AlexInput = AlexInput
-    { inpPos  :: AlexPosn
+data AlexInput = Input
+    { inpMeta :: Meta
     , inpLast :: {-# UNPACK #-} !Char
     , inpText :: {-# UNPACK #-} !Text
     } deriving (Show)
+
+data State = State
+    { stateInput :: AlexInput
+    , stateCode  :: Int
+    }
 
 newtype Alex a = Alex { unAlex :: State -> Either String (State, a) }
 
@@ -154,40 +150,49 @@ instance Monad Alex where
             Left  e       -> Left e
             Right (s', x) -> unAlex (k x) s'
 
-runAlex :: Text -> Alex a -> Either String a
-runAlex inp (Alex f) = snd `fmap` f (State start inp '\n' 0)
+runAlex :: String -> Text -> Alex a -> Either String a
+runAlex src txt (Alex f) = snd `fmap` f state
+  where
+    state = State
+        { stateInput = input
+        , stateCode  = 0
+        }
+
+    input = Input
+        { inpMeta = start src
+        , inpLast = '\n'
+        , inpText = txt
+        }
 
 getInput :: Alex AlexInput
-getInput = Alex $ \s@State{..} ->
-    Right (s, AlexInput stPos stLast stText)
+getInput = Alex $ \s -> Right (s, stateInput s)
 
 setInput :: AlexInput -> Alex ()
-setInput (AlexInput pos c inp) = Alex $ \s ->
-    Right (s { stPos = pos, stLast = c, stText = inp }, ())
+setInput inp = Alex $ \s -> Right (s { stateInput = inp }, ())
 
 getCode :: Alex Int
-getCode = Alex $ \s -> Right (s, stCode s)
+getCode = Alex $ \s -> Right (s, stateCode s)
 
 setCode :: Int -> Alex ()
-setCode c = Alex $ \s -> Right (s { stCode = c }, ())
+setCode c = Alex $ \s -> Right (s { stateCode = c }, ())
 
 scan :: Alex Token
 scan = do
-    inp@(AlexInput _ _ str) <- getInput
-    c <- getCode
+    inp <- getInput
+    c   <- getCode
     case alexScan inp c of
         AlexEOF ->
-            return (Lexeme 0 0 LEOF)
-        AlexError (AlexInput (AlexPn _ line column) _ _) ->
-            fail $ "lexical error at line " ++ (show line) ++ ", column " ++ (show column)
+            return $ TA (inpMeta inp) KEOF
+        AlexError inp' ->
+            fail $ "lexical error at: " ++ show (inpMeta inp')
         AlexSkip inp' len -> do
             setInput inp'
             scan
-        AlexToken inp'@(AlexInput _ _ str') len action -> do
+        AlexToken inp' len action -> do
             setInput inp'
             action inp len
-          where
-            len = Text.length str - Text.length str'
+          -- where
+          --   len = Text.length (inpText inp) - Text.length (inpText inp')
 
 -- | Ignore this token and scan another.
 skip :: AlexInput -> Int -> Alex Token
@@ -202,9 +207,9 @@ andBegin :: (AlexInput -> Int -> Alex a) -> Int -> AlexInput -> Int -> Alex a
 (a `andBegin` c) inp len = setCode c >> a inp len
 
 alexGetByte :: Num a => AlexInput -> Maybe (a, AlexInput)
-alexGetByte (AlexInput p _ t)
+alexGetByte (Input p _ t)
     | Text.null t = Nothing
-    | otherwise   = Just $! (c2w c, AlexInput (move p c) c cs)
+    | otherwise   = Just $! (c2w c, Input (move p c) c cs)
   where
     (c, cs) = (Text.unsafeHead t, Text.unsafeTail t)
 
@@ -213,8 +218,8 @@ alexGetByte (AlexInput p _ t)
     -- convenience for ByteString construction.
     c2w = fromIntegral . ord
 
-tokenise :: Text -> Either String [Token]
-tokenise txt = runAlex txt loop
+tokenise :: String -> Text -> Either String [Token]
+tokenise src txt = runAlex src txt loop
   where
     loop = do
         t <- scan
