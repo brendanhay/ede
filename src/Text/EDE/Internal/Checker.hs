@@ -25,7 +25,6 @@ import           Text.EDE.Internal.Checker.Context
 import           Text.EDE.Internal.Checker.Monad
 import           Text.EDE.Internal.Checker.Subst
 import           Text.EDE.Internal.Pretty
-import           Text.EDE.Internal.Types
 
 -- | Type checking:
 --   check Γ e A = Δ <=> Γ |- e <= A -| Δ

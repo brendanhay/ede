@@ -9,13 +9,16 @@
 -- Portability : non-portable (GHC extensions)
 
 -- | Abstract syntax smart constructors
-module Text.EDE.Internal.AST where
+module Text.EDE.Internal.AST
+    ( module Text.EDE.Internal.AST
+    , module Text.EDE.Internal.Types
+    ) where
 
 import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
-var :: a -> String -> Exp a
-var a = EVar a . Var
+evar :: a -> String -> Exp a
+evar a = EVar a . Var
 
 eabs :: a -> String -> Exp a -> Exp a
 eabs a = EAbs a . Var
@@ -23,8 +26,12 @@ eabs a = EAbs a . Var
 eapp :: a -> [Exp a] -> Exp a
 eapp a = foldl1 (EApp a)
 
-eint :: a -> Integer -> Exp a
-eint a = ELit a . LNum
+infixr 4 $$
+($$) :: Exp Meta -> Exp Meta -> Exp Meta
+a $$ b = eapp (meta a) [a, b]
+
+einteger :: a -> Integer -> Exp a
+einteger a = ELit a . LNum
 
 etext :: a -> Text -> Exp a
 etext a = ELit a . LText

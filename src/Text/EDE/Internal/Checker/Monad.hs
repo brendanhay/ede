@@ -67,9 +67,7 @@ traceNS :: (Pretty a, Pretty b) => String -> a -> Check b -> Check b
 traceNS f args x = do
     p <- gets tracing
     if not p
-        then do
-            res <- x
-            return res
+        then x
         else do
             ilevel <- gets indent
             let ind = replicate (ilevel * 3) ' '

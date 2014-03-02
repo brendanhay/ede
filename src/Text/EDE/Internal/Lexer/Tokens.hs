@@ -19,12 +19,12 @@ data Token
     | TA !Meta !Atom
       deriving (Show)
 
-tokenMeta :: Token -> Meta
-tokenMeta (TC m _ _) = m
-tokenMeta (TA m _)   = m
+instance HasMeta Token where
+    meta (TC m _ _) = m
+    meta (TA m _)   = m
 
 tokenSourcePos :: Token -> SourcePos
-tokenSourcePos t = let Meta src row col = tokenMeta t in newPos src row col
+tokenSourcePos t = let Meta src row col = meta t in newPos src row col
 
 eof :: Token -> Bool
 eof (TA _ KEOF) = True

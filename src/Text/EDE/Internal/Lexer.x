@@ -1,5 +1,6 @@
 {
 {-# LANGUAGE BangPatterns             #-}
+{-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE RecordWildCards          #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
