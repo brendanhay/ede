@@ -17,13 +17,11 @@
 
 module Text.EDE.Internal.Lexer (tokenise) where
 
-import Control.Monad
-import Data.Text        (Text)
-import qualified Data.Text        as Text
-import qualified Data.Text.Unsafe as Text
-import Text.EDE.Internal.Lexer.Tokens
-
-import System.IO.Unsafe
+import           Control.Monad
+import           Data.Text                      (Text)
+import qualified Data.Text                      as Text
+import qualified Data.Text.Unsafe               as Text
+import           Text.EDE.Internal.Lexer.Tokens
 }
 
 $whitespace  = [\ \t\b\xa0]
