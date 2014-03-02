@@ -185,40 +185,24 @@ runParser f name parser = Parsec.runParser parser (ParserState f name) name
 
 pLiteral :: Parser (Exp Meta)
 pLiteral = choice
-    [ try integer <?> "an integer"
-    -- , try string  <?> "a string"
-    -- , boolean     <?> "a boolean"
+    [ try string  <?> "a string"
+    , try boolean <?> "a boolean"
+    , integer     <?> "an integer"
     ]
   where
+    string  = uncurry etext <$> pCapture KText
+    boolean = true <|> false
+
+    true  = (`ebool` True)  <$> pAtom KTrue
+    false = (`ebool` False) <$> pAtom KFalse
+
     integer = do
         (m, txt) <- pCapture KNum
         case Read.signed Read.decimal txt of
             Right (x, rs)
                 | Text.null rs -> return $! einteger m x
-                | otherwise    -> fail $ "unexpected leftovers after parsing number: " ++ show (txt, rs)
+                | otherwise    -> fail $ "leftovers after parsing number: " ++ show (txt, rs)
             Left  e            -> fail $ "unexpected error parsing number:" ++ e
-
-    -- bool = first LBool <$> pTokMaybeM h <?> "a boolean"
-
-    -- char = pTok
-
-    -- literal = do
-    --     (l, m) <- pTokMaybeM f <?> "a string or numeric literal"
-    --     (,m) <$> g m l
-
-    -- f (KPrim (KLit x)) = Just x
-    -- f _                = Nothing
-
-    -- g _ (KText  s) = return . LText $ Text.pack s
-    -- g m n@(KNum x) = do
-    --     show <- pTokShow
-    --     maybe (fail $ "unexpected " ++ show (Token (KPrim (KLit n)) m))
-    --           (return . LNum)
-    --           (readMay x) <?> "a valid numeric literal"
-
-    -- h (KAtom KTrue)  = Just True
-    -- h (KAtom KFalse) = Just False
-    -- h _              = Nothing
 
 pCapture :: Capture -> Parser (Meta, Text)
 pCapture x = pMaybe f
