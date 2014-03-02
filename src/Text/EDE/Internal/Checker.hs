@@ -2,21 +2,30 @@
 {-# LANGUAGE GADTs         #-}
 {-# LANGUAGE TupleSections #-}
 
--- | Bidirectional typechecking for higher-rank polymorphism
---   Implementation of http://www.mpi-sws.org/~neelk/bidir.pdf
+-- Module      : Text.EDE.Internal.Checker
+-- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
+-- License     : This Source Code Form is subject to the terms of
+--               the Mozilla Public License, v. 2.0.
+--               A copy of the MPL can be found in the LICENSE file or
+--               you can obtain it at http://mozilla.org/MPL/2.0/.
+-- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
+-- Stability   : experimental
+-- Portability : non-portable (GHC extensions)
+
+-- | Bidirectional typechecking for higher-rank polymorphism.
+--   See: http://www.mpi-sws.org/~neelk/bidir.pdf
 module Text.EDE.Internal.Checker where
 
-import Control.Applicative
-import Control.Monad
-import qualified Data.HashSet        as Set
-import Data.Maybe
-
-import Text.EDE.Internal.AST
-import Text.EDE.Internal.Checker.Context
-import Text.EDE.Internal.Checker.Monad
-import Text.EDE.Internal.Checker.Subst
-import Text.EDE.Internal.Pretty
-import Text.EDE.Internal.Types
+import           Control.Applicative
+import           Control.Monad
+import qualified Data.HashSet                      as Set
+import           Data.Maybe
+import           Text.EDE.Internal.AST
+import           Text.EDE.Internal.Checker.Context
+import           Text.EDE.Internal.Checker.Monad
+import           Text.EDE.Internal.Checker.Subst
+import           Text.EDE.Internal.Pretty
+import           Text.EDE.Internal.Types
 
 -- | Type checking:
 --   check Γ e A = Δ <=> Γ |- e <= A -| Δ

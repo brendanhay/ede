@@ -65,6 +65,7 @@ library
         array
       , base            >= 4.6 && < 5
       , hashable
+      , parsec
       , pretty
       , text            >= 1.0
       , unordered-containers

@@ -1,14 +1,23 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs     #-}
 
--- | Some helpers for working with contexts
+-- Module      : Text.EDE.Internal.Checker.Context
+-- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
+-- License     : This Source Code Form is subject to the terms of
+--               the Mozilla Public License, v. 2.0.
+--               A copy of the MPL can be found in the LICENSE file or
+--               you can obtain it at http://mozilla.org/MPL/2.0/.
+-- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
+-- Stability   : experimental
+-- Portability : non-portable (GHC extensions)
+
+-- | Operations on typechecking contexts.
 module Text.EDE.Internal.Checker.Context where
 
 import Data.Maybe
 import Data.Monoid
-
-import Text.EDE.Internal.Types
 import Text.EDE.Internal.Pretty
+import Text.EDE.Internal.Types
 
 -- | Snoc
 (>:) :: Context -> Elem -> Context
