@@ -32,7 +32,7 @@ data State = State
     , supply  :: [Kind -> TVar]
     }
 
-newtype Check a = Check { runCheck :: State -> (State, Either String a) }
+newtype Check a = Check { runCheck :: State -> Either String (State, a) }
 
 instance Functor Check where
     fmap = liftM
