@@ -196,7 +196,7 @@ pLiteral = choice
         (m, txt) <- pCapture KNum
         case Read.signed Read.decimal txt of
             Right (x, rs)
-                | Text.null rs -> return $! einteger m x
+                | Text.null rs -> return (einteger m x)
                 | otherwise    -> fail $ "leftovers after parsing number: " ++ show (txt, rs)
             Left  e            -> fail $ "unexpected error parsing number:" ++ e
 
