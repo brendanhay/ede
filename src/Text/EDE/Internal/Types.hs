@@ -1,6 +1,9 @@
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -15,189 +18,106 @@
 module Text.EDE.Internal.Types where
 
 import           Control.Applicative
-import           Control.Monad
-import           Data.Aeson              hiding (Result, Success, Error)
-import           Data.Aeson.Types        (Pair)
-import           Data.HashMap.Strict     (HashMap)
-import           Data.List               (intercalate)
+import           Data.HashSet        (HashSet)
+import qualified Data.HashSet        as Set
+import           Data.Hashable
 import           Data.Monoid
-import           Data.Scientific
-import           Data.Text               (Text)
-import           Data.Text.Buildable
-import           Data.Text.Format        (Format, format)
-import           Data.Text.Format.Params (Params)
-import qualified Data.Text.Lazy          as LText
-import           Data.Text.Lazy.Builder
+import           Data.Text           (Text)
 
--- | A function to resolve the target of an @include@ expression.
-type Resolver m = Text -> Meta -> m (Result Template)
-
--- | A parsed and compiled template.
-data Template = Template
-    { tmplName :: !Text
-    , tmplExpr :: UExp
-    , tmplIncl :: HashMap Text UExp
-    } deriving (Eq)
-
--- | Meta information describing the source position of an expression or error.
 data Meta = Meta
-    { metaSource :: !String
-    , metaRow    :: !Int
-    , metaColumn :: !Int
-    } deriving (Eq, Ord)
+    { metaName :: String
+    , metaRow  :: Int
+    , metaCol  :: Int
+    } deriving (Eq, Show)
 
-instance Show Meta where
-    show _ = ""
+data Ann a = Ann
+    { annType :: Polytype
+    , annTail :: a
+    } deriving (Show)
 
--- | The result of running parsing or rendering steps.
-data Result a
-    = Error !Meta [String]
-    | Success a
-      deriving (Eq, Ord, Show)
+type Id = String
 
-instance Functor Result where
-    fmap _ (Error m e) = Error m e
-    fmap f (Success x) = Success $ f x
-    {-# INLINE fmap #-}
+newtype Var = Var Id
+    -- = Bound Id
+    -- | Free  Id
+      deriving (Eq, Show)
 
-instance Monad Result where
-    return          = Success
-    {-# INLINE return #-}
-    Error m e >>= _ = Error m e
-    Success a >>= k = k a
-    {-# INLINE (>>=) #-}
+data Lit
+    = LNum  Integer
+    | LText Text
+    | LBool Bool
+      deriving (Eq, Show)
 
-instance Applicative Result where
-    pure  = return
-    {-# INLINE pure #-}
-    (<*>) = ap
-    {-# INLINE (<*>) #-}
+data Exp a
+    = ELit a Lit
+    | EVar a Var             -- ^ x
+    | EAbs a Var     (Exp a) -- ^ \x. e
+    | EApp a (Exp a) (Exp a) -- ^ e1 e2
+      deriving (Eq, Show)
 
-instance MonadPlus Result where
-    mzero = fail "mzero"
-    {-# INLINE mzero #-}
-    mplus a@(Success _) _ = a
-    mplus _ b             = b
-    {-# INLINE mplus #-}
+data TCon
+    = TNum
+    | TText
+    | TBool
+      deriving (Eq, Show)
 
-instance Monoid a => Monoid (Result a) where
-    mempty  = Success mempty
-    {-# INLINE mempty #-}
-    mappend = mplus
-    {-# INLINE mappend #-}
+newtype TVar = TypeVar Id deriving (Eq, Ord, Show, Hashable)
 
--- | Convert a 'Result' to an 'Either' with the 'Left' case holding a formatted
--- error message, and 'Right' being the successful result over which 'Result' is paramterised.
-eitherResult :: Result a -> Either String a
-eitherResult = result f Right
-  where
-    f Meta{..} e = Left . concat $
-        [ "ED-E error position: "
-        , concat [metaSource, ":(", show metaRow, ",", show metaColumn, ")"]
-        , ", messages: " ++ intercalate ", " e
-        ]
+data TKind = Mono | Poly
 
--- | Perform a case analysis on a 'Result'.
-result :: (Meta -> [String] -> b) -- ^ Function to apply to the 'Error' parameters.
-       -> (a -> b)                -- ^ Function to apply to the 'Success' case.
-       -> Result a                -- ^ The 'Result' to map over.
-       -> b
-result f _ (Error m e) = f m e
-result _ g (Success x) = g x
+-- | Types, indexed by their kind: Monotype or Polytype.
+--   Only Polytypes can have foralls.
+data Type :: TKind -> * where
+    TCon    :: TCon   -> Type a
+    TVar    :: TVar   -> Type a                 -- ^ alpha
+    TExists :: TVar   -> Type a                 -- ^ alpha^
+    TForall :: TVar   -> Type Poly -> Type Poly -- ^ forall alpha. A
+    TFun    :: Type a -> Type a    -> Type a    -- ^ A -> B
 
--- | Convenience for returning a successful 'Result'.
-success :: Monad m => a -> m (Result a)
-success = return . Success
+deriving instance Show (Type a)
+deriving instance Eq   (Type a)
 
--- | Convenience for returning an error 'Result'.
-failure :: Monad m => Meta -> [String] -> m (Result a)
-failure m = return . Error m
+type Polytype = Type Poly
+type Monotype = Type Mono
 
-newtype Id = Id Text
-    deriving (Eq, Ord, Show)
+-- | Is the type a Monotype?
+monotype :: Type a -> Maybe Monotype
+monotype typ = case typ of
+    TCon c      -> Just $ TCon c
+    TVar v      -> Just $ TVar v
+    TForall _ _ -> Nothing
+    TExists v   -> Just $ TExists v
+    TFun t1 t2  -> TFun <$> monotype t1 <*> monotype t2
 
-instance Buildable Id where
-    build (Id i) = build i
-    {-# INLINE build #-}
+-- | Any type is a Polytype since Monotype is a subset of Polytype
+polytype :: Type a -> Polytype
+polytype typ = case typ of
+    TCon c      -> TCon c
+    TVar v      -> TVar v
+    TForall v t -> TForall v t
+    TExists v   -> TExists v
+    TFun t1 t2  -> TFun (polytype t1) (polytype t2)
 
-data Fun where
-    Fun :: (Eq a, Eq b) => TType a -> TType b -> (a -> b) -> Fun
+-- | The free type variables in a type
+freeTVars :: Type a -> HashSet TVar
+freeTVars typ = case typ of
+    TCon _      -> mempty
+    TVar v      -> Set.singleton v
+    TForall v t -> Set.delete v (freeTVars t)
+    TExists v   -> Set.singleton v
+    TFun t1 t2  -> freeTVars t1 <> freeTVars t2
 
-instance Eq Fun where
-    _ == _ = False
+data Elem
+    = CVar          Var  Polytype -- ^ x : A
+    | CForall       TVar          -- ^ alpha
+    | CExists       TVar          -- ^ alpha^
+    | CExistsSolved TVar Monotype -- ^ alpha^ = tau
+    | CMarker       TVar          -- ^ |> alpha^
+      deriving (Eq, Show)
 
-data TType a where
-    TNil  :: TType ()
-    TText :: TType Text
-    TBool :: TType Bool
-    TNum  :: TType Scientific
-    TBld  :: TType Builder
-    TMap  :: TType Object
-    TList :: TType Array
-    TFun  :: TType Fun
-    TVar  :: TType a
+newtype Context = Context [Elem]
+    deriving (Show)
 
-deriving instance Show (TType a)
-
-data UExp
-    = UNil
-    | UText !Meta !Text
-    | UBool !Meta !Bool
-    | UNum  !Meta !Scientific
-    | UBld  !Meta !Builder
-    | UVar  !Meta !Id
-    | UFun  !Meta !Id
-    | UApp  !Meta !UExp !UExp
-    | UNeg  !Meta !UExp
-    | UBin  !Meta !BinOp !UExp !UExp
-    | URel  !Meta !RelOp !UExp !UExp
-    | UCond !Meta !UExp !UExp !UExp
-    | UCase !Meta !UExp [(UExp, UExp)] !UExp
-    | ULoop !Meta !Id !UExp !UExp !UExp
-    | UIncl !Meta !Text (Maybe UExp)
-      deriving (Eq, Ord, Show)
-
--- FIXME:
--- {% assign ... %}
--- {% capture ... %}
-
-data BinOp = And | Or
-    deriving (Eq, Ord, Show)
-
-data RelOp
-    = Equal
-    | NotEqual
-    | Greater
-    | GreaterEqual
-    | Less
-    | LessEqual
-      deriving (Eq, Ord, Show)
-
-throwError :: Params ps => Meta -> Format -> ps -> Result a
-throwError m f = Error m . (:[]) . LText.unpack . format f
-
-mkMeta :: String -> Meta
-mkMeta n = Meta n 0 0
-
-_meta :: UExp -> Meta
-_meta u = case u of
-    UNil            -> mkMeta "_meta"
-    UText m _       -> m
-    UBool m _       -> m
-    UNum  m _       -> m
-    UBld  m _       -> m
-    UVar  m _       -> m
-    UFun  m _       -> m
-    UApp  m _ _     -> m
-    UNeg  m _       -> m
-    UBin  m _ _ _   -> m
-    URel  m _ _ _   -> m
-    UCond m _ _ _   -> m
-    UCase m _ _ _   -> m
-    ULoop m _ _ _ _ -> m
-    UIncl m _ _     -> m
-
--- | Create an 'Object' from a list of name/value 'Pair's.
--- See 'Aeson''s documentation for more details.
-fromPairs :: [Pair] -> Object
-fromPairs = (\(Object o) -> o) . object
+instance Monoid Context where
+    mempty = Context []
+    mappend (Context a) (Context b) = Context (b ++ a)

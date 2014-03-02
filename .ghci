@@ -2,13 +2,11 @@
 
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
-import           Data.Aeson                 hiding (Result)
-import           Data.Text                  (Text)
-import qualified Data.Text.Lazy             as LText
-import qualified Data.Text.Lazy.Builder     as LText
-import qualified Data.Text.Lazy.IO          as LText
-import qualified Text.Parsec                as P
-
-:l Text.EDE.Internal.Types
-:l Text.EDE.Internal.Compiler
-:l Text.EDE.Internal.Parser
+import           Data.Aeson                      hiding (Result)
+import           Data.Text                       (Text)
+import qualified Data.Text.Lazy                  as LText
+import qualified Data.Text.Lazy.Builder          as LText
+import qualified Data.Text.Lazy.IO               as LText
+import           Text.EDE.Internal.Lexer
+import           Text.EDE.Internal.Checker
+import           Text.EDE.Internal.Types

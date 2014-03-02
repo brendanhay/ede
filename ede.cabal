@@ -1,5 +1,5 @@
 name:                  ede
-version:               0.1.3
+version:               0.2.0
 synopsis:              Textual Templating Language
 homepage:              http://github.com/brendanhay/ede
 license:               OtherLicense
@@ -47,43 +47,26 @@ library
     hs-source-dirs:    src
 
     exposed-modules:
-        Text.EDE
-      , Text.EDE.Filters
-
-    other-modules:
-        Text.EDE.Internal.Compiler
+        Text.EDE.Internal.AST
+      , Text.EDE.Internal.Checker
+      , Text.EDE.Internal.Checker.Context
+      , Text.EDE.Internal.Checker.Monad
       , Text.EDE.Internal.Lexer
-      , Text.EDE.Internal.Parser
+      , Text.EDE.Internal.Lexer.Tokens
+      , Text.EDE.Internal.Pretty
       , Text.EDE.Internal.Types
 
     ghc-options:       -Wall
 
+    build-tools:
+        alex
+
     build-depends:
-        aeson           >= 0.7
+        array
       , base            >= 4.6 && < 5
-      , directory
-      , filepath
+      , hashable
       , parsec
-      , scientific
+      , pretty
       , text            >= 1.0
-      , text-format
-      , transformers
       , unordered-containers
-      , vector
-
-test-suite golden
-    default-language:  Haskell2010
-    type:              exitcode-stdio-1.0
-    hs-source-dirs:    test
-    main-is:           golden.hs
-
-    ghc-options:       -Wall -threaded
-
-    build-depends:
-        aeson
-      , base >= 4.6 && < 5
-      , directory
-      , ede
-      , text
-      , tasty
-      , tasty-golden
+      , wl-pprint-text
