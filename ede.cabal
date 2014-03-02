@@ -4,7 +4,7 @@ synopsis:              Textual Templating Language
 homepage:              http://github.com/brendanhay/ede
 license:               OtherLicense
 license-file:          LICENSE
-author:                Brendan Hay
+author:                Brendan Hay, Olle Fredriksson
 maintainer:            Brendan Hay <brendan.g.hay@gmail.com>
 copyright:             Copyright (c) 2013-2014 Brendan Hay
 stability:             Experimental
@@ -36,7 +36,9 @@ description:
     @include@ expressions or to use their own pure mechanism.
 
 extra-source-files:
-    README.md
+      AUTHORS
+    , LICENSE
+    , README.md
 
 source-repository head
     type:     git
@@ -53,6 +55,7 @@ library
       , Text.EDE.Internal.Checker.Monad
       , Text.EDE.Internal.Lexer
       , Text.EDE.Internal.Lexer.Tokens
+      , Text.EDE.Internal.Parser
       , Text.EDE.Internal.Pretty
       , Text.EDE.Internal.Types
 
