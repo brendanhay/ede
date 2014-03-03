@@ -61,7 +61,7 @@ $dquoted     = \0-\255 # [\"\n]
 @identr      = "}}"
 
 @sectionl    = "{%"
-@sectionr    = "{%"
+@sectionr    = "%}"
 @sectionws   = $white+
 
 @commentl    = "{-"
@@ -86,9 +86,6 @@ $newline               { atom KNewLine }
 <expr> @identr         { atom KIdentR `andBegin` frag }
 <expr> @sectionr       { atom KSectionR `andBegin` frag }
 <expr> @sectionws      { skip }
-<expr> @sign? @number  { capture KNum }
-<expr> $letter $ident+ { capture KIdent }
-<expr> \" @string* \"  { capture KText }
 
 <expr> @unary          { capture KOp }
 <expr> @logical        { capture KOp }
@@ -115,6 +112,10 @@ $newline               { atom KNewLine }
 <expr> "endcapture"    { atom KEndCapture }
 <expr> "raw"           { atom KRaw }
 <expr> "endraw"        { atom KEndRaw }
+
+<expr> @sign? @number  { capture KNum }
+<expr> $letter $ident+ { capture KIdent }
+<expr> \" @string* \"  { capture KText }
 
 <expr> \(              { atom KParenL }
 <expr> \)              { atom KParenR }
@@ -237,7 +238,7 @@ tokenise src txt = runAlex src txt loop
   where
     loop = do
         t <- scan
-        if eof t
+        if tokenEOF t
             then return []
             else do
                 ts <- loop
