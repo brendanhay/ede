@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -74,7 +75,7 @@ instance Pretty Meta where
 
 instance Pretty Lit where
     pretty _ (LNum  n) = integer n
-    pretty _ (LText t) = text $ LText.fromStrict t
+    pretty _ (LText t) = dquotes $ text (LText.fromStrict t)
     pretty _ (LBool b) = bool b
 
 instance Pretty Var where
@@ -94,6 +95,10 @@ instance Pretty (Exp a) where
         absPrec, appPrec :: Int
         absPrec = 1
         appPrec = 10
+
+instance Show e => Pretty (Either e (Exp a)) where
+    pretty d (Left  e) = parensIf (d > 1) $ "Left:" <+> fromString (show e)
+    pretty d (Right x) = parensIf (d > 1) $ "Right:" <+> pretty 0 x
 
 instance Pretty TVar where
     pretty d (TypeVar v) = pretty d v

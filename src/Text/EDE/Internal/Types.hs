@@ -64,14 +64,14 @@ data Exp a
     | EApp a (Exp a) (Exp a) -- ^ e1 e2
       deriving (Eq, Show)
 
+instance HasMeta a => HasMeta (Exp a) where
+    meta = meta . ann
+
 ann :: Exp a -> a
 ann (ELit a _)   = a
 ann (EVar a _)   = a
 ann (EAbs a _ _) = a
 ann (EApp a _ _) = a
-
-instance HasMeta a => HasMeta (Exp a) where
-    meta = meta . ann
 
 data TCon
     = TNum

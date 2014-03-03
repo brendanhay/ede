@@ -10,7 +10,9 @@
 
 module Text.EDE.Internal.Lexer.Tokens where
 
-import Data.Text               (Text)
+import Data.String
+import Data.Text                (Text)
+import Text.EDE.Internal.Pretty
 import Text.EDE.Internal.Types
 import Text.Parsec.Pos
 
@@ -19,6 +21,9 @@ data Token
     | TA !Meta !Atom
       deriving (Show)
 
+instance Pretty Token where
+    pretty _ = fromString . show
+
 instance HasMeta Token where
     meta (TC m _ _) = m
     meta (TA m _)   = m
@@ -26,9 +31,9 @@ instance HasMeta Token where
 tokenSourcePos :: Token -> SourcePos
 tokenSourcePos t = let Meta src row col = meta t in newPos src row col
 
-eof :: Token -> Bool
-eof (TA _ KEOF) = True
-eof _           = False
+tokenEOF :: Token -> Bool
+tokenEOF (TA _ KEOF) = True
+tokenEOF _           = False
 
 data Capture
     = KNum

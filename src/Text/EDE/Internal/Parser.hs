@@ -1,4 +1,6 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
+
 
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -40,41 +42,37 @@ runParser :: (Token -> String)
           -> Either ParseError a
 runParser f name parser = Parsec.runParser parser (ParserState f name) name
 
--- pDoc :: Parser Exp
--- pDoc = f $ pFragM <|> pIdentM <|> pExpM
---   where
---     f :: Parser (Exp, Meta) -> Parser Exp
---     f p = do
---         (x, _) <- p
---         xs     <- map fst <$> many1 p <|> return []
---         return $ foldl' (\a e -> eapp [ebound "<>", a, e]) x xs
---         -- alternative associativty:
---         -- return $ foldr (\e a -> eapp [ebound "mappend", a, e]) x xs
+pDoc :: Parser (Exp Meta)
+pDoc = do
+    x  <- p
+    xs <- many p <* eof
+    return $ foldl' (\a e -> evar (meta a) "<>" $$ a $$ e) x xs
+  where
+    p = pExp <|> pIdent <|> pFrag
 
--- pFragM :: Parser (Exp, Meta)
--- pFragM = do
---     (c, m) <- pTokMaybeM f <?> "a fragment"
---     cs     <- manyTill (pTokMaybeM f) (try . lookAhead $ void (pTokMaybeM g) <|> eof)
---     return (elit (LText . Text.pack $ c : map fst cs), m)
---   where
---     f (KFrag c) = Just c
---     f _         = Nothing
+        -- alternative associativty:
+        -- return $ foldr (\e a -> eapp [ebound "mappend", a, e]) x xs
 
---     g (KFrag _) = Nothing
---     g _         = Just ()
+-- FIXME: handle whitespace tokens, newlines
+pFrag :: Parser (Exp Meta)
+pFrag = do
+    (m, txt) : cs <- many1 p
+    return $ case cs of
+        [] -> etext m txt
+        _  -> etext m $ Text.concat (txt : map snd cs)
+  where
+    p = choice
+        [ pCapture KFrag <?> "a textual fragment"
+        , pCapture KWhiteSpace <?> "whitespace"
+        , ((,"\n") <$> pAtom KNewLine) <?> "a newline"
+        ]
 
--- pIdentM :: Parser (Exp, Meta)
--- pIdentM = do
---     (_, m) <- pTokM KIdentL
---     (v, _) <- pAtomM <* pTok KIdentR
---     return (v, m)
+pIdent :: Parser (Exp Meta)
+pIdent = pAtom KIdentL *> pTerm <* pAtom KIdentR
 
--- pExp :: Parser Exp
--- pExp = fst <$> pExpM
-
--- pExpM :: Parser (Exp a, Meta)
--- pExpM = choice
---     [ -- assign <name> = <exp>
+pExp :: Parser (Exp Meta)
+pExp = choice
+    [ -- assign <name> = <exp>
       -- try $ do
       --   (_, m) <- pTokM KSectionL
       --   n      <- pTok  KAssign *> pId
@@ -119,8 +117,8 @@ runParser f name parser = Parsec.runParser parser (ParserState f name) name
     --      return (EIncl m (UName n) mw, m)
 
       -- APP1 APP2
---      pAppM pAtomM
---    ] <?> "an expression"
+--      pApp pTerm
+    ] <?> "an expression"
 
 -- pAlts :: TokAtom -> TokAtom -> Parser [Alt]
 -- pAlts begin end = (<?> "an alternate expression") $
@@ -139,41 +137,25 @@ runParser f name parser = Parsec.runParser parser (ParserState f name) name
 -- pDefault end = ADefault <$> (pSection KElse *> pExp <* pSection end)
 --     <?> "an else expression"
 
--- pSection :: TokAtom -> Parser ()
--- pSection k = do
---     show   <- pTokShow
---     (_, m) <- pTokM KSectionL <?> "the start of a section"
---     pTok k <?> ('a' : ' ' : show (Token (KAtom k) m))
---     pTok KSectionR <?> "the end of a section"
+-- FIXME: needs to handle whitespace / newline control
+-- just do as monoids fornow
 
--- pAppM :: Parser (Exp, Meta) -> Parser (Exp, Meta)
--- pAppM p = do
---     (x, m) <- p
---     res    <- choice [eapp . (x:) . map fst <$> many1 p, return x]
---     return (res, m)
+pSection :: Atom -> Parser Meta
+pSection k = begin *> pAtom k <* end
+  where
+    begin = optional (line >> white) >> pAtom KSectionL
+    end   = pAtom KSectionR >> optional (white >> line)
 
--- pAtomM :: Parser (Exp, Meta)
--- pAtomM = choice
---     [ -- (EXP)
---       do (_, m) <- pTokM KParenL
---          t      <- pExp <* pTok KParenR
---          return (t, m)
+    white = many (pCapture KWhiteSpace)
+    line  = pAtom KNewLine
 
---       -- literals
---     , do (l, m) <- pLitM
---          return (elit l, m)
+pApp :: Parser (Exp Meta) -> Parser (Exp Meta)
+pApp p = do
+    x <- p
+    (eapp (meta x) . (x :) <$> many1 p) <|> return x
 
---       -- variables
---     , pFreeM
---     ]
-
--- pBound, pFree :: Parser Exp
--- pBound = fst <$> pBoundM
--- pFree  = fst <$> pFreeM
-
--- pBoundM, pFreeM :: Parser (Exp, Meta)
--- pBoundM = first ebound <$> pIdM
--- pFreeM  = first efree  <$> pIdM
+pTerm :: Parser (Exp Meta)
+pTerm = pExp <|> pLiteral <|> pVar
 
 pVar :: Parser (Exp Meta)
 pVar = uncurry evar <$> pCapture KIdent

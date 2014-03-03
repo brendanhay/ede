@@ -1,6 +1,7 @@
-{-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE GADTs         #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.Checker
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>

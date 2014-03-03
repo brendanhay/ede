@@ -17,7 +17,7 @@
 -- Portability : non-portable (GHC extensions)
 
 module Text.EDE.Internal.Lexer
-     ( tokenise
+     ( runLexer
      , module Text.EDE.Internal.Lexer.Tokens
      ) where
 
@@ -233,8 +233,8 @@ alexGetByte (AlexInput p _ t)
     -- convenience for ByteString construction.
     c2w = fromIntegral . ord
 
-tokenise :: String -> Text -> Either String [Token]
-tokenise src txt = runAlex src txt loop
+runLexer :: String -> Text -> Either String [Token]
+runLexer src txt = runAlex src txt loop
   where
     loop = do
         t <- scan
