@@ -29,7 +29,7 @@ import           Text.EDE.Internal.Pretty
 
 -- | Type checking:
 --   check Γ e A = Δ <=> Γ |- e <= A -| Δ
-check :: Context -> Exp a -> Polytype -> Check Context
+check :: Context -> Exp a -> Polytype -> Check (Context)
 check gamma expr typ =
   traceNS "check" (gamma, expr, typ) $
   checkwftype gamma typ $ case (expr, typ) of
@@ -41,9 +41,9 @@ check gamma expr typ =
         check (gamma >: CForall alpha') e (subst (TVar alpha') alpha a)
     -- ->I
     (EAbs a' x e, TFun a b) -> do
-      x' <- freshVar
-      dropMarker (CVar x' a) <$>
-        check (gamma >: CVar x' a) (subst (EVar a' x') x e) b
+      x'     <- freshVar
+      gamma' <- check (gamma >: CVar x' a) (subst (EVar a' x') (bind x) e) b
+      return $ dropMarker (CVar x' a) gamma'
     -- Sub
     (e, b) -> do
       (a, theta) <- synth gamma e
@@ -62,7 +62,7 @@ synth gamma expr = traceNS "synth" (gamma, expr) $ checkwf gamma $
     -- Var
     EVar _ x -> return
       ( fromMaybe (error $ "synth: not in scope " ++ pp (expr, gamma))
-                  (findVarType gamma x)
+                  (findVarType gamma (x))
       , gamma
       )
     -- ->I=> Full Damas-Milner type inference
@@ -76,10 +76,12 @@ synth gamma expr = traceNS "synth" (gamma, expr) $ checkwf gamma $
                          , CExists beta
                          , CVar x' (TExists alpha)
                          ])
-                  (subst (EVar a' x') x e)
+                  (subst (EVar a' x') (bind x) e)
                   (TExists beta)
-      let tau = apply delta' (TFun (TExists alpha) (TExists beta))
-      let evars = unsolved delta'
+
+      let tau   = apply delta' (TFun (TExists alpha) (TExists beta))
+          evars = unsolved delta'
+
       uvars <- replicateM (length evars) freshTVar
       return ( tforalls uvars $ substs (zip (map TVar uvars) evars) tau
              , delta)
@@ -98,9 +100,7 @@ applySynth gamma typ e = traceNS "applySynth" (gamma, typ, e) $
     TForall alpha a -> do
       -- Do alpha conversion to avoid clashes
       alpha' <- freshTVar
-      applySynth (gamma >: CExists alpha')
-                     (subst (TExists alpha') alpha a)
-                     e
+      applySynth (gamma >: CExists alpha') (subst (TExists alpha') alpha a) e
     -- alpha^App
     TExists alpha -> do
       alpha1 <- freshTVar
@@ -124,7 +124,7 @@ applySynth gamma typ e = traceNS "applySynth" (gamma, typ, e) $
 
 -- | Algorithmic subtyping:
 --   subtype Γ A B = Δ <=> Γ |- A <: B -| Δ
-subtype :: Context -> Polytype -> Polytype -> Check Context
+subtype :: Context -> Polytype -> Polytype -> Check (Context)
 subtype gamma typ1 typ2 =
   traceNS "subtype" (gamma, typ1, typ2) $
   checkwftype gamma typ1 $ checkwftype gamma typ2 $
@@ -166,7 +166,7 @@ subtype gamma typ1 typ2 =
 
 -- | Algorithmic instantiation (left):
 --   instantiateL Γ α A = Δ <=> Γ |- α^ :=< A -| Δ
-instantiateL :: Context -> TVar -> Polytype -> Check Context
+instantiateL :: Context -> TVar -> Polytype -> Check (Context)
 instantiateL gamma alpha a =
   traceNS "instantiateL" (gamma, alpha, a) $
   checkwftype gamma a $ checkwftype gamma (TExists alpha) $
@@ -202,7 +202,7 @@ instantiateL gamma alpha a =
 
 -- | Algorithmic instantiation (right):
 --   instantiateR Γ A α = Δ <=> Γ |- A =:< α -| Δ
-instantiateR :: Context -> Polytype -> TVar -> Check Context
+instantiateR :: Context -> Polytype -> TVar -> Check (Context)
 instantiateR gamma a alpha =
   traceNS "instantiateR" (gamma, a, alpha) $
   checkwftype gamma a $ checkwftype gamma (TExists alpha) $
@@ -255,8 +255,8 @@ instantiateR gamma a alpha =
 
 initial :: Context
 initial = Context
-    [ "mappend" ==> tforall "a" (tvar "a" --> tvar "a" --> tvar "a")
-    , "+"       ==> TCon TNum --> TCon TNum --> TCon TNum
+    [ "<>" ==> tforall "a" (tvar "a" --> tvar "a" --> tvar "a")
+    , "+"  ==> TCon TNum --> TCon TNum --> TCon TNum
     ]
 
 -- | Strictness annotations ensure the context

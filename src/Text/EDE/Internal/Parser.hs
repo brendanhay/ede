@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
-
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -42,13 +41,14 @@ runParser :: (Token -> String)
           -> Either ParseError a
 runParser f name parser = Parsec.runParser parser (ParserState f name) name
 
+-- FIXME: meta positioning for mappends is incorrect
 pDoc :: Parser (Exp Meta)
 pDoc = do
     x  <- p
     xs <- many p <* eof
-    return $ foldl' (\a e -> evar (meta a) "<>" $$ a $$ e) x xs
+    return $ foldl' (\a e -> eapp (meta a) [evar (meta a) "<>", a, e]) x xs
   where
-    p = pExp <|> pIdent <|> pFrag
+    p = pConstruct <|> pIdent <|> pFrag
 
         -- alternative associativty:
         -- return $ foldr (\e a -> eapp [ebound "mappend", a, e]) x xs
@@ -68,10 +68,10 @@ pFrag = do
         ]
 
 pIdent :: Parser (Exp Meta)
-pIdent = pAtom KIdentL *> pTerm <* pAtom KIdentR
+pIdent = pAtom KIdentL *> pExp <* pAtom KIdentR
 
-pExp :: Parser (Exp Meta)
-pExp = choice
+pConstruct :: Parser (Exp Meta)
+pConstruct = choice
     [ -- assign <name> = <exp>
       -- try $ do
       --   (_, m) <- pTokM KSectionL
@@ -149,13 +149,23 @@ pSection k = begin *> pAtom k <* end
     white = many (pCapture KWhiteSpace)
     line  = pAtom KNewLine
 
+pExp :: Parser (Exp Meta)
+pExp = pApp (pOp <|> pTerm)
+
+pTerm :: Parser (Exp Meta)
+pTerm = pLiteral <|> pVar
+
+pOp :: Parser (Exp Meta)
+pOp = do
+    x      <- try pTerm
+    (m, o) <- pCapture KOp
+    y      <- pTerm
+    return (eapp m [evar m o, x, y])
+
 pApp :: Parser (Exp Meta) -> Parser (Exp Meta)
 pApp p = do
     x <- p
     (eapp (meta x) . (x :) <$> many1 p) <|> return x
-
-pTerm :: Parser (Exp Meta)
-pTerm = pExp <|> pLiteral <|> pVar
 
 pVar :: Parser (Exp Meta)
 pVar = uncurry evar <$> pCapture KIdent

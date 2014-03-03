@@ -1,5 +1,4 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs     #-}
+{-# LANGUAGE GADTs #-}
 
 -- Module      : Text.EDE.Internal.Checker.Context
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -46,7 +45,7 @@ existentials (Context gamma) = aux =<< gamma
 unsolved :: Context -> [TVar]
 unsolved (Context gamma) = [alpha | CExists alpha <- gamma]
 
-vars :: Context -> [Var]
+vars :: Context -> [Bound]
 vars (Context gamma) = [x | CVar x _ <- gamma]
 
 foralls :: Context -> [TVar]
@@ -77,7 +76,7 @@ wf (Context gamma) = case gamma of
 
 -- | Well-formedness of types
 --   typewf Γ A <=> Γ |- A
-typewf :: Context -> Type a -> Bool
+typewf :: Context -> Type b -> Bool
 typewf gamma typ = case typ of
     TCon _          -> True
     -- UvarWF
@@ -94,11 +93,11 @@ findSolved :: Context -> TVar -> Maybe Monotype
 findSolved (Context gamma) v = listToMaybe [t | CExistsSolved v' t <- gamma, v == v']
 
 -- | findVarType (ΓL,x : A,ΓR) x = Just A
-findVarType :: Context -> Var -> Maybe Polytype
+findVarType :: Context -> Bound -> Maybe Polytype
 findVarType (Context gamma) v = listToMaybe [t | CVar v' t <- gamma, v == v']
 
 -- | solve (ΓL,α^,ΓR) α τ = (ΓL,α = τ,ΓR)
-solve :: Context -> TVar -> Monotype -> Maybe Context
+solve :: Context -> TVar -> Monotype -> Maybe (Context)
 solve gamma alpha tau
     | typewf gammaL tau = Just gamma'
     | otherwise         = Nothing

@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+
 -- Module      : Text.EDE.Internal.AST
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -18,17 +20,13 @@ import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
 evar :: a -> Id -> Exp a
-evar a = EVar a . Var
+evar a = EVar a . Bound
 
 eabs :: a -> Id -> Exp a -> Exp a
-eabs a = EAbs a . Var
+eabs a = EAbs a . Bind
 
 eapp :: a -> [Exp a] -> Exp a
 eapp a = foldl1 (EApp a)
-
-infixr 4 $$
-($$) :: Exp Meta -> Exp Meta -> Exp Meta
-a $$ b = eapp (meta a) [a, b]
 
 einteger :: a -> Integer -> Exp a
 einteger a = ELit a . LNum
@@ -57,4 +55,4 @@ tforalls = flip (foldr TForall)
 
 infixr 3 ==>
 (==>) :: Id -> Polytype -> Elem
-v ==> a = CVar (Var v) a
+v ==> a = CVar (Bound v) a

@@ -78,8 +78,11 @@ instance Pretty Lit where
     pretty _ (LText t) = dquotes $ text (LText.fromStrict t)
     pretty _ (LBool b) = bool b
 
-instance Pretty Var where
-    pretty d (Var v) = pretty d v
+instance Pretty Bound where
+    pretty d (Bound i) = pretty d i
+
+instance Pretty Bind where
+    pretty d (Bind i) = pretty d i
 
 instance Pretty (Exp a) where
     pretty d expr = case expr of
@@ -123,10 +126,10 @@ instance Pretty (Type a) where
 
 instance Pretty Elem where
     pretty d ctx = case ctx of
-        CForall v ->
-            pretty d v
         CVar v t ->
             parensIf (d > hastypePrec) $ pretty (hastypePrec + 1) v <+> "::" <+> pretty hastypePrec t
+        CForall v ->
+            pretty d v
         CExists v ->
             parensIf (d > existsPrec) $ "exists" <+> pretty existsPrec v
         CExistsSolved v t ->

@@ -16,26 +16,28 @@ module Text.EDE.Internal.Checker.Subst where
 import Text.EDE.Internal.Types
 
 class Subst a where
-    type SV a :: *
-    subst  :: a -> SV a   -> a -> a
-    substs :: [(a, SV a)] -> a -> a
+    type SVar a :: *
+    subst :: a -> SVar a -> a -> a
 
-    substs = flip $ foldr (uncurry subst)
+substs :: Subst a => [(a, SVar a)] -> a -> a
+substs = flip $ foldr (uncurry subst)
 
 -- | Expression substitution: e' x e = [e'/x]e
 instance Subst (Exp a) where
-    type SV (Exp a) = Var
+    type SVar  (Exp a) = Bound
     subst e' x expr = case expr of
-        ELit a l                -> ELit a l
-        EVar a x'   | x' == x   -> e'
-                    | otherwise -> EVar a x'
-        EAbs a x' e | x' == x   -> EAbs a x' e
-                    | otherwise -> EAbs a x' (subst e' x e)
-        EApp a e1 e2            -> EApp a (subst e' x e1) (subst e' x e2)
+        ELit a l                   -> ELit a l
+        EVar a x'   | x' == x      -> e'
+                    | otherwise    -> EVar a x'
+        EAbs a x' e | bind x' == x -> EAbs a x' e
+                    | otherwise    -> EAbs a x' (subst e' x e)
+        EApp a e1 e2               -> EApp a (subst e' x e1) (subst e' x e2)
+
+--    EAnno e t             -> EAnno (subst e' x e) t
 
 -- | Type substitution: A α B = [A/α]B
 instance Subst (Type a) where
-    type SV (Type a) = TVar
+    type SVar  (Type a) = TVar
     subst t' v typ = case typ of
         TCon c                   -> TCon c
         TVar v'      | v' == v   -> t'

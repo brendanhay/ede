@@ -24,7 +24,7 @@ data Token
 instance Pretty Token where
     pretty _ = fromString . show
 
-instance HasMeta Token where
+instance Metadata Token where
     meta (TC m _ _) = m
     meta (TA m _)   = m
 
