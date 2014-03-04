@@ -157,7 +157,6 @@ data AlexState = AlexState
 newtype Alex a = Alex { unAlex :: AlexState -> Either String (AlexState, a) }
 
 instance Monad Alex where
-    fail   !e = Alex $ const (Left e)
     return !x = Alex $ \s -> Right (s, x)
 
     (>>=) !m !k = Alex $ \s ->
@@ -179,6 +178,9 @@ runAlex src txt (Alex f) = snd `fmap` f state
         , inpText = txt
         }
 
+throw :: String -> Alex a
+throw !e = Alex $ const (Left e)
+
 getInput :: Alex AlexInput
 getInput = Alex $ \s -> Right (s, stateInput s)
 
@@ -199,7 +201,7 @@ scan = do
         AlexEOF ->
             return $ TA (inpMeta inp) KEOF
         AlexError inp' ->
-            fail $ "lexical error at: " ++ show (inpMeta inp')
+            throw $ "lexical error at: " ++ show (inpMeta inp')
         AlexSkip inp' len -> do
             setInput inp'
             scan

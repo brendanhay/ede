@@ -48,6 +48,12 @@ parensIf False = id
 class Pretty a where
     pretty :: Int -> a -> Doc
 
+instance Pretty a => Pretty (Either String a) where
+    pretty d eth = parensIf (d > 1) $
+        case eth of
+            Left  e -> "Left:"  <+> fromString e
+            Right x -> "Right:" <+> pretty 0 x
+
 instance Pretty a => Pretty [a] where
     pretty _ xs = lbracket <> go xs
       where
@@ -98,10 +104,6 @@ instance Pretty (Exp a) where
         absPrec, appPrec :: Int
         absPrec = 1
         appPrec = 10
-
-instance Show e => Pretty (Either e (Exp a)) where
-    pretty d (Left  e) = parensIf (d > 1) $ "Left:" <+> fromString (show e)
-    pretty d (Right x) = parensIf (d > 1) $ "Right:" <+> pretty 0 x
 
 instance Pretty TVar where
     pretty d (TypeVar v) = pretty d v

@@ -31,7 +31,6 @@ instance Functor Check where
     fmap = liftM
 
 instance Monad Check where
-    fail   !e = Check $ const (Left e)
     return !x = Check $ \s -> Right (s, x)
 
     (>>=) !m !k = Check $ \s ->
@@ -48,6 +47,9 @@ evalCheck t c = fmap snd . unCheck c $ CheckState
     }
   where
     namelist = [1..] >>= (`replicateM` ['a'..'z'])
+
+throw :: String -> Check a
+throw !e = Check $ const (Left e)
 
 -- | Create a fresh variable
 freshVar :: Check Bound

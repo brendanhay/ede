@@ -29,7 +29,7 @@ import           Text.EDE.Internal.Pretty
 
 -- | Type checking:
 --   check Γ e A = Δ <=> Γ |- e <= A -| Δ
-check :: Context -> Exp a -> Polytype -> Check (Context)
+check :: Context -> Exp a -> Polytype -> Check Context
 check gamma expr typ =
   traceNS "check" (gamma, expr, typ) $
   checkwftype gamma typ $ case (expr, typ) of
@@ -60,11 +60,11 @@ synth gamma expr = traceNS "synth" (gamma, expr) $ checkwf gamma $
             LText _ -> TCon TText
             LBool _ -> TCon TBool
     -- Var
-    EVar _ x -> return
-      ( fromMaybe (error $ "synth: not in scope " ++ pp (expr, gamma))
-                  (findVarType gamma (x))
-      , gamma
-      )
+    EVar _ x ->
+        maybe (throw $ "synth: not in scope " ++ pp (expr, gamma))
+              (return . (,gamma))
+              (findVarType gamma x)
+
     -- ->I=> Full Damas-Milner type inference
     EAbs a' x e -> do
       x'    <- freshVar
@@ -119,12 +119,12 @@ applySynth gamma typ e = traceNS "applySynth" (gamma, typ, e) $
       delta <- check gamma e a
       return (c, delta)
 
-    _ -> error $ "applySynth: don't know what to do with: "
+    _ -> throw $ "applySynth: don't know what to do with: "
               ++ pp (gamma, typ, e)
 
 -- | Algorithmic subtyping:
 --   subtype Γ A B = Δ <=> Γ |- A <: B -| Δ
-subtype :: Context -> Polytype -> Polytype -> Check (Context)
+subtype :: Context -> Polytype -> Polytype -> Check Context
 subtype gamma typ1 typ2 =
   traceNS "subtype" (gamma, typ1, typ2) $
   checkwftype gamma typ1 $ checkwftype gamma typ2 $
@@ -161,12 +161,11 @@ subtype gamma typ1 typ2 =
     (a, TExists alpha) | alpha `elem` existentials gamma
                       && not (alpha `Set.member` freeTVars a) ->
       instantiateR gamma a alpha
-    _ -> error $ "subtype, don't know what to do with:\n"
-                           ++ pp (gamma, typ1, typ2) ++ "\n" ++ show (gamma, typ1, typ2)
+    _ -> throw $ "no subtype exists for:\n" ++ pp (gamma, typ1, typ2)
 
 -- | Algorithmic instantiation (left):
 --   instantiateL Γ α A = Δ <=> Γ |- α^ :=< A -| Δ
-instantiateL :: Context -> TVar -> Polytype -> Check (Context)
+instantiateL :: Context -> TVar -> Polytype -> Check Context
 instantiateL gamma alpha a =
   traceNS "instantiateL" (gamma, alpha, a) $
   checkwftype gamma a $ checkwftype gamma (TExists alpha) $
@@ -197,12 +196,12 @@ instantiateL gamma alpha a =
           instantiateL (gamma >++ [CForall beta'])
                        alpha
                        (subst (TVar beta') beta b)
-      _ -> error $ "The impossible happened! instantiateL: "
+      _ -> throw $ "The impossible happened! instantiateL: "
                 ++ pp (gamma, alpha, a)
 
 -- | Algorithmic instantiation (right):
 --   instantiateR Γ A α = Δ <=> Γ |- A =:< α -| Δ
-instantiateR :: Context -> Polytype -> TVar -> Check (Context)
+instantiateR :: Context -> Polytype -> TVar -> Check Context
 instantiateR gamma a alpha =
   traceNS "instantiateR" (gamma, a, alpha) $
   checkwftype gamma a $ checkwftype gamma (TExists alpha) $
@@ -233,7 +232,7 @@ instantiateR gamma a alpha =
           instantiateR (gamma >++ [CMarker beta', CExists beta'])
                        (subst (TExists beta') beta b)
                        alpha
-      _ -> error $ "The impossible happened! instantiateR: "
+      _ -> throw $ "The impossible happened! instantiateR: "
                 ++ pp (gamma, a, alpha)
 
 -- -- Examples
