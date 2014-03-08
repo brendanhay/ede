@@ -31,8 +31,10 @@ literals :: TestTree
 literals = testGroup "Literal"
     [ parse "Integer" $
         \x -> (ident (show x), einteger m x)
+
     , parse "Text" $
         \x -> (ident ('"' : x ++ "\""), etext m (pack x))
+
     , parse "Bool" $
         \x -> (ident (show x), ebool m x)
     ]
