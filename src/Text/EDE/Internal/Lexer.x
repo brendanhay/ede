@@ -57,40 +57,20 @@ $dquoted     = \0-\255 # [\"\n]
              | 0[oO] @octal
              | 0[xX] @hexadecimal
 
-@identl      = "{{"
-@identr      = "}}"
-
-@sectionl    = "{%"
-@sectionr    = "%}"
-@sectionws   = $white+
-
-@commentl    = "{-"
-@commentr    = "-}"
-
-@unary       = "-"  | "+"  | "!"
-@logical     = "&&" | "||"
-@equality    = "==" | "!="
-@relational  =  ">" | ">=" | "<=" | "<"
-
 tokens :-
 
 $newline               { atom KNewLine }
 
-<frag> @identl         { atom KIdentL `andBegin` expr }
-<frag> @sectionl       { atom KSectionL `andBegin` expr }
-<frag> @commentl       { begin comm }
+<frag> "{{"            { atom KIdentL `andBegin` expr }
+<frag> "{%"            { atom KSectionL `andBegin` expr }
+<frag> "{-"            { begin comm }
 
 <frag> $whitespace+    { capture KWhiteSpace }
 <frag> $fragment+      { capture KFrag }
 
-<expr> @identr         { atom KIdentR `andBegin` frag }
-<expr> @sectionr       { atom KSectionR `andBegin` frag }
-<expr> @sectionws      { skip }
-
-<expr> @unary          { capture KOp }
-<expr> @logical        { capture KOp }
-<expr> @equality       { capture KOp }
-<expr> @relational     { capture KOp }
+<expr> "}}"            { atom KIdentR `andBegin` frag }
+<expr> "%}"            { atom KSectionR `andBegin` frag }
+<expr> $white+         { skip }
 
 <expr> "true"          { atom KTrue }
 <expr> "false"         { atom KFalse }
@@ -117,6 +97,18 @@ $newline               { atom KNewLine }
 <expr> $letter $ident* { capture KIdent }
 <expr> \" @string* \"  { capture KText }
 
+<expr> "-"             { capture KOp }
+<expr> "+"             { capture KOp }
+<expr> "!"             { capture KOp }
+<expr> "&&"            { capture KOp }
+<expr> "||"            { capture KOp }
+<expr> "=="            { capture KOp }
+<expr> "!="            { capture KOp }
+<expr> ">"             { capture KOp }
+<expr> ">="            { capture KOp }
+<expr> "<="            { capture KOp }
+<expr> "<"             { capture KOp }
+
 <expr> \(              { atom KParenL }
 <expr> \)              { atom KParenR }
 <expr> \[              { atom KBracketL }
@@ -125,7 +117,7 @@ $newline               { atom KNewLine }
 <expr> \,              { atom KComma }
 <expr> \_              { atom KUnderscore }
 
-<comm> @commentr       { begin frag }
+<comm> "-}"            { begin frag }
 <comm> .               { skip }
 
 {
