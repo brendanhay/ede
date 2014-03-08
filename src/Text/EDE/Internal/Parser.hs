@@ -70,6 +70,15 @@ pFrag = do
 pIdent :: Parser (Exp Meta)
 pIdent = pAtom KIdentL *> pExp <* pAtom KIdentR
 
+pSection :: Atom -> Parser Meta
+pSection k = (begin *> pAtom k <* end) <?> "a section"
+  where
+    begin = optional (line >> white) >> pAtom KSectionL
+    end   = pAtom KSectionR >> optional (white >> line)
+
+    white = many (pCapture KWhiteSpace)
+    line  = pAtom KNewLine
+
 pConstruct :: Parser (Exp Meta)
 pConstruct = choice
     [ -- assign <name> = <exp>
@@ -86,12 +95,15 @@ pConstruct = choice
 
         return (elet m v rhs bdy)
 
-    --   -- capture <name> ...
-    -- , try $ do
-    --     (_, m) <- pTokM KSectionL
-    --     n      <- pTok  KCapture *> pId
-    --     b      <- pTok  KSectionR *> pExp <* pSection KEndCapture
-    --     return (ELet m (UName n) b, m)
+      -- capture <name> ...
+    , try $ do
+        m      <- pAtom KSectionL <* pAtom KCapture
+        (_, v) <- pCapture KIdent <* pAtom KSectionR
+
+        rhs    <- pDoc <* pSection KEndCapture
+        bdy    <- pDoc <|> return (etext m "") -- consume the rest of the document
+
+        return (elet m v rhs bdy)
 
     --   -- if [<alt>]
     -- , try $ do
@@ -146,15 +158,6 @@ pConstruct = choice
 
 -- FIXME: needs to handle whitespace / newline control
 -- just do as monoids fornow
-
-pSection :: Atom -> Parser Meta
-pSection k = (begin *> pAtom k <* end) <?> "a section"
-  where
-    begin = optional (line >> white) >> pAtom KSectionL
-    end   = pAtom KSectionR >> optional (white >> line)
-
-    white = many (pCapture KWhiteSpace)
-    line  = pAtom KNewLine
 
 pExp :: Parser (Exp Meta)
 pExp = pApp (try pOp <|> pTerm) <?> "an expression"
