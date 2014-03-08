@@ -19,8 +19,11 @@ module Text.EDE.Internal.AST
 import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
-evar :: a -> Id -> Exp a
-evar a = EVar a . Bound
+efree :: a -> Id -> Exp a
+efree a = EVar a . VFree
+
+ebound :: a -> Id -> Exp a
+ebound a = EVar a . VBound
 
 eabs :: a -> Id -> Exp a -> Exp a
 eabs a = EAbs a . Bind
@@ -55,4 +58,4 @@ tforalls = flip (foldr TForall)
 
 infixr 3 ==>
 (==>) :: Id -> Polytype -> Elem
-v ==> a = CVar (Bound v) a
+v ==> a = CVar (VBound v) a

@@ -114,7 +114,7 @@ $newline               { atom KNewLine }
 <expr> "endraw"        { atom KEndRaw }
 
 <expr> @sign? @number  { capture KNum }
-<expr> $letter $ident+ { capture KIdent }
+<expr> $letter $ident* { capture KIdent }
 <expr> \" @string* \"  { capture KText }
 
 <expr> \(              { atom KParenL }

@@ -19,7 +19,7 @@ import           Text.EDE.Internal.Pretty
 import           Text.EDE.Internal.Types
 
 data CheckState = CheckState
-    { varNames  :: [Bound]
+    { varNames  :: [Var]
     , tvarNames :: [TVar]
     , indent    :: !Int
     , tracing   :: !Bool
@@ -40,7 +40,7 @@ instance Monad Check where
 
 evalCheck :: Bool -> Check a -> Either String a
 evalCheck t c = fmap snd . unCheck c $ CheckState
-    { varNames  = map (Bound . Text.pack . ('$':)) namelist
+    { varNames  = map (VBound  . Text.pack . ('$':)) namelist
     , tvarNames = map (TypeVar . Text.pack) namelist
     , indent    = 0
     , tracing   = t
@@ -52,7 +52,7 @@ throw :: String -> Check a
 throw !e = Check $ const (Left e)
 
 -- | Create a fresh variable
-freshVar :: Check Bound
+freshVar :: Check Var
 freshVar = do
     v:vs <- gets varNames
     modify $ \s -> s {varNames = vs}

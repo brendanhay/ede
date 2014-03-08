@@ -59,11 +59,15 @@ synth gamma expr = traceNS "synth" (gamma, expr) $ checkwf gamma $
             LNum  _ -> TCon TNum
             LText _ -> TCon TText
             LBool _ -> TCon TBool
-    -- Var
-    EVar _ x ->
-        maybe (throw $ "synth: not in scope " ++ pp (expr, gamma))
-              (return . (,gamma))
-              (findVarType gamma x)
+
+    -- ->Exists
+    EVar a' x ->
+        case findVarType gamma x of
+            Just x' -> return (x', gamma)
+            Nothing | VBound _ <- x -> throw $ "typesynth: not in scope " ++ pp (expr, gamma)
+            Nothing | VFree  _ <- x -> do
+                alpha <- freshTVar
+                return (TExists alpha, gamma >: CExists alpha)
 
     -- ->I=> Full Damas-Milner type inference
     EAbs a' x e -> do
@@ -130,15 +134,19 @@ subtype gamma typ1 typ2 =
   checkwftype gamma typ1 $ checkwftype gamma typ2 $
     case (typ1, typ2) of
     (TCon alpha, TCon alpha') | alpha == alpha' -> return gamma
+
     -- <:Var
     (TVar alpha, TVar alpha') | alpha == alpha' -> return gamma
+
     -- <:Exvar
     (TExists alpha, TExists alpha')
       | alpha == alpha' && alpha `elem` existentials gamma -> return gamma
+
     -- <:->
     (TFun a1 a2, TFun b1 b2) -> do
       theta <- subtype gamma b1 a1
       subtype theta (apply theta a2) (apply theta b2)
+
     -- <:forallL
     (TForall alpha a, b) -> do
       -- Do alpha conversion to avoid clashes
@@ -147,20 +155,24 @@ subtype gamma typ1 typ2 =
         subtype (gamma >++ [CMarker alpha', CExists alpha'])
                 (subst (TExists alpha') alpha a)
                 b
+
     -- <:forallR
     (a, TForall alpha b) -> do
       -- Do alpha conversion to avoid clashes
       alpha' <- freshTVar
       dropMarker (CForall alpha') <$>
         subtype (gamma >: CForall alpha') a (subst (TVar alpha') alpha b)
+
     -- <:InstantiateL
     (TExists alpha, a) | alpha `elem` existentials gamma
                       && not (alpha `Set.member` freeTVars a) ->
       instantiateL gamma alpha a
+
     -- <:InstantiateR
     (a, TExists alpha) | alpha `elem` existentials gamma
                       && not (alpha `Set.member` freeTVars a) ->
       instantiateR gamma a alpha
+
     _ -> throw $ "no subtype exists for:\n" ++ pp (gamma, typ1, typ2)
 
 -- | Algorithmic instantiation (left):

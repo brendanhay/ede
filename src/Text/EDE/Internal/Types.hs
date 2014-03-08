@@ -30,27 +30,22 @@ data Meta = Meta
     , metaCol  :: Int
     } deriving (Eq, Show)
 
-class Metadata a where
-    meta :: a -> Meta
-
-instance Metadata Meta where
-    meta = id
-
 data Ann a = Ann
     { annType :: Polytype
     , annTail :: a
     } deriving (Show)
 
-instance Metadata a => Metadata (Ann a) where
-    meta = meta . annTail
-
 type Id = Text
 
-newtype Bound = Bound Id deriving (Eq, Show)
-newtype Bind  = Bind  Id deriving (Eq, Show)
+data Var
+    = VBound Id
+    | VFree  Id
+      deriving (Eq, Show)
 
-bind :: Bind -> Bound
-bind (Bind i) = Bound i
+newtype Bind = Bind Id deriving (Eq, Show)
+
+bind :: Bind -> Var
+bind (Bind i) = VBound i
 
 data Lit
     = LNum  Integer
@@ -60,21 +55,11 @@ data Lit
 
 data Exp a
     = ELit a Lit
-    | EVar a Bound
+    | EVar a Var
     | EAbs a Bind    (Exp a)
     | EApp a (Exp a) (Exp a)
     | ELet a Bind    [Alt a] (Exp a)
       deriving (Eq, Show)
-
-instance Metadata a => Metadata (Exp a) where
-    meta = meta . ann
-
-ann :: Exp a -> a
-ann (ELit a _)     = a
-ann (EVar a _)     = a
-ann (EAbs a _ _)   = a
-ann (EApp a _ _)   = a
-ann (ELet a _ _ _) = a
 
 data Pat
     = PWildcard
@@ -84,9 +69,6 @@ data Pat
 
 data Alt a = Alt Pat (Exp a)
     deriving (Eq, Show)
-
-instance Metadata a => Metadata (Alt a) where
-    meta (Alt _ x) = meta x
 
 data TCon
     = TNum
@@ -141,11 +123,11 @@ freeTVars typ = case typ of
     TFun t1 t2  -> freeTVars t1 <> freeTVars t2
 
 data Elem
-    = CVar          Bound Polytype -- ^ x : A
-    | CForall       TVar           -- ^ alpha
-    | CExists       TVar           -- ^ alpha^
-    | CExistsSolved TVar  Monotype -- ^ alpha^ = tau
-    | CMarker       TVar           -- ^ |> alpha^
+    = CVar          Var  Polytype -- ^ x : A
+    | CForall       TVar          -- ^ alpha
+    | CExists       TVar          -- ^ alpha^
+    | CExistsSolved TVar Monotype -- ^ alpha^ = tau
+    | CMarker       TVar          -- ^ |> alpha^
       deriving (Eq, Show)
 
 newtype Context = Context [Elem]
@@ -154,3 +136,24 @@ newtype Context = Context [Elem]
 instance Monoid Context where
     mempty = Context []
     mappend (Context a) (Context b) = Context (b ++ a)
+
+class Metadata a where
+    meta :: a -> Meta
+
+instance Metadata Meta where
+    meta = id
+
+instance Metadata a => Metadata (Ann a) where
+    meta = meta . annTail
+
+instance Metadata a => Metadata (Exp a) where
+    meta = meta . ann
+      where
+        ann (ELit a _)     = a
+        ann (EVar a _)     = a
+        ann (EAbs a _ _)   = a
+        ann (EApp a _ _)   = a
+        ann (ELet a _ _ _) = a
+
+instance Metadata a => Metadata (Alt a) where
+    meta (Alt _ x) = meta x

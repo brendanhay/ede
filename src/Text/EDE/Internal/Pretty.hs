@@ -84,8 +84,9 @@ instance Pretty Lit where
     pretty _ (LText t) = dquotes $ text (LText.fromStrict t)
     pretty _ (LBool b) = bool b
 
-instance Pretty Bound where
-    pretty d (Bound i) = pretty d i
+instance Pretty Var where
+    pretty d (VBound i) = pretty d i
+    pretty d (VFree  i) = pretty d i
 
 instance Pretty Bind where
     pretty d (Bind i) = pretty d i

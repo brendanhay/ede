@@ -46,7 +46,7 @@ pDoc :: Parser (Exp Meta)
 pDoc = do
     x  <- p
     xs <- many p <* eof
-    return $ foldl' (\a e -> eapp (meta a) [evar (meta a) "<>", a, e]) x xs
+    return $ foldl' (\a e -> eapp (meta a) [ebound (meta a) "<>", a, e]) x xs
   where
     p = pConstruct <|> pIdent <|> pFrag
 
@@ -160,7 +160,7 @@ pOp = do
     x      <- try pTerm
     (m, o) <- pCapture KOp
     y      <- pTerm
-    return (eapp m [evar m o, x, y])
+    return (eapp m [ebound m o, x, y])
 
 pApp :: Parser (Exp Meta) -> Parser (Exp Meta)
 pApp p = do
@@ -168,7 +168,7 @@ pApp p = do
     (eapp (meta x) . (x :) <$> many1 p) <|> return x
 
 pVar :: Parser (Exp Meta)
-pVar = uncurry evar <$> pCapture KIdent
+pVar = uncurry efree <$> pCapture KIdent
 
 pLiteral :: Parser (Exp Meta)
 pLiteral = choice

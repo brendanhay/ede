@@ -24,7 +24,7 @@ substs = flip $ foldr (uncurry subst)
 
 -- | Expression substitution: e' x e = [e'/x]e
 instance Subst (Exp a) where
-    type SVar  (Exp a) = Bound
+    type SVar  (Exp a) = Var
     subst e' x expr = case expr of
         ELit a l                   -> ELit a l
         EVar a x'   | x' == x      -> e'

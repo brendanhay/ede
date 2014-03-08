@@ -45,7 +45,7 @@ existentials (Context gamma) = aux =<< gamma
 unsolved :: Context -> [TVar]
 unsolved (Context gamma) = [alpha | CExists alpha <- gamma]
 
-vars :: Context -> [Bound]
+vars :: Context -> [Var]
 vars (Context gamma) = [x | CVar x _ <- gamma]
 
 foralls :: Context -> [TVar]
@@ -93,7 +93,7 @@ findSolved :: Context -> TVar -> Maybe Monotype
 findSolved (Context gamma) v = listToMaybe [t | CExistsSolved v' t <- gamma, v == v']
 
 -- | findVarType (ΓL,x : A,ΓR) x = Just A
-findVarType :: Context -> Bound -> Maybe Polytype
+findVarType :: Context -> Var -> Maybe Polytype
 findVarType (Context gamma) v = listToMaybe [t | CVar v' t <- gamma, v == v']
 
 -- | solve (ΓL,α^,ΓR) α τ = (ΓL,α = τ,ΓR)
