@@ -98,7 +98,7 @@ instance Pretty (Exp a) where
         EVar _ v ->
             pretty d v
         EAbs _ v e ->
-            parensIf (d > absPrec) $ "\\" <> pretty (absPrec + 1) v <> dot <+> pretty absPrec e
+            parensIf (d > absPrec) $ "λ" <> pretty (absPrec + 1) v <> dot <+> pretty absPrec e
         EApp _ e1 e2 ->
             parensIf (d > appPrec) $ pretty appPrec e1 <+> pretty (appPrec + 1) e2
       where
@@ -130,7 +130,7 @@ instance Pretty (Type a) where
 instance Pretty Elem where
     pretty d ctx = case ctx of
         CVar v t ->
-            parensIf (d > hastypePrec) $ pretty (hastypePrec + 1) v <+> "::" <+> pretty hastypePrec t
+            parensIf (d > hastypePrec) $ pretty (hastypePrec + 1) v -- <+> "::" <+> pretty hastypePrec t
         CForall v ->
             pretty d v
         CExists v ->

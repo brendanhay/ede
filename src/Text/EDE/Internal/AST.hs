@@ -50,6 +50,12 @@ infixr 4 -->
 exists :: Id -> Type a
 exists = TExists . TypeVar
 
+tnum :: Type a
+tnum = TCon TNum
+
+tbool :: Type a
+tbool = TCon TBool
+
 tforall :: Id -> Polytype -> Polytype
 tforall = TForall . TypeVar
 

@@ -247,6 +247,30 @@ instantiateR gamma a alpha =
       _ -> throw $ "The impossible happened! instantiateR: "
                 ++ pp (gamma, a, alpha)
 
+-- | Strictness annotations ensure the context
+--   is evaluated, and thereby well-formed.
+infer :: Bool -> Exp a -> Either String (Polytype, Context)
+infer t x =
+    case evalCheck t (synth initial x) of
+        Left  e            -> Left e
+        Right (!a, !gamma) -> Right (apply gamma a, gamma)
+
+initial :: Context
+initial = Context
+    [ "<>" ==> tforall "a" (tvar "a" --> tvar "a" --> tvar "a")
+
+    -- Unary
+    , "-"  ==> tnum  --> tnum --> tnum
+    , "+"  ==> tnum  --> tnum --> tnum
+    , "!"  ==> tbool --> tbool
+
+    -- Relational
+    , ">"  ==> tforall "a" (tvar "a" --> tvar "a" --> tbool)
+    , ">=" ==> tforall "a" (tvar "a" --> tvar "a" --> tbool)
+    , "<"  ==> tforall "a" (tvar "a" --> tvar "a" --> tbool)
+    , "<=" ==> tforall "a" (tvar "a" --> tvar "a" --> tbool)
+    ]
+
 -- -- Examples
 -- eid :: Exp a -- (λx. x) : ∀ t. t → t
 -- eid = eabs "x" (var "x") -: tforall "t" (tvar "t" --> tvar "t")
@@ -263,20 +287,6 @@ instantiateR gamma a alpha =
 
 -- mappnd :: Exp a
 -- mappnd = eapp [eabs "x" . eabs "y" $ var "z"]
-
-initial :: Context
-initial = Context
-    [ "<>" ==> tforall "a" (tvar "a" --> tvar "a" --> tvar "a")
-    , "+"  ==> TCon TNum --> TCon TNum --> TCon TNum
-    ]
-
--- | Strictness annotations ensure the context
---   is evaluated, and thereby well-formed.
-infer :: Bool -> Exp a -> Either String (Polytype, Context)
-infer t x =
-    case evalCheck t (synth initial x) of
-        Left  e            -> Left e
-        Right (!a, !gamma) -> Right (apply gamma a, gamma)
 
 -- realpha :: Polytype -> Polytype
 -- realpha t = evalState (f t) (mempty, ['a'..'z'])
