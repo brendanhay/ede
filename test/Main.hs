@@ -47,15 +47,14 @@ parse :: Testable IO (a -> Either String String)
       => String
       -> (a -> (Text, Exp Meta))
       -> TestTree
-parse src f = testProperty src $ \x -> do
-    let (txt, e) = f x
+parse src f = testProperty src $ \x -> prop (f x)
+  where
+    prop (txt, e) = do
+        ts <- runLexer src txt
+        a  <- either (Left . show) Right (runParser show src pDoc ts)
 
-    ts <- runLexer src txt
-    a  <- either (Left . show) Right (runParser show src pDoc ts)
-
-    let e' = const (meta a) `fmap` e
-
-    if e' /= a
-        then Left  $ "Actual: " ++ show a ++ "\nExpected: " ++ show e'
-        else Right $ "Correctly parsed: " ++ show a
+        let b = const (meta a) `fmap` e
+         in if b /= a
+                then Left  $ "Actual: " ++ show a ++ "\nExpected: " ++ show b
+                else Right $ "Correctly parsed: " ++ show a
 
