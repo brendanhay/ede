@@ -108,6 +108,7 @@ $newline               { atom KNewLine }
 <expr> ">="            { capture KOp }
 <expr> "<="            { capture KOp }
 <expr> "<"             { capture KOp }
+<expr> "="             { capture KOp }
 
 <expr> \(              { atom KParenL }
 <expr> \)              { atom KParenR }
@@ -143,7 +144,7 @@ data AlexInput = AlexInput
 
 data AlexState = AlexState
     { stateInput :: AlexInput
-    , stateCode  :: Int
+    , stateCode  :: {-# UNPACK #-} !Int
     }
 
 newtype Alex a = Alex { unAlex :: AlexState -> Either String (AlexState, a) }
@@ -193,7 +194,7 @@ scan = do
         AlexEOF ->
             return $ TA (inpMeta inp) KEOF
         AlexError inp' ->
-            throw $ "lexical error at: " ++ show (inpMeta inp')
+            throw $ "lexical error at: " ++ show inp'
         AlexSkip inp' len -> do
             setInput inp'
             scan

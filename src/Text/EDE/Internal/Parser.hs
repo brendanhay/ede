@@ -73,11 +73,18 @@ pIdent = pAtom KIdentL *> pExp <* pAtom KIdentR
 pConstruct :: Parser (Exp Meta)
 pConstruct = choice
     [ -- assign <name> = <exp>
-      -- try $ do
-      --   (_, m) <- pTokM KSectionL
-      --   n      <- pTok  KAssign *> pId
-      --   b      <- pTok  (KOp "=") *> pExp <* pTok KSectionR
-      --   return (elet n b, m)
+      try $ do
+        m       <- pAtom KSectionL <* pAtom KAssign
+        (_, v)  <- pCapture KIdent
+        (_, op) <- pCapture KOp
+
+        unless (op == "=") $
+            fail "ballsacks"
+
+        rhs     <- pTerm <* pAtom KSectionR
+        bdy     <- pDoc <|> return (etext m "") -- consume the rest of the document
+
+        return (elet m v rhs bdy)
 
     --   -- capture <name> ...
     -- , try $ do
@@ -118,7 +125,7 @@ pConstruct = choice
 
       -- APP1 APP2
 --      pApp pTerm
-    ] <?> "an expression"
+    ] -- <?> "a section construct"
 
 -- pAlts :: TokAtom -> TokAtom -> Parser [Alt]
 -- pAlts begin end = (<?> "an alternate expression") $
@@ -141,7 +148,7 @@ pConstruct = choice
 -- just do as monoids fornow
 
 pSection :: Atom -> Parser Meta
-pSection k = begin *> pAtom k <* end
+pSection k = (begin *> pAtom k <* end) <?> "a section"
   where
     begin = optional (line >> white) >> pAtom KSectionL
     end   = pAtom KSectionR >> optional (white >> line)
@@ -150,14 +157,14 @@ pSection k = begin *> pAtom k <* end
     line  = pAtom KNewLine
 
 pExp :: Parser (Exp Meta)
-pExp = pApp (pOp <|> pTerm)
+pExp = pApp (try pOp <|> pTerm) <?> "an expression"
 
 pTerm :: Parser (Exp Meta)
 pTerm = pLiteral <|> pVar
 
 pOp :: Parser (Exp Meta)
 pOp = do
-    x      <- try pTerm
+    x      <- pTerm
     (m, o) <- pCapture KOp
     y      <- pTerm
     return (eapp m [ebound m o, x, y])
@@ -166,9 +173,10 @@ pApp :: Parser (Exp Meta) -> Parser (Exp Meta)
 pApp p = do
     x <- p
     (eapp (meta x) . (x :) <$> many1 p) <|> return x
+    <?> "an expression application"
 
 pVar :: Parser (Exp Meta)
-pVar = uncurry efree <$> pCapture KIdent
+pVar = (uncurry efree <$> pCapture KIdent) <?> "a variable"
 
 pLiteral :: Parser (Exp Meta)
 pLiteral = choice

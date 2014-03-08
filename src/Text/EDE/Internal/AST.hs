@@ -28,6 +28,9 @@ ebound a = EVar a . VBound
 eabs :: a -> Id -> Exp a -> Exp a
 eabs a = EAbs a . Bind
 
+elet :: a -> Id -> Exp a -> Exp a -> Exp a
+elet a v = ELet a (Bind v)
+
 eapp :: a -> [Exp a] -> Exp a
 eapp a = foldl1 (EApp a)
 

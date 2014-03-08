@@ -71,13 +71,7 @@ instance Pretty Text where
     pretty _ = text . LText.fromStrict
 
 instance Pretty Meta where
-    pretty _ Meta{..} =
-          fromString metaName
-       <> ":("
-       <> int metaRow
-       <> char ','
-       <> int metaCol
-       <> char ')'
+    pretty _ = fromString . show
 
 instance Pretty Lit where
     pretty _ (LNum  n) = integer n
@@ -101,6 +95,8 @@ instance Pretty (Exp a) where
             parensIf (d > absPrec) $ "λ" <> pretty (absPrec + 1) v <> dot <+> pretty absPrec e
         EApp _ e1 e2 ->
             parensIf (d > appPrec) $ pretty appPrec e1 <+> pretty (appPrec + 1) e2
+        ELet _ v rhs bdy ->
+            "let" <+> pretty 0 v <+> "=" <+> pretty 0 rhs <+> "in" <$> nest 4 (pretty 0 bdy)
       where
         absPrec, appPrec :: Int
         absPrec = 1

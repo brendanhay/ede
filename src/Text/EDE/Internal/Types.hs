@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE RecordWildCards            #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -28,7 +29,10 @@ data Meta = Meta
     { metaName :: String
     , metaRow  :: Int
     , metaCol  :: Int
-    } deriving (Eq, Show)
+    } deriving (Eq)
+
+instance Show Meta where
+    show Meta{..} = metaName <> ":" <> show metaRow <> ":" <> show metaCol
 
 data Ann a = Ann
     { annType :: Polytype
@@ -58,7 +62,7 @@ data Exp a
     | EVar a Var
     | EAbs a Bind    (Exp a)
     | EApp a (Exp a) (Exp a)
-    | ELet a Bind    [Alt a] (Exp a)
+    | ELet a Bind    (Exp a) (Exp a)
       deriving (Eq, Show)
 
 data Pat
@@ -66,9 +70,6 @@ data Pat
     | PVar Id
     | PLit Lit
       deriving (Eq, Show)
-
-data Alt a = Alt Pat (Exp a)
-    deriving (Eq, Show)
 
 data TCon
     = TNum
@@ -154,6 +155,3 @@ instance Metadata a => Metadata (Exp a) where
         ann (EAbs a _ _)   = a
         ann (EApp a _ _)   = a
         ann (ELet a _ _ _) = a
-
-instance Metadata a => Metadata (Alt a) where
-    meta (Alt _ x) = meta x
