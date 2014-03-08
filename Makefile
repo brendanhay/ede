@@ -16,10 +16,10 @@ clean:
 	cabal clean
 
 test:
-	cabal install --enable-tests $(FLAGS)
+	cabal test
 
 bench:
-	cabal install --enable-benchmarks $(FLAGS)
+	cabal bench
 
 lint:
 	hlint src

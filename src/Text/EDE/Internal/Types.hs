@@ -65,6 +65,13 @@ data Exp a
     | ELet a Bind    (Exp a) (Exp a)
       deriving (Eq, Show)
 
+instance Functor Exp where
+    fmap f (ELit x l)     = ELit (f x) l
+    fmap f (EVar x v)     = EVar (f x) v
+    fmap f (EAbs x b e)   = EAbs (f x) b (f <$> e)
+    fmap f (EApp x a b)   = EApp (f x)   (f <$> a) (f <$> b)
+    fmap f (ELet x b r e) = ELet (f x) b (f <$> r) (f <$> e)
+
 data Pat
     = PWildcard
     | PVar Id

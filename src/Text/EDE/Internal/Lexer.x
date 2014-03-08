@@ -72,8 +72,11 @@ $newline               { atom KNewLine }
 <expr> "%}"            { atom KSectionR `andBegin` frag }
 <expr> $white+         { skip }
 
+<expr> "True"          { atom KTrue }
 <expr> "true"          { atom KTrue }
+<expr> "False"         { atom KFalse }
 <expr> "false"         { atom KFalse }
+
 <expr> "else"          { atom KElse }
 <expr> "if"            { atom KIf }
 <expr> "elif"          { atom KElseIf }
@@ -95,7 +98,8 @@ $newline               { atom KNewLine }
 
 <expr> @sign? @number  { capture KNum }
 <expr> $letter $ident* { capture KIdent }
-<expr> \" @string* \"  { capture KText }
+
+<expr> \" @string* \"  { scoped KText (Text.tail . Text.init) }
 
 <expr> "-"             { capture KOp }
 <expr> "+"             { capture KOp }
@@ -122,6 +126,9 @@ $newline               { atom KNewLine }
 <comm> .               { skip }
 
 {
+-- scoped :: Capture -> AlexInput -> Int -> Alex Token
+scoped k f inp len = return $ TC (inpMeta inp) k (f . Text.take len $ inpText inp)
+
 capture :: Capture -> AlexInput -> Int -> Alex Token
 capture k inp len = return $ TC (inpMeta inp) k (Text.take len $ inpText inp)
 

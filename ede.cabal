@@ -73,3 +73,18 @@ library
       , text            >= 1.0
       , unordered-containers
       , wl-pprint-text
+
+test-suite tests
+    default-language:  Haskell2010
+    type:              exitcode-stdio-1.0
+    hs-source-dirs:    test
+    main-is:           Main.hs
+    ghc-options:       -Wall -rtsopts -threaded
+
+    build-depends:
+        base             >= 4.6 && < 5
+      , ede
+      , smallcheck
+      , tasty
+      , tasty-smallcheck
+      , text
