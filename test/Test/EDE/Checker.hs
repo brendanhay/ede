@@ -1,4 +1,4 @@
--- Module      : Main
+-- Module      : Test.EDE.Checker
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -8,16 +8,9 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Main (main) where
+module Test.EDE.Checker (tests) where
 
-import qualified Test.EDE.Checker as Checker
-import qualified Test.EDE.Lexer   as Lexer
-import qualified Test.EDE.Parser  as Parser
-import           Test.Tasty
+import Test.Tasty
 
-main :: IO ()
-main = defaultMain $ testGroup "EDE"
-    [ Lexer.tests
-    , Parser.tests
-    , Checker.tests
-    ]
+tests :: TestTree
+tests = testGroup "Type Checking" []

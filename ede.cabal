@@ -86,5 +86,6 @@ test-suite tests
       , ede
       , smallcheck
       , tasty
+      , tasty-hunit
       , tasty-smallcheck
       , text

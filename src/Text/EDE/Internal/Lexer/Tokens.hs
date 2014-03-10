@@ -19,7 +19,7 @@ import Text.Parsec.Pos
 data Token
     = TC !Meta !Capture !Text
     | TA !Meta !Atom
-      deriving (Show)
+      deriving (Eq, Show)
 
 instance Pretty Token where
     pretty _ = fromString . show

@@ -42,8 +42,8 @@ data Ann a = Ann
 type Id = Text
 
 data Var
-    = VBound Id
-    | VFree  Id
+    = VBound { varId :: Id }
+    | VFree  { varId :: Id }
       deriving (Eq, Show)
 
 newtype Bind = Bind Id deriving (Eq, Show)
