@@ -3,6 +3,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
+
 -- Module      : Test.EDE.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -15,55 +17,74 @@
 
 module Test.EDE.Parser (tests) where
 
-import Data.Monoid
-import Data.Text                (Text, pack)
-import Test.Tasty
-import Test.Tasty.SmallCheck
-import Test.Tasty.HUnit
-import Text.EDE.Internal.AST
-import Text.EDE.Internal.Lexer
-import Text.EDE.Internal.Parser
+import           Data.Monoid
+import           Data.Text                (Text)
+import qualified Data.Text                as Text
+import           Test.SmallCheck.Series
+import           Test.Tasty
+import           Test.Tasty.HUnit
+import           Test.Tasty.SmallCheck
+import           Text.EDE.Internal.AST
+import           Text.EDE.Internal.Lexer
+import           Text.EDE.Internal.Parser
 
 tests :: TestTree
 tests = testGroup "Parsing"
-    [ testGroup "Variables"
-        [ parseCase "{{ var' }}" (efree m "var'")
-
-        ]
-
-    , testGroup "Literals"
-        [ parseProp "String" $
-            \x -> (ident ('"' : x ++ "\""), etext m (pack x))
-        , parseProp "Integer" $
-            \x -> (ident (show x), einteger m x)
-        , parseProp "Bool" $
-            \x -> (ident (show x), ebool m x)
-        ]
+    [ variables
+    , literals
     ]
 
-parseCase :: TestName -> Exp a -> TestTree
-parseCase src ex = testCase src $
-    either assertFailure
-           (\x -> const (meta x) `fmap` ex @=? x)
-           (do ts <- runLexer src (pack src)
-               either (Left . show) Right (runParser show src pDoc ts))
+variables :: TestTree
+variables = testGroup "Variables" $
+    map (\x -> parseCase (ident x) (efree m x))
+        [ "var'"
+        , "_alpha123"
+        , "test_Name'"
+        , "_123"
+        ]
 
-parseProp :: Testable IO (a -> Either String String)
-          => String
-          -> (a -> (Text, Exp Meta))
-          -> TestTree
+literals :: TestTree
+literals = testGroup "Literals"
+    [ parseProp "String"  $ \x -> (ident (quote x), etext m x)
+    , parseProp "Integer" $ \x -> (ident (pack x), einteger m x)
+    , parseProp "Bool"    $ \x -> (ident (pack x), ebool m x)
+    ]
+
+parseCase :: Text -> Exp meta -> TestTree
+parseCase txt ex =
+    let src = Text.unpack txt
+     in testCase src $
+            either assertFailure
+               (\x -> const (meta x) `fmap` ex @=? x)
+               (parse src txt)
+
+parseProp :: Testable IO (t -> Either String [Char]) =>
+                   [Char] -> (t -> (Text, Exp a)) -> TestTree
 parseProp src f = testProperty src $ \x -> prop (f x)
   where
     prop (txt, e) = do
-        ts <- runLexer src txt
-        a  <- either (Left . show) Right (runParser show src pDoc ts)
-        let b = const (meta a) `fmap` e
-         in if b /= a
-                then Left  $ "Actual: " ++ show a ++ "\nExpected: " ++ show b
-                else Right $ "Correctly parsed: " ++ show a
+        act <- parse src txt
+        let ex = const (meta act) `fmap` e
+         in if ex /= act
+                then Left  $ "Actual: " ++ show act ++ "\nExpected: " ++ show ex
+                else Right $ "Correctly parsed: " ++ show act
 
-ident :: String -> Text
-ident x = "{{" <> pack x <> "}}"
+parse :: String -> Text -> Either String (Exp Meta)
+parse src txt = do
+    ts <- runLexer src txt
+    either (Left . show) Right (runParser show src pDoc ts)
+
+pack :: Show a => a -> Text
+pack = Text.pack . show
+
+ident :: Text -> Text
+ident x = "{{ " <> x <> " }}"
+
+quote :: Text -> Text
+quote x = "\"" <> x <> "\""
 
 m :: Meta
 m = Meta "m" 0 0
+
+instance Monad m => Serial m Text where
+    series = cons1 Text.pack
