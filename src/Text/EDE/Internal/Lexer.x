@@ -112,6 +112,7 @@ $newline               { atom KNewLine }
 <expr> ">="            { capture KOp }
 <expr> "<="            { capture KOp }
 <expr> "<"             { capture KOp }
+
 <expr> "="             { capture KOp }
 
 <expr> \(              { atom KParenL }
@@ -126,7 +127,7 @@ $newline               { atom KNewLine }
 <comm> .               { skip }
 
 {
--- scoped :: Capture -> AlexInput -> Int -> Alex Token
+scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
 scoped k f inp len = return $ TC (inpMeta inp) k (f . Text.take len $ inpText inp)
 
 capture :: Capture -> AlexInput -> Int -> Alex Token

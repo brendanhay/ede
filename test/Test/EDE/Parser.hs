@@ -30,18 +30,28 @@ import           Text.EDE.Internal.Parser
 
 tests :: TestTree
 tests = testGroup "Parsing"
-    [ variables
+    [ operators
+    , variables
     , literals
     ]
 
-variables :: TestTree
-variables = testGroup "Variables" $
-    map (\x -> parseCase (ident x) (efree m x))
-        [ "var'"
-        , "_alpha123"
-        , "test_Name'"
-        , "_123"
+operators :: TestTree
+operators = testGroup "Operators" $ map f
+    ["-", "+", "!", "&&", "||", "==", "!=", ">", ">=", "<=", "<"]
+  where
+    f g = parseCase ("x " <> g <> " y") $ eapp m
+        [ ebound m g
+        , efree m "x"
+        , efree m "y"
         ]
+
+variables :: TestTree
+variables = testGroup "Variables" $ map (\x -> parseCase x (efree m x))
+    [ "var'"
+    , "_alpha123"
+    , "test_Name'"
+    , "_123"
+    ]
 
 literals :: TestTree
 literals = testGroup "Literals"
@@ -50,24 +60,25 @@ literals = testGroup "Literals"
     , parseProp "Bool"    $ \x -> (ident (pack x), ebool m x)
     ]
 
-parseCase :: Text -> Exp meta -> TestTree
+parseCase :: Text -> Exp Meta -> TestTree
 parseCase txt ex =
     let src = Text.unpack txt
      in testCase src $
             either assertFailure
-               (\x -> const (meta x) `fmap` ex @=? x)
-               (parse src txt)
+                   (\act -> NoMeta ex @=? NoMeta act)
+                   (parse src $ ident txt)
 
-parseProp :: Testable IO (t -> Either String [Char]) =>
-                   [Char] -> (t -> (Text, Exp a)) -> TestTree
+parseProp :: Testable IO (a -> Either String [Char])
+          => [Char]
+          -> (a -> (Text, Exp Meta))
+          -> TestTree
 parseProp src f = testProperty src $ \x -> prop (f x)
   where
-    prop (txt, e) = do
+    prop (txt, ex) = do
         act <- parse src txt
-        let ex = const (meta act) `fmap` e
-         in if ex /= act
-                then Left  $ "Actual: " ++ show act ++ "\nExpected: " ++ show ex
-                else Right $ "Correctly parsed: " ++ show act
+        if NoMeta ex /= NoMeta act
+            then Left  $ "Actual: " ++ show act ++ "\nExpected: " ++ show ex
+            else Right $ "Correctly parsed: " ++ show act
 
 parse :: String -> Text -> Either String (Exp Meta)
 parse src txt = do
@@ -85,6 +96,16 @@ quote x = "\"" <> x <> "\""
 
 m :: Meta
 m = Meta "m" 0 0
+
+newtype NoMeta = NoMeta (Exp Meta)
+
+instance Show NoMeta where
+    show (NoMeta x) = show x
+
+instance Eq NoMeta where
+    NoMeta a == NoMeta b = f a == f b
+      where
+        f = fmap (const True)
 
 instance Monad m => Serial m Text where
     series = cons1 Text.pack
