@@ -30,35 +30,59 @@ import           Text.EDE.Internal.Parser
 
 tests :: TestTree
 tests = testGroup "Parsing"
-    [ operators
+    [ literals
     , variables
-    , literals
+    , operators
+    , comments
+    , sections
     ]
 
-operators :: TestTree
-operators = testGroup "Operators" $ map f
-    ["-", "+", "!", "&&", "||", "==", "!=", ">", ">=", "<=", "<"]
-  where
-    f g = parseCase ("x " <> g <> " y") $ eapp m
-        [ ebound m g
-        , efree m "x"
-        , efree m "y"
+literals :: TestTree
+literals = testGroup "Literals"
+    [ parseProp "Integer" $ \x -> (ident (pack x), einteger m x)
+    , parseProp "Bool"    $ \x -> (ident (pack x), ebool m x)
+    , testGroup "Text"    $ map (\x -> parseCase (ident $ quote x) (etext m x))
+        [ "c"
+        , "some text"
+        , "break\n"
+        , "esc\'ap\"ed\""
         ]
+    ]
 
 variables :: TestTree
-variables = testGroup "Variables" $ map (\x -> parseCase x (efree m x))
+variables = testGroup "Variables" $ map f
     [ "var'"
     , "_alpha123"
     , "test_Name'"
     , "_123"
     ]
+  where
+    f x = parseCase (ident x) (efree m x)
 
-literals :: TestTree
-literals = testGroup "Literals"
-    [ parseProp "String"  $ \x -> (ident (quote x), etext m x)
-    , parseProp "Integer" $ \x -> (ident (pack x), einteger m x)
-    , parseProp "Bool"    $ \x -> (ident (pack x), ebool m x)
+operators :: TestTree
+operators = testGroup "Operators" $ map f
+    ["-", "+", "!", "&&", "||", "==", "!=", ">", ">=", "<=", "<"]
+  where
+    f g = parseCase (ident $ "x " <> g <> " y") $ eapp m
+        [ ebound m g
+        , efree m "x"
+        , efree m "y"
+        ]
+
+comments :: TestTree
+comments = testGroup "Comments" $ map f
+    [ "some random shit"
+    , "more \n random \t shit {{ with }} junk\r\n "
     ]
+  where
+    f x = parseCase (comment x) (efree m "undefined")
+
+sections :: TestTree
+sections = testGroup "Sections"
+   [ testGroup "assign"
+       [
+       ]
+   ]
 
 parseCase :: Text -> Exp Meta -> TestTree
 parseCase txt ex =
@@ -66,7 +90,7 @@ parseCase txt ex =
      in testCase src $
             either assertFailure
                    (\act -> NoMeta ex @=? NoMeta act)
-                   (parse src $ ident txt)
+                   (parse src txt)
 
 parseProp :: Testable IO (a -> Either String [Char])
           => [Char]
@@ -90,6 +114,12 @@ pack = Text.pack . show
 
 ident :: Text -> Text
 ident x = "{{ " <> x <> " }}"
+
+section :: Text -> Text
+section x = "{% " <> x <> " %}"
+
+comment :: Text -> Text
+comment x = "{- " <> x <> " -}"
 
 quote :: Text -> Text
 quote x = "\"" <> x <> "\""

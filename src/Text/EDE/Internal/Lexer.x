@@ -25,6 +25,7 @@ import           Control.Monad
 import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
 import qualified Data.Text.Unsafe               as Text
+import           Prelude                        hiding (exp)
 import           Text.EDE.Internal.Lexer.Tokens
 import           Text.EDE.Internal.Types
 }
@@ -32,23 +33,14 @@ import           Text.EDE.Internal.Types
 $whitespace  = [\ \t\b\xa0]
 $newline     = [\n]
 
+$sign        = [\-\+]
 $digit       = 0-9
 $octit       = 0-7
-$hexit       = [$digit A-F a-f]
 
-$letter      = [a-zA-Z_]
-$ident       = [$digit $letter ']
-
-$fragment    = [^\{]
-
-$dquoted     = \0-\255 # [\"\n]
-@descape     = \\ ([ntvbrfaeE\\\?\"] | $octit{1,3} | x$hexit+ | X$hexit+)
-@string      = $dquoted | @descape
-
-@sign        = [\-\+]
+@hexit       = [$digit A-F a-f]
 @decimal     = $digit+
 @octal       = $octit+
-@hexadecimal = $hexit+
+@hexadecimal = @hexit+
 @exponent    = [eE] [\-\+]? @decimal
 
 @number      = @decimal
@@ -57,74 +49,80 @@ $dquoted     = \0-\255 # [\"\n]
              | 0[oO] @octal
              | 0[xX] @hexadecimal
 
+$letter      = [a-zA-Z_]
+$fragment    = [^\{]
+
+@escape      = \\ ([ntvbrfaeE\\\?\"] | $octit{1,3} | x@hexit+ | X@hexit+)
+@ident       = [$digit $letter ']
+@string      = [. $newline] # [\"\\] | @escape
+
 tokens :-
 
-$newline               { atom KNewLine }
+<0> "{{"              { atom KIdentL `andBegin` exp }
+<0> "{%"              { atom KSectionL `andBegin` exp }
+<0> "{-"              { begin com }
 
-<frag> "{{"            { atom KIdentL `andBegin` expr }
-<frag> "{%"            { atom KSectionL `andBegin` expr }
-<frag> "{-"            { begin comm }
+<0> $newline          { atom KNewLine }
+<0> $whitespace+      { capture KWhiteSpace }
+<0> $fragment+        { capture KFrag }
 
-<frag> $whitespace+    { capture KWhiteSpace }
-<frag> $fragment+      { capture KFrag }
+<exp> "}}"            { atom KIdentR `andBegin` 0 }
+<exp> "%}"            { atom KSectionR `andBegin` 0 }
+<exp> $white+         { skip }
 
-<expr> "}}"            { atom KIdentR `andBegin` frag }
-<expr> "%}"            { atom KSectionR `andBegin` frag }
-<expr> $white+         { skip }
+<exp> "True"          { atom KTrue }
+<exp> "true"          { atom KTrue }
+<exp> "False"         { atom KFalse }
+<exp> "false"         { atom KFalse }
 
-<expr> "True"          { atom KTrue }
-<expr> "true"          { atom KTrue }
-<expr> "False"         { atom KFalse }
-<expr> "false"         { atom KFalse }
+<exp> "else"          { atom KElse }
+<exp> "if"            { atom KIf }
+<exp> "elif"          { atom KElseIf }
+<exp> "elsif"         { atom KElseIf }
+<exp> "endif"         { atom KEndIf }
+<exp> "case"          { atom KCase }
+<exp> "when"          { atom KWhen }
+<exp> "endcase"       { atom KEndCase }
+<exp> "for"           { atom KFor }
+<exp> "in"            { atom KIn }
+<exp> "endfor"        { atom KEndFor }
+<exp> "include"       { atom KInclude }
+<exp> "with"          { atom KWith }
+<exp> "assign"        { atom KAssign }
+<exp> "capture"       { atom KCapture }
+<exp> "endcapture"    { atom KEndCapture }
+<exp> "raw"           { atom KRaw }
+<exp> "endraw"        { atom KEndRaw }
 
-<expr> "else"          { atom KElse }
-<expr> "if"            { atom KIf }
-<expr> "elif"          { atom KElseIf }
-<expr> "elsif"         { atom KElseIf }
-<expr> "endif"         { atom KEndIf }
-<expr> "case"          { atom KCase }
-<expr> "when"          { atom KWhen }
-<expr> "endcase"       { atom KEndCase }
-<expr> "for"           { atom KFor }
-<expr> "in"            { atom KIn }
-<expr> "endfor"        { atom KEndFor }
-<expr> "include"       { atom KInclude }
-<expr> "with"          { atom KWith }
-<expr> "assign"        { atom KAssign }
-<expr> "capture"       { atom KCapture }
-<expr> "endcapture"    { atom KEndCapture }
-<expr> "raw"           { atom KRaw }
-<expr> "endraw"        { atom KEndRaw }
+<exp> $sign? @number  { capture KNum }
+<exp> $letter @ident* { capture KIdent }
 
-<expr> @sign? @number  { capture KNum }
-<expr> $letter $ident* { capture KIdent }
+<exp> \" @string* \"  { scoped KText (Text.tail . Text.init) }
 
-<expr> \" @string* \"  { scoped KText (Text.tail . Text.init) }
+<exp> "-"             { capture KOp }
+<exp> "+"             { capture KOp }
+<exp> "!"             { capture KOp }
+<exp> "&&"            { capture KOp }
+<exp> "||"            { capture KOp }
+<exp> "=="            { capture KOp }
+<exp> "!="            { capture KOp }
+<exp> ">"             { capture KOp }
+<exp> ">="            { capture KOp }
+<exp> "<="            { capture KOp }
+<exp> "<"             { capture KOp }
 
-<expr> "-"             { capture KOp }
-<expr> "+"             { capture KOp }
-<expr> "!"             { capture KOp }
-<expr> "&&"            { capture KOp }
-<expr> "||"            { capture KOp }
-<expr> "=="            { capture KOp }
-<expr> "!="            { capture KOp }
-<expr> ">"             { capture KOp }
-<expr> ">="            { capture KOp }
-<expr> "<="            { capture KOp }
-<expr> "<"             { capture KOp }
+<exp> "="             { capture KOp }
 
-<expr> "="             { capture KOp }
+<exp> \(              { atom KParenL }
+<exp> \)              { atom KParenR }
+<exp> \[              { atom KBracketL }
+<exp> \]              { atom KBracketR }
+<exp> \.              { atom KDot }
+<exp> \,              { atom KComma }
+<exp> \_              { atom KUnderscore }
 
-<expr> \(              { atom KParenL }
-<expr> \)              { atom KParenR }
-<expr> \[              { atom KBracketL }
-<expr> \]              { atom KBracketR }
-<expr> \.              { atom KDot }
-<expr> \,              { atom KComma }
-<expr> \_              { atom KUnderscore }
-
-<comm> "-}"            { begin frag }
-<comm> .               { skip }
+<com> "-}"            { begin 0 }
+<com> [. $newline]    { skip }
 
 {
 scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
@@ -170,7 +168,7 @@ runAlex src txt (Alex f) = snd `fmap` f state
   where
     state = AlexState
         { stateInput = input
-        , stateCode  = frag
+        , stateCode  = 0
         }
 
     input = AlexInput
