@@ -56,7 +56,9 @@ data Atom
     | KDot
     | KComma
     | KUnderscore
+    | KEquals
 
+    | KComment
     | KNewLine
     | KEOF
 
@@ -77,6 +79,4 @@ data Atom
     | KAssign
     | KCapture
     | KEndCapture
-    | KRaw
-    | KEndRaw
       deriving (Eq, Show)

@@ -45,7 +45,7 @@ literals = testGroup "Literals"
         [ "c"
         , "some text"
         , "break\n"
-        , "esc\'ap\"ed\""
+        , "esc\'ap\\\"ed\\\""
         ]
     ]
 
@@ -75,25 +75,27 @@ comments = testGroup "Comments" $ map f
     , "more \n random \t shit {{ with }} junk\r\n "
     ]
   where
-    f x = parseCase (comment x) (efree m "undefined")
+    f x = parseCase (comment x <> " ") (etext m " ")
 
 sections :: TestTree
 sections = testGroup "Sections"
-   [ testGroup "assign"
-       [
-       ]
+   [
+--        [ parseCase (sectionBlock "raw" "{{ var }} text {% if false %}\n{% endif %}")
+--                    (etext m "{{ var }} text {% if false %}\n{% endif %}")
+-- --       , sectionLine "raw" "{{ var }} text {% if false %}\n{% endif %}"
+--        ]
    ]
 
 parseCase :: Text -> Exp Meta -> TestTree
 parseCase txt ex =
-    let src = Text.unpack txt
+    let src = init . tail $ show txt
      in testCase src $
             either assertFailure
                    (\act -> NoMeta ex @=? NoMeta act)
                    (parse src txt)
 
-parseProp :: Testable IO (a -> Either String [Char])
-          => [Char]
+parseProp :: Testable IO (a -> Either String String)
+          => String
           -> (a -> (Text, Exp Meta))
           -> TestTree
 parseProp src f = testProperty src $ \x -> prop (f x)
@@ -115,8 +117,9 @@ pack = Text.pack . show
 ident :: Text -> Text
 ident x = "{{ " <> x <> " }}"
 
-section :: Text -> Text
-section x = "{% " <> x <> " %}"
+sectionBlock, sectionLine :: Text -> Text -> Text
+sectionBlock k x = sectionLine k ("\n" <> x <> "\n")
+sectionLine  k x = "{% " <> k <> " %}" <> x <> "{% end" <> k <> " %}"
 
 comment :: Text -> Text
 comment x = "{- " <> x <> " -}"

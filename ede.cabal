@@ -50,9 +50,6 @@ library
 
     exposed-modules:
         Text.EDE.Internal.AST
-      , Text.EDE.Internal.Checker
-      , Text.EDE.Internal.Checker.Context
-      , Text.EDE.Internal.Checker.Monad
       , Text.EDE.Internal.Lexer
       , Text.EDE.Internal.Lexer.Tokens
       , Text.EDE.Internal.Parser

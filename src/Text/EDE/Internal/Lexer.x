@@ -4,7 +4,6 @@
 {-# LANGUAGE RecordWildCards          #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
-{-# OPTIONS_GHC -w                    #-}
 
 -- Module      : Text.EDE.Internal.Lexer
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -21,7 +20,9 @@ module Text.EDE.Internal.Lexer
      , module Text.EDE.Internal.Lexer.Tokens
      ) where
 
+import           Control.Applicative
 import           Control.Monad
+import           Data.Monoid
 import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
 import qualified Data.Text.Unsafe               as Text
@@ -64,11 +65,13 @@ tokens :-
 
 <0> $newline          { atom KNewLine }
 <0> $whitespace+      { capture KWhiteSpace }
-<0> $fragment+        { capture KFrag }
+<0> .                 { captureFrag }
 
 <exp> "}}"            { atom KIdentR `andBegin` 0 }
 <exp> "%}"            { atom KSectionR `andBegin` 0 }
 <exp> $white+         { skip }
+
+<exp> "="             { atom KEquals }
 
 <exp> "True"          { atom KTrue }
 <exp> "true"          { atom KTrue }
@@ -91,8 +94,6 @@ tokens :-
 <exp> "assign"        { atom KAssign }
 <exp> "capture"       { atom KCapture }
 <exp> "endcapture"    { atom KEndCapture }
-<exp> "raw"           { atom KRaw }
-<exp> "endraw"        { atom KEndRaw }
 
 <exp> $sign? @number  { capture KNum }
 <exp> $letter @ident* { capture KIdent }
@@ -110,8 +111,6 @@ tokens :-
 <exp> ">="            { capture KOp }
 <exp> "<="            { capture KOp }
 <exp> "<"             { capture KOp }
-
-<exp> "="             { capture KOp }
 
 <exp> \(              { atom KParenL }
 <exp> \)              { atom KParenR }
@@ -134,6 +133,25 @@ capture k inp len = return $ TC (inpMeta inp) k (Text.take len $ inpText inp)
 atom :: Atom -> AlexInput -> Int -> Alex Token
 atom k inp _ = return $ TA (inpMeta inp) k
 
+captureFrag AlexInput{..} _ = do
+    setInput $ AlexInput
+        { inpMeta = Text.foldl' move inpMeta res
+        , inpText = Text.drop (Text.length res) inpText
+        }
+    return $ TC inpMeta KFrag res
+  where
+    res = go inpText
+
+    go txt =
+        let (x, y) = Text.break (== '{') txt
+            r      = fst <$> Text.uncons (Text.drop 1 y)
+         in case (Text.null y, r) of
+                (_,     Just '%') -> x
+                (_,     Just '-') -> x
+                (_,     Just '{') -> x
+                (True,  _)        -> x
+                (False, _)        -> x <> Text.take 2 y <> go (Text.drop 2 y)
+
 start :: String -> Meta
 start src = Meta src 1 1
 
@@ -144,7 +162,6 @@ move (Meta src l c) _    = Meta src  l      (c + 1)
 
 data AlexInput = AlexInput
     { inpMeta :: Meta
-    , inpLast :: {-# UNPACK #-} !Char
     , inpText :: {-# UNPACK #-} !Text
     } deriving (Show)
 
@@ -173,7 +190,6 @@ runAlex src txt (Alex f) = snd `fmap` f state
 
     input = AlexInput
         { inpMeta = start src
-        , inpLast = '\n'
         , inpText = txt
         }
 
@@ -207,8 +223,6 @@ scan = do
         AlexToken inp' len action -> do
             setInput inp'
             action inp len
-          -- where
-          --   len = Text.length (inpText inp) - Text.length (inpText inp')
 
 -- | Ignore this token and scan another.
 skip :: AlexInput -> Int -> Alex Token
@@ -223,9 +237,9 @@ andBegin :: (AlexInput -> Int -> Alex a) -> Int -> AlexInput -> Int -> Alex a
 (a `andBegin` c) inp len = setCode c >> a inp len
 
 alexGetByte :: Num a => AlexInput -> Maybe (a, AlexInput)
-alexGetByte (AlexInput p _ t)
+alexGetByte (AlexInput p t)
     | Text.null t = Nothing
-    | otherwise   = Just $! (c2w c, AlexInput (move p c) c cs)
+    | otherwise   = Just $! (c2w c, AlexInput (move p c) cs)
   where
     (c, cs) = (Text.unsafeHead t, Text.unsafeTail t)
 
