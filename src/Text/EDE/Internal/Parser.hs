@@ -79,7 +79,7 @@ assign = elet
 match :: Parser (Exp Text)
 match = ECase
     <$> section "case" (atom KCase *> term)
-    <*> many1 (alt <$> section "when" (atom KWhen *> pattern0) <*> document)
+    <*> many1 (alt <$> section "when" (atom KWhen *> pattern) <*> document)
     <*  section "endcase" (atom KEndCase)
 
 conditional :: Parser (Exp Text)
@@ -106,12 +106,12 @@ term0 = EVar <$> identifier <|> literal
 term1 :: Parser (Exp Text)
 term1 = foldl1 EApp <$> some term0
 
-pattern0 :: Parser (P Text)
-pattern0 = (varp <$> identifier) <|> (wildp <$ atom KUnderscore)
+pattern :: Parser (P Text)
+pattern = (varp <$> identifier) <|> (wildp <$ atom KUnderscore)
     <?> "a pattern"
 
-pattern1 :: Parser (P Text)
-pattern1 = asp <$> try (identifier <* atom KAt) <*> pattern1 <|> pattern0
+pattern0 :: Parser (P Text)
+pattern0 = asp <$> try (identifier <* atom KAt) <*> pattern0 <|> pattern
 
 identifier :: Parser Text
 identifier = snd <$> capture KIdent
