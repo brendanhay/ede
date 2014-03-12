@@ -63,5 +63,14 @@ elet bs b = ELet (length bs) (map (abstr . snd) bs) (abstr b)
 --   where
 --     abstr = abstract (`elemIndex` map fst as)
 
+eif :: Eq a => Exp a -> Exp a -> Exp a -> Exp a
+eif p x y = ECase p [true x, false y]
+
+true :: Eq a => Exp a -> Alt Exp a
+true = alt (P (const (PLit $ LBool True)) [])
+
+false :: Eq a => Exp a -> Alt Exp a
+false = alt (P (const (PLit $ LBool False)) [])
+
 alt :: Eq a => P a -> Exp a -> Alt Exp a
-alt (P p as) t = Alt (length as) (p []) (abstract (`elemIndex` as) t)
+alt (P p as) = Alt (length as) (p []) . abstract (`elemIndex` as)

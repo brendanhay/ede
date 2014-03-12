@@ -13,18 +13,18 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Bound
 import           Control.Applicative
-import           Data.List                      (elemIndex)
+import           Data.Foldable                  (foldl')
 import           Data.Monoid
 import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
 import qualified Data.Text.Read                 as Read
-import           Text.EDE.Internal.Lexer.Tokens
 import           Text.EDE.Internal.AST
-import qualified Text.Parsec                    as Parsec
+import           Text.EDE.Internal.Lexer.Tokens
 import           Text.Parsec                    (Parsec, (<?>), getState, try)
+import qualified Text.Parsec                    as Parsec
 import           Text.Parsec.Combinator
+import           Text.Parsec.Error
 
 type Parser = Parsec [Token] ParserState
 
@@ -33,39 +33,40 @@ data ParserState = ParserState
     , stateName :: String
     }
 
--- runParser :: (Token -> String)
---           -> String
---           -> Parser a
---           -> [Token]
---           -> Either ParseError a
-runParser p = Parsec.runParser (p <* eof) (ParserState show "parse") "parse"
+runParser :: String -> Parser a -> [Token] -> Either ParseError a
+runParser src p = Parsec.runParser (p <* eof) (ParserState show src) src
 
 document :: Parser (Exp Text)
 document = foldl1 (EApp . EApp (EVar "<>")) <$> many1
     (fragment <|> substitution <|> sections)
 
 fragment :: Parser (Exp a)
-fragment = expect "a textual fragment" $ do
-    (m, txt) : cs <- many1 (capture KFrag <|> whitespace <|> newline)
+fragment = do
+    (_, txt) : cs <- many1 (capture KFrag <|> whitespace <|> newline)
     return . ELit . LText $
         case cs of
             [] -> txt
             _  -> Text.concat (txt : map snd cs)
+    <?> "a textual fragment"
 
 whitespace :: Parser (Meta, Text)
-whitespace = expect "whitespace" $ capture KWhiteSpace
+whitespace = capture KWhiteSpace
+    <?> "whitespace"
 
 newline :: Parser (Meta, Text)
-newline = expect "a newline" $ (, "\n") <$> atom KNewLine
+newline = (, "\n") <$> atom KNewLine
+    <?> "a newline"
 
 substitution :: Parser (Exp Text)
-substitution = expect "substitution" $ atom KIdentL *> term <* atom KIdentR
+substitution = atom KIdentL *> term <* atom KIdentR
+    <?> "substitution"
 
 sections :: Parser (Exp Text)
 sections = choice
     [ assign
     , match
-    ]
+    , conditional
+    ] <?> "a section"
 
 section :: String -> Parser a -> Parser a
 section n p = try (atom KSectionL *> p <* atom KSectionR) <?> n
@@ -78,49 +79,26 @@ assign = elet
 match :: Parser (Exp Text)
 match = ECase
     <$> section "case" (atom KCase *> term)
-    <*> many1 a
+    <*> many1 (alt <$> section "when" (atom KWhen *> pattern0) <*> document)
     <*  section "endcase" (atom KEndCase)
-  where
-    a = alt
-        <$> section "when" (atom KWhen *> pattern0)
-        <*> document
 
 conditional :: Parser (Exp Text)
-conditional = do
-    p <- section "if" (atom KIf *> term)
-    e <- document
-    n <- 
-
-    section "endif" (atom KEndIf)
-  where
---    branch n a = section n (atom a *> term) <$>
-
-
-    a = (,)
-        <$> section "elsif" (atom KElseIf *> term)
-        <*> document
-
--- if a
--- x
--- elsif b
--- y
--- else
--- z
--- end
-
--- ECase a [(True, x), (False, ECase b ...)]
-
--- conditional
+conditional = foldl' (\a (x, y) -> a . eif x y)
+    <$> (eif <$> section "if" (atom KIf *> term) <*> document)
+    <*> many ((,) <$> section "elsif" (atom KElseIf *> term) <*> document)
+    <*> (section "else" (atom KElse) *> document <|> blank)
+    <*  section "endif" (atom KEndIf)
 
 -- loop
-
 -- include
 
 decls :: Parser [(Text, Exp Text)]
 decls = sepBy1 ((,) <$> identifier <* atom KEquals <*> term) (atom KNewLine)
+    <?> "a declaration"
 
 term :: Parser (Exp Text)
 term = term0 <|> term1
+    <?> "a term"
 
 term0 :: Parser (Exp Text)
 term0 = EVar <$> identifier <|> literal
@@ -130,31 +108,34 @@ term1 = foldl1 EApp <$> some term0
 
 pattern0 :: Parser (P Text)
 pattern0 = (varp <$> identifier) <|> (wildp <$ atom KUnderscore)
+    <?> "a pattern"
 
 pattern1 :: Parser (P Text)
 pattern1 = asp <$> try (identifier <* atom KAt) <*> pattern1 <|> pattern0
 
 identifier :: Parser Text
 identifier = snd <$> capture KIdent
+    <?> "an identifier"
 
 literal :: Parser (Exp a)
 literal = boolean <|> string <|> integer
 
 boolean :: Parser (Exp a)
-boolean = expect "a boolean" $ ELit . LBool <$> (true <|> false)
-  where
-    true  = atom KTrue  >> return True
-    false = atom KFalse >> return False
+boolean = ELit . LBool <$>
+    (atom KTrue *> return True <|> atom KFalse *> return False)
+    <?> "a boolean"
 
 string :: Parser (Exp a)
-string = expect "a string" $ ELit . LText . snd <$> capture KText
+string = ELit . LText . snd <$> capture KText
+    <?> "a string"
 
 integer :: Parser (Exp a)
-integer = expect "an integer" $ do
+integer = do
     (_, txt) <- capture KNum
     either (fail . mappend "unexpected error parsing number: ")
            (uncurry parse)
            (Read.signed Read.decimal txt)
+    <?> "an integer"
   where
     parse n "" = return $ ELit (LInteger n)
     parse n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
@@ -164,8 +145,6 @@ blank = return $ ELit (LText "")
 
 parens :: Parser a -> Parser a
 parens p = atom KParenL *> p <* atom KParenR
-
-expect = flip (<?>)
 
 capture :: Capture -> Parser (Meta, Text)
 capture x = token f
