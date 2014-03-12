@@ -56,6 +56,8 @@ data Atom
     | KDot
     | KComma
     | KUnderscore
+    | KAt
+    | KEquals
 
     | KNewLine
     | KEOF

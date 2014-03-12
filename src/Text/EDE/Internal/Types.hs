@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
@@ -58,22 +59,19 @@ data Lit
       deriving (Eq, Show)
 
 data Exp a
-    = ELit a Lit
-    | EVar a Var
-    | EAbs a Bind    (Exp a)
-    | EApp a (Exp a) (Exp a)
-    | ELet a Bind    (Exp a) (Exp a)
+    = ELit  a Lit
+    | EVar  a Var
+    | EAbs  a Bind    (Exp a)
+    | EApp  a (Exp a) (Exp a)
+    | ELet  a [Alt a] (Exp a)
+    | ECase a (Exp a) [Alt a]
       deriving (Eq, Show)
 
-instance Functor Exp where
-    fmap f (ELit x l)     = ELit (f x) l
-    fmap f (EVar x v)     = EVar (f x) v
-    fmap f (EAbs x b e)   = EAbs (f x) b (f <$> e)
-    fmap f (EApp x a b)   = EApp (f x)   (f <$> a) (f <$> b)
-    fmap f (ELet x b r e) = ELet (f x) b (f <$> r) (f <$> e)
+data Alt a = Alt Pat (Exp a)
+    deriving (Eq, Show)
 
 data Pat
-    = PWildcard
+    = PWild
     | PVar Id
     | PLit Lit
       deriving (Eq, Show)
