@@ -15,7 +15,7 @@ f x = either (Left . show) Right x
 g :: Show a => Either String a -> IO ()
 g = either putStrLn print
 
-run p t = f . runParser p =<< runLexer "lex" t
+run p t = f . runParser "parse" p =<< runLexer "lex" t
 
 -- h :: Pretty a => Either String a -> IO ()
 -- h = either putStrLn ppLn

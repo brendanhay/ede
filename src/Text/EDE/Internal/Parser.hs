@@ -106,11 +106,11 @@ term0 = EVar <$> identifier <|> literal
 term1 :: Parser (Exp Text)
 term1 = foldl1 EApp <$> some term0
 
-pattern :: Parser (P Text)
+pattern :: Parser (Pattern Text)
 pattern = (varp <$> identifier) <|> (wildp <$ atom KUnderscore)
     <?> "a pattern"
 
-pattern0 :: Parser (P Text)
+pattern0 :: Parser (Pattern Text)
 pattern0 = asp <$> try (identifier <* atom KAt) <*> pattern0 <|> pattern
 
 identifier :: Parser Text

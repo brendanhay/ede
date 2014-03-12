@@ -21,35 +21,27 @@ import Data.List               (elemIndex)
 import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
-data P a = P
-    { pattern  :: [a] -> Pat Exp a
-    , bindings :: [a]
-    }
+varp :: a -> Pattern a
+varp a = Pattern (const PVar) [a]
 
-varp :: a -> P a
-varp a = P (const PVar) [a]
+wildp :: Pattern a
+wildp = Pattern (const PWild) []
 
-wildp :: P a
-wildp = P (const PWild) []
+asp :: a -> Pattern a -> Pattern a
+asp a (Pattern p as) = Pattern (\bs -> PAs (p (a:bs))) (a:as)
 
-asp :: a -> P a -> P a
-asp a (P p as) = P (\bs -> PAs (p (a:bs))) (a:as)
-
--- |
--- >>> lam (conp "Hello" [varp "x", wildp]) (V "y")
--- Lam 1 (ConP "Hello" [VarP,WildP]) (Scope (V (F (V "y"))))
-conp :: String -> [P a] -> P a
-conp g ps = P (PCon g . go ps) (ps >>= bindings)
+conp :: String -> [Pattern a] -> Pattern a
+conp g ps = Pattern (PCon g . go ps) (ps >>= _bindings)
   where
-    go (P p as:ps) bs = p bs : go ps (bs ++ as)
+    go (Pattern p as:ps) bs = p bs : go ps (bs ++ as)
     go [] _ = []
 
 -- | view patterns can view variables that are bound earlier than them in the pattern
-viewp :: Eq a => Exp a -> P a -> P a
-viewp t (P p as) = P (\bs -> PView (abstract (`elemIndex` bs) t) (p bs)) as
+viewp :: Eq a => Exp a -> Pattern a -> Pattern a
+viewp t (Pattern p as) = Pattern (\bs -> PView (abstract (`elemIndex` bs) t) (p bs)) as
 
-elam :: Eq a => P a -> Exp a -> Exp a
-elam (P p as) t = ELam (length as) (p []) (abstract (`elemIndex` as) t)
+elam :: Eq a => Pattern a -> Exp a -> Exp a
+elam (Pattern p as) t = ELam (length as) (p []) (abstract (`elemIndex` as) t)
 
 -- | Let expression smart constructor.
 elet :: Eq a => [(a, Exp a)] -> Exp a -> Exp a
@@ -58,19 +50,14 @@ elet bs b = ELet (length bs) (map (abstr . snd) bs) (abstr b)
   where
     abstr = abstract (`elemIndex` map fst bs)
 
--- ecase p [] = p -- FIXME: error
--- ecase p as = ECase p 
---   where
---     abstr = abstract (`elemIndex` map fst as)
-
 eif :: Eq a => Exp a -> Exp a -> Exp a -> Exp a
 eif p x y = ECase p [true x, false y]
 
 true :: Eq a => Exp a -> Alt Exp a
-true = alt (P (const (PLit $ LBool True)) [])
+true = alt (Pattern (const (PLit $ LBool True)) [])
 
 false :: Eq a => Exp a -> Alt Exp a
-false = alt (P (const (PLit $ LBool False)) [])
+false = alt (Pattern (const (PLit $ LBool False)) [])
 
-alt :: Eq a => P a -> Exp a -> Alt Exp a
-alt (P p as) = Alt (length as) (p []) . abstract (`elemIndex` as)
+alt :: Eq a => Pattern a -> Exp a -> Alt Exp a
+alt (Pattern p as) = Alt (length as) (p []) . abstract (`elemIndex` as)

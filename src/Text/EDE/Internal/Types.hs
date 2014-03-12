@@ -60,6 +60,11 @@ instance Monad Exp where
 instance Eq1   Exp
 instance Show1 Exp
 
+data Pattern a = Pattern
+    { _pattern  :: [a] -> Pat Exp a
+    , _bindings :: [a]
+    }
+
 data Pat f a
     = PVar
     | PLit  Lit
