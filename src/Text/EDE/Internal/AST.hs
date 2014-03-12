@@ -16,55 +16,52 @@ module Text.EDE.Internal.AST
     , module Text.EDE.Internal.Types
     ) where
 
+import Bound
+import Data.List               (elemIndex)
 import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
-efree :: a -> Id -> Exp a
-efree a = EVar a . VFree
+data P a = P
+    { pattern  :: [a] -> Pat Exp a
+    , bindings :: [a]
+    }
 
-ebound :: a -> Id -> Exp a
-ebound a = EVar a . VBound
+varp :: a -> P a
+varp a = P (const PVar) [a]
 
-eabs :: a -> Id -> Exp a -> Exp a
-eabs a = EAbs a . Bind
+wildp :: P a
+wildp = P (const PWild) []
 
-elet :: a -> Id -> Exp a -> Exp a -> Exp a
-elet a v = ELet a (Bind v)
+asp :: a -> P a -> P a
+asp a (P p as) = P (\bs -> PAs (p (a:bs))) (a:as)
 
-eapp :: a -> [Exp a] -> Exp a
-eapp a = foldl1 (EApp a)
+-- |
+-- >>> lam (conp "Hello" [varp "x", wildp]) (V "y")
+-- Lam 1 (ConP "Hello" [VarP,WildP]) (Scope (V (F (V "y"))))
+conp :: String -> [P a] -> P a
+conp g ps = P (PCon g . go ps) (ps >>= bindings)
+  where
+    go (P p as:ps) bs = p bs : go ps (bs ++ as)
+    go [] _ = []
 
-einteger :: a -> Integer -> Exp a
-einteger a = ELit a . LNum
+-- | view patterns can view variables that are bound earlier than them in the pattern
+viewp :: Eq a => Exp a -> P a -> P a
+viewp t (P p as) = P (\bs -> PView (abstract (`elemIndex` bs) t) (p bs)) as
 
-etext :: a -> Text -> Exp a
-etext a = ELit a . LText
+elam :: Eq a => P a -> Exp a -> Exp a
+elam (P p as) t = ELam (length as) (p []) (abstract (`elemIndex` as) t)
 
-ebool :: a -> Bool -> Exp a
-ebool a = ELit a . LBool
+-- | Let expression smart constructor.
+elet :: Eq a => [(a, Exp a)] -> Exp a -> Exp a
+elet [] b = b
+elet bs b = ELet (length bs) (map (abstr . snd) bs) (abstr b)
+  where
+    abstr = abstract (`elemIndex` map fst bs)
 
-tvar :: Id -> Type a
-tvar = TVar . TypeVar
+-- ecase p [] = p -- FIXME: error
+-- ecase p as = ECase p 
+--   where
+--     abstr = abstract (`elemIndex` map fst as)
 
-infixr 4 -->
-(-->) :: Type a -> Type a -> Type a
-(-->) = TFun
-
-exists :: Id -> Type a
-exists = TExists . TypeVar
-
-tnum :: Type a
-tnum = TCon TNum
-
-tbool :: Type a
-tbool = TCon TBool
-
-tforall :: Id -> Polytype -> Polytype
-tforall = TForall . TypeVar
-
-tforalls :: [TVar] -> Polytype -> Polytype
-tforalls = flip (foldr TForall)
-
-infixr 3 ==>
-(==>) :: Id -> Polytype -> Elem
-v ==> a = CVar (VBound v) a
+alt :: Eq a => P a -> Exp a -> Alt Exp a
+alt (P p as) t = Alt (length as) (p []) (abstract (`elemIndex` as) t)

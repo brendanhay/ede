@@ -79,7 +79,10 @@ comments = testGroup "Comments" $ map f
 
 sections :: TestTree
 sections = testGroup "Sections"
-   [
+   [ testGroup "IfElse"
+       [ parseCase "{% if false %}no{% else %}yes{% endif %}" (efree m "x")
+       ]
+
 --        [ parseCase (sectionBlock "raw" "{{ var }} text {% if false %}\n{% endif %}")
 --                    (etext m "{{ var }} text {% if false %}\n{% endif %}")
 -- --       , sectionLine "raw" "{{ var }} text {% if false %}\n{% endif %}"

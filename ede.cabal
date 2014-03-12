@@ -49,12 +49,17 @@ library
     hs-source-dirs:    src
 
     exposed-modules:
-        Text.EDE.Internal.AST
-      , Text.EDE.Internal.Lexer
-      , Text.EDE.Internal.Lexer.Tokens
-      , Text.EDE.Internal.Parser
-      , Text.EDE.Internal.Pretty
-      , Text.EDE.Internal.Types
+      --   Text.EDE.Internal.AST
+      -- , Text.EDE.Internal.Parser
+      -- , Text.EDE.Internal.Pretty
+
+
+       Text.EDE.Internal.Types
+
+     , Text.EDE.Internal.Lexer
+     , Text.EDE.Internal.Lexer.Tokens
+
+     , Text.EDE.Internal.Parser
 
     ghc-options:       -Wall
 
@@ -64,10 +69,12 @@ library
     build-depends:
         array
       , base            >= 4.6 && < 5
-      , hashable
+      , bound
       , parsec
+      , prelude-extras
       , pretty
       , text            >= 1.0
+      , transformers
       , unordered-containers
       , wl-pprint-text
 

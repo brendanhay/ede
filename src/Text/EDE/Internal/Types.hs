@@ -18,16 +18,30 @@ import Bound
 import Control.Applicative
 import Control.Monad
 import Data.Foldable
+import Data.Text           (Text)
 import Data.Traversable
 import Prelude.Extras
 
+data Meta = Meta !String !Int !Int
+    deriving (Eq, Show)
+
+class Metadata a where
+    meta :: a -> Meta
+
+data Lit
+    = LBool    !Bool
+    | LInteger !Integer
+    | LText    !Text
+      deriving (Eq, Show)
+
 data Exp a
     = EVar  a
+    | ELit  !Lit
     | EApp  (Exp a) (Exp a)
     | ELam  !Int    (Pat Exp a)       (Scope Int Exp a)
     | ELet  !Int    [Scope Int Exp a] (Scope Int Exp a)
     | ECase (Exp a) [Alt Exp a]
-      deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+      deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Applicative Exp where
     pure  = EVar
@@ -35,6 +49,7 @@ instance Applicative Exp where
 
 instance Monad Exp where
     EVar  a      >>= f = f a
+    ELit  l      >>= _ = ELit l
     EApp  x y    >>= f = EApp (x >>= f) (y >>= f)
     ELam  n p e  >>= f = ELam n (p >>>= f) (e >>>= f)
     ELet  n bs e >>= f = ELet n (map (>>>= f) bs) (e >>>= f)
@@ -43,27 +58,27 @@ instance Monad Exp where
     return = EVar
 
 instance Eq1   Exp
-instance Ord1  Exp
 instance Show1 Exp
-instance Read1 Exp
 
 data Pat f a
     = PVar
+    | PLit  Lit
     | PWild
     | PAs   (Pat f a)
     | PCon  String [Pat f a]
     | PView (Scope Int f a) (Pat f a)
-      deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+      deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Bound Pat where
     PVar       >>>= _ = PVar
+    PLit  l    >>>= _ = PLit l
     PWild      >>>= _ = PWild
     PAs   p    >>>= f = PAs (p >>>= f)
     PCon  g ps >>>= f = PCon g (map (>>>= f) ps)
     PView e p  >>>= f = PView (e >>>= f) (p >>>= f)
 
 data Alt f a = Alt !Int (Pat f a) (Scope Int f a)
-    deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+    deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Bound Alt where
     Alt n p b >>>= f = Alt n (p >>>= f) (b >>>= f)

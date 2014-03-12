@@ -10,9 +10,7 @@
 
 module Text.EDE.Internal.Lexer.Tokens where
 
-import Data.String
-import Data.Text                (Text)
-import Text.EDE.Internal.Pretty
+import Data.Text               (Text)
 import Text.EDE.Internal.Types
 import Text.Parsec.Pos
 
@@ -20,9 +18,6 @@ data Token
     = TC !Meta !Capture !Text
     | TA !Meta !Atom
       deriving (Eq, Show)
-
-instance Pretty Token where
-    pretty _ = fromString . show
 
 instance Metadata Token where
     meta (TC m _ _) = m
@@ -53,15 +48,14 @@ data Atom
     | KParenR
     | KBracketL
     | KBracketR
+    | KAt
     | KDot
     | KComma
     | KUnderscore
     | KEquals
-
     | KComment
     | KNewLine
     | KEOF
-
     | KTrue
     | KFalse
     | KElse

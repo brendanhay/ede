@@ -69,6 +69,7 @@ tokens :-
 
 <exp> "}}"            { atom KIdentR `andBegin` 0 }
 <exp> "%}"            { atom KSectionR `andBegin` 0 }
+<exp> $newline        { atom KNewLine }
 <exp> $white+         { skip }
 
 <exp> "="             { atom KEquals }
