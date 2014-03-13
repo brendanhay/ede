@@ -40,7 +40,7 @@ instance Monad Check where
 
 evalCheck :: Bool -> Check a -> Either String a
 evalCheck t c = fmap snd . unCheck c $ CheckState
-    { varNames  = map (VBound  . Text.pack . ('$':)) namelist
+    { varNames  = map (Var . Text.pack . ('$':)) namelist
     , tvarNames = map (TypeVar . Text.pack) namelist
     , indent    = 0
     , tracing   = t

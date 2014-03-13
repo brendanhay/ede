@@ -26,14 +26,12 @@ substs = flip $ foldr (uncurry subst)
 instance Subst (Exp a) where
     type SVar  (Exp a) = Var
     subst e' x expr = case expr of
-        ELit a l                   -> ELit a l
-        EVar a x'   | x' == x      -> e'
-                    | otherwise    -> EVar a x'
-        EAbs a x' e | bind x' == x -> EAbs a x' e
-                    | otherwise    -> EAbs a x' (subst e' x e)
-        EApp a e1 e2               -> EApp a (subst e' x e1) (subst e' x e2)
-
---    EAnno e t             -> EAnno (subst e' x e) t
+        ELit a l                -> ELit a l
+        EVar a x'   | x' == x   -> e'
+                    | otherwise -> EVar a x'
+        EAbs a x' e | x' == x   -> EAbs a x' e
+                    | otherwise -> EAbs a x' (subst e' x e)
+        EApp a e1 e2            -> EApp a (subst e' x e1) (subst e' x e2)
 
 -- | Type substitution: A α B = [A/α]B
 instance Subst (Type a) where

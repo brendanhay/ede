@@ -25,6 +25,7 @@ import qualified Data.HashSet        as Set
 import           Data.Hashable
 import           Data.Monoid
 import           Data.Text           (Text)
+import Text.Parsec.Pos
 
 data Meta = Meta
     { metaName :: String
@@ -42,15 +43,7 @@ data Ann a = Ann
 
 type Id = Text
 
-data Var
-    = VBound { varId :: Id }
-    | VFree  { varId :: Id }
-      deriving (Eq, Show)
-
-newtype Bind = Bind Id deriving (Eq, Show)
-
-bind :: Bind -> Var
-bind (Bind i) = VBound i
+newtype Var = Var Id deriving (Eq, Show)
 
 data Lit
     = LNum  Integer
@@ -61,14 +54,10 @@ data Lit
 data Exp a
     = ELit  a Lit
     | EVar  a Var
-    | EAbs  a Bind    (Exp a)
+    | EAbs  a Var     (Exp a)
     | EApp  a (Exp a) (Exp a)
-    | ELet  a [Alt a] (Exp a)
-    | ECase a (Exp a) [Alt a]
+    | ELet  a Var     (Exp a) (Exp a)
       deriving (Eq, Show)
-
-data Alt a = Alt Pat (Exp a)
-    deriving (Eq, Show)
 
 data Pat
     = PWild
@@ -90,10 +79,10 @@ data TKind = Mono | Poly
 --   Only Polytypes can have foralls.
 data Type :: TKind -> * where
     TCon    :: TCon   -> Type a
-    TVar    :: TVar   -> Type a                 -- ^ alpha
-    TExists :: TVar   -> Type a                 -- ^ alpha^
-    TForall :: TVar   -> Type Poly -> Type Poly -- ^ forall alpha. A
-    TFun    :: Type a -> Type a    -> Type a    -- ^ A -> B
+    TVar    :: TVar   -> Type a                 -- alpha
+    TExists :: TVar   -> Type a                 -- alpha^
+    TForall :: TVar   -> Type Poly -> Type Poly -- forall alpha. A
+    TFun    :: Type a -> Type a    -> Type a    -- A -> B
 
 deriving instance Show (Type a)
 deriving instance Eq   (Type a)
@@ -129,11 +118,11 @@ freeTVars typ = case typ of
     TFun t1 t2  -> freeTVars t1 <> freeTVars t2
 
 data Elem
-    = CVar          Var  Polytype -- ^ x : A
-    | CForall       TVar          -- ^ alpha
-    | CExists       TVar          -- ^ alpha^
-    | CExistsSolved TVar Monotype -- ^ alpha^ = tau
-    | CMarker       TVar          -- ^ |> alpha^
+    = CVar          Var  Polytype -- x : A
+    | CForall       TVar          -- alpha
+    | CExists       TVar          -- alpha^
+    | CExistsSolved TVar Monotype -- alpha^ = tau
+    | CMarker       TVar          -- - |> alpha^
       deriving (Eq, Show)
 
 newtype Context = Context [Elem]
@@ -160,3 +149,6 @@ instance Metadata a => Metadata (Exp a) where
         ann (EAbs a _ _)   = a
         ann (EApp a _ _)   = a
         ann (ELet a _ _ _) = a
+
+instance Metadata SourcePos where
+    meta p = Meta (sourceName p) (sourceLine p) (sourceColumn p)

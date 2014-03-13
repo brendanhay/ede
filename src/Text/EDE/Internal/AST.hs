@@ -19,17 +19,61 @@ module Text.EDE.Internal.AST
 import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
-efree :: a -> Id -> Exp a
-efree a = EVar a . VFree
+-- varp :: a -> Pattern a
+-- varp a = Pattern (const PVar) [a]
 
-ebound :: a -> Id -> Exp a
-ebound a = EVar a . VBound
+-- wildp :: Pattern a
+-- wildp = Pattern (const PWild) []
+
+-- asp :: a -> Pattern a -> Pattern a
+-- asp a (Pattern p as) = Pattern (\bs -> PAs (p (a:bs))) (a:as)
+
+-- conp :: String -> [Pattern a] -> Pattern a
+-- conp g ps = Pattern (PCon g . go ps) (ps >>= _bindings)
+--   where
+--     go (Pattern p as:ps) bs = p bs : go ps (bs ++ as)
+--     go [] _ = []
+
+-- -- | view patterns can view variables that are bound earlier than them in the pattern
+-- viewp :: Eq a => Exp a -> Pattern a -> Pattern a
+-- viewp t (Pattern p as) = Pattern (\bs -> PView (abstract (`elemIndex` bs) t) (p bs)) as
+
+-- elam :: Eq a => Pattern a -> Exp a -> Exp a
+-- elam (Pattern p as) t = ELam (length as) (p []) (abstract (`elemIndex` as) t)
+
+-- -- | Let expression smart constructor.
+-- elet :: Eq a => [(a, Exp a)] -> Exp a -> Exp a
+-- elet [] b = b
+-- elet bs b = ELet (length bs) (map (abstr . snd) bs) (abstr b)
+--   where
+--     abstr = abstract (`elemIndex` map fst bs)
+
+-- eif :: Eq a => Exp a -> Exp a -> Exp a -> Exp a
+-- eif p x y = ECase p [true x, false y]
+
+-- true :: Eq a => Exp a -> Alt Exp a
+-- true = alt (Pattern (const (PLit $ LBool True)) [])
+
+-- false :: Eq a => Exp a -> Alt Exp a
+-- false = alt (Pattern (const (PLit $ LBool False)) [])
+
+-- alt :: Eq a => Pattern a -> Exp a -> Alt Exp a
+-- alt (Pattern p as) = Alt (length as) (p []) . abstract (`elemIndex` as)
+
+-- efree :: a -> Id -> Exp a
+-- efree a = EVar a . VFree
+
+-- ebound :: a -> Id -> Exp a
+-- ebound a = EVar a . VBound
+
+evar :: a -> Id -> Exp a
+evar a = EVar a . Var
 
 eabs :: a -> Id -> Exp a -> Exp a
-eabs a = EAbs a . Bind
+eabs a = EAbs a . Var
 
 elet :: a -> Id -> Exp a -> Exp a -> Exp a
-elet a v = ELet a (Bind v)
+elet a v = ELet a (Var v)
 
 eapp :: a -> [Exp a] -> Exp a
 eapp a = foldl1 (EApp a)
@@ -67,4 +111,4 @@ tforalls = flip (foldr TForall)
 
 infixr 3 ==>
 (==>) :: Id -> Polytype -> Elem
-v ==> a = CVar (VBound v) a
+v ==> a = CVar (Var v) a

@@ -79,11 +79,7 @@ instance Pretty Lit where
     pretty _ (LBool b) = bool b
 
 instance Pretty Var where
-    pretty d (VBound i) = pretty d i
-    pretty d (VFree  i) = pretty d i
-
-instance Pretty Bind where
-    pretty d (Bind i) = pretty d i
+    pretty d (Var i) = pretty d i
 
 instance Pretty (Exp a) where
     pretty d expr = case expr of
@@ -95,8 +91,8 @@ instance Pretty (Exp a) where
             parensIf (d > absPrec) $ "λ" <> pretty (absPrec + 1) v <> dot <+> pretty absPrec e
         EApp _ e1 e2 ->
             parensIf (d > appPrec) $ pretty appPrec e1 <+> pretty (appPrec + 1) e2
-        ELet _ v rhs bdy ->
-            "let" <+> pretty 0 v <+> "=" <+> pretty 0 rhs <+> "in" <$> nest 4 (pretty 0 bdy)
+        -- ELet _ v rhs bdy ->
+        --     "let" <+> pretty 0 v <+> "=" <+> pretty 0 rhs <+> "in" <$> nest 4 (pretty 0 bdy)
       where
         absPrec, appPrec :: Int
         absPrec = 1

@@ -14,6 +14,7 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
+import           Control.Arrow
 import           Data.Foldable                  (foldl')
 import           Data.Monoid
 import           Data.Text                      (Text)
@@ -26,6 +27,13 @@ import qualified Text.Parsec                    as Parsec
 import           Text.Parsec.Combinator
 import           Text.Parsec.Error
 
+-- $setup
+-- >>> :set -XOverloadedStrings
+-- >>> let m  = Meta "m" 1 1
+-- >>> let tc = TC m
+-- >>> let ta = TA m
+-- >>> let parse p = either (error . show) id . runParser "m" p
+
 type Parser = Parsec [Token] ParserState
 
 data ParserState = ParserState
@@ -34,115 +42,123 @@ data ParserState = ParserState
     }
 
 runParser :: String -> Parser a -> [Token] -> Either ParseError a
-runParser src p = Parsec.runParser (p <* eof) (ParserState show src) src
+runParser src p = Parsec.runParser p (ParserState show src) src
 
-document :: Parser (Exp Text)
-document = foldl1 (EApp . EApp (EVar "<>")) <$> many1
-    (fragment <|> substitution <|> sections)
+document :: Parser (Exp Meta)
+document = do
+    x  <- p
+    xs <- many p <* eof
+    return $ foldl' (\a e -> eapp (meta a) [evar (meta a) "<>", a, e]) x xs
+  where
+    p = fragment <|> substitution <|> sections
 
-fragment :: Parser (Exp a)
+fragment :: Parser (Exp Meta)
 fragment = do
-    (_, txt) : cs <- many1 (capture KFrag <|> whitespace <|> newline)
-    return . ELit . LText $
+    (m, txt) : cs <- many1 (capture KFrag <|> whitespace <|> newline)
+    return . ELit m . LText $
         case cs of
             [] -> txt
             _  -> Text.concat (txt : map snd cs)
     <?> "a textual fragment"
 
+-- |
+-- >>> parse (snd <$> whitespace) [tc KWhiteSpace "   "]
+-- "   "
 whitespace :: Parser (Meta, Text)
 whitespace = capture KWhiteSpace
     <?> "whitespace"
 
+-- |
+-- >>> parse (snd <$> newline) [ta KNewLine]
+-- "\n"
 newline :: Parser (Meta, Text)
 newline = (, "\n") <$> atom KNewLine
     <?> "a newline"
 
-substitution :: Parser (Exp Text)
+-- |
+-- >>> parse substitution [ta KIdentL, ta KTrue, ta KIdentR]
+-- ELit m:1:1 (LBool True)
+substitution :: Parser (Exp Meta)
 substitution = atom KIdentL *> term <* atom KIdentR
     <?> "substitution"
 
-sections :: Parser (Exp Text)
+sections :: Parser (Exp Meta)
 sections = choice
-    [ assign
-    , match
-    , conditional
+    [ -- assign
     ] <?> "a section"
 
 section :: String -> Parser a -> Parser a
 section n p = try (atom KSectionL *> p <* atom KSectionR) <?> n
 
-assign :: Parser (Exp Text)
-assign = elet
-    <$> section "assign" (atom KAssign *> decls)
-    <*> (document <|> blank)
-
-match :: Parser (Exp Text)
-match = ECase
-    <$> section "case" (atom KCase *> term)
-    <*> many1 (alt <$> section "when" (atom KWhen *> pattern) <*> document)
-    <*  section "endcase" (atom KEndCase)
-
-conditional :: Parser (Exp Text)
-conditional = foldl' (\a (x, y) -> a . eif x y)
-    <$> (eif <$> section "if" (atom KIf *> term) <*> document)
-    <*> many ((,) <$> section "elsif" (atom KElseIf *> term) <*> document)
-    <*> (section "else" (atom KElse) *> document <|> blank)
-    <*  section "endif" (atom KEndIf)
+-- assign :: Parser (Exp Meta)
+-- assign = elet
+--     <$> section "assign" (atom KAssign *> decls)
+--     <*> (document <|> blank)
 
 -- loop
 -- include
 
-decls :: Parser [(Text, Exp Text)]
-decls = sepBy1 ((,) <$> identifier <* atom KEquals <*> term) (atom KNewLine)
-    <?> "a declaration"
+-- decls :: Parser [(Text, Exp Meta)]
+-- decls = sepBy1 ((,) <$> identifier <* atom KEquals <*> term) (atom KNewLine)
+--     <?> "a declaration"
 
-term :: Parser (Exp Text)
+term :: Parser (Exp Meta)
 term = term0 <|> term1
     <?> "a term"
 
-term0 :: Parser (Exp Text)
-term0 = EVar <$> identifier <|> literal
+term0 :: Parser (Exp Meta)
+term0 = uncurry EVar <$> variable <|> literal
 
-term1 :: Parser (Exp Text)
-term1 = foldl1 EApp <$> some term0
+term1 :: Parser (Exp Meta)
+term1 = eapp <$> position <*> some term0
 
-pattern :: Parser (Pattern Text)
-pattern = (varp <$> identifier) <|> (wildp <$ atom KUnderscore)
-    <?> "a pattern"
+variable :: Parser (Meta, Var)
+variable = second Var <$> capture KIdent
+    <?> "a variable"
 
-pattern0 :: Parser (Pattern Text)
-pattern0 = asp <$> try (identifier <* atom KAt) <*> pattern0 <|> pattern
-
-identifier :: Parser Text
-identifier = snd <$> capture KIdent
-    <?> "an identifier"
-
-literal :: Parser (Exp a)
+literal :: Parser (Exp Meta)
 literal = boolean <|> string <|> number
 
-boolean :: Parser (Exp a)
-boolean = ELit . LBool <$>
-    (atom KTrue *> return True <|> atom KFalse *> return False)
+-- |
+-- >>> parse boolean [ta KTrue]
+-- ELit m:1:1 (LBool True)
+-- >>> parse boolean [ta KFalse]
+-- ELit m:1:1 (LBool False)
+boolean :: Parser (Exp Meta)
+boolean = uncurry ELit . second LBool <$>
+    ((,True) <$> atom KTrue <|> (,False) <$> atom KFalse)
     <?> "a boolean"
 
-string :: Parser (Exp a)
-string = ELit . LText . snd <$> capture KText
+-- |
+-- >>> parse string [tc KText "abc"]
+-- ELit m:1:1 (LText "abc")
+string :: Parser (Exp Meta)
+string = uncurry ELit . second LText <$> capture KText
     <?> "a string"
 
-number :: Parser (Exp a)
+-- |
+-- >>> parse number [tc KNum "123"]
+-- ELit m:1:1 (LNum 123)
+number :: Parser (Exp Meta)
 number = do
-    (_, txt) <- capture KNum
+    (m, txt) <- capture KNum
     either (fail . mappend "unexpected error parsing number: ")
-           (uncurry parse)
+           (uncurry $ parse m)
            (Read.signed Read.decimal txt)
     <?> "an number"
   where
-    parse n "" = return $ ELit (LNum n)
-    parse n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
+    parse m n "" = return $ ELit m (LNum n)
+    parse _ n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
 
-blank :: Parser (Exp Text)
-blank = return $ ELit (LText "")
+-- |
+-- >>> parse blank []
+-- ELit m:1:1 (LText "")
+blank :: Parser (Exp Meta)
+blank = ELit <$> position <*> pure (LText "")
 
+-- |
+-- >>> parse (parens $ snd <$> variable) [ta KParenL, tc KIdent "var", ta KParenR]
+-- Var "var"
 parens :: Parser a -> Parser a
 parens p = atom KParenL *> p <* atom KParenR
 
@@ -160,3 +176,6 @@ atom x = token f
 
 token :: (Token -> Maybe a) -> Parser a
 token f = stateShow <$> getState >>= \g -> Parsec.token g tokenSourcePos f
+
+position :: Parser Meta
+position = meta <$> Parsec.getPosition

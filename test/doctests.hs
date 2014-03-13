@@ -13,4 +13,9 @@ module Main (main) where
 import Test.DocTest
 
 main :: IO ()
-main = doctest ["-isrc", "src/Text/EDE.hs"]
+main = doctest
+    [ "-isrc"
+    , "-optP-include"
+    , "-optPdist/build/autogen/cabal_macros.h"
+    , "src/Text/EDE/Internal/Parser.hs"
+    ]

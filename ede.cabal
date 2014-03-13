@@ -59,33 +59,29 @@ library
       , Text.EDE.Internal.Pretty
       , Text.EDE.Internal.Types
 
-    ghc-options:       -Wall
+    ghc-options:       -Wall -funbox-strict-fields
 
     build-tools:
         alex
 
     build-depends:
         array
-      , base            >= 4.6 && < 5
+      , base    >= 4.6 && < 5
       , hashable
       , parsec
       , pretty
-      , text            >= 1.0
+      , text    >= 1.0
       , unordered-containers
       , wl-pprint-text
 
-test-suite tests
+test-suite doctests
     default-language:  Haskell2010
     type:              exitcode-stdio-1.0
     hs-source-dirs:    test
-    main-is:           Main.hs
-    ghc-options:       -Wall -rtsopts -threaded
+    main-is:           doctests.hs
+    ghc-options:       -Wall -threaded
 
     build-depends:
-        base             >= 4.6 && < 5
+        base    >= 4.6 && < 5
+      , doctest
       , ede
-      , smallcheck
-      , tasty
-      , tasty-hunit
-      , tasty-smallcheck
-      , text

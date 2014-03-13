@@ -42,7 +42,7 @@ check gamma expr typ =
     -- ->I
     (EAbs a' x e, TFun a b) -> do
       x'     <- freshVar
-      gamma' <- check (gamma >: CVar x' a) (subst (EVar a' x') (bind x) e) b
+      gamma' <- check (gamma >: CVar x' a) (subst (EVar a' x') x e) b
       return $ dropMarker (CVar x' a) gamma'
     -- Sub
     (e, b) -> do
@@ -64,10 +64,10 @@ synth gamma expr = traceNS "synth" (gamma, expr) $ checkwf gamma $
     EVar a' x ->
         case findVarType gamma x of
             Just x' -> return (x', gamma)
-            Nothing | VBound _ <- x -> throw $ "typesynth: not in scope " ++ pp (expr, gamma)
-            Nothing | VFree  _ <- x -> do
-                alpha <- freshTVar
-                return (TExists alpha, gamma >: CExists alpha)
+            Nothing -> throw $ "typesynth: not in scope " ++ pp (expr, gamma)
+            -- Nothing | VFree  _ <- x -> do
+            --     alpha <- freshTVar
+            --     return (TExists alpha, gamma >: CExists alpha)
 
     -- ->I=> Full Damas-Milner type inference
     EAbs a' x e -> do
@@ -80,7 +80,7 @@ synth gamma expr = traceNS "synth" (gamma, expr) $ checkwf gamma $
                          , CExists beta
                          , CVar x' (TExists alpha)
                          ])
-                  (subst (EVar a' x') (bind x) e)
+                  (subst (EVar a' x') x e)
                   (TExists beta)
 
       let tau   = apply delta' (TFun (TExists alpha) (TExists beta))
