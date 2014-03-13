@@ -106,16 +106,28 @@ term :: Parser (Exp Meta)
 term = term0 <|> term1
     <?> "a term"
 
+-- |
+-- >>> parse term0 [tc KIdent "x"]
+-- EVar m:1:1 (Var "x")
 term0 :: Parser (Exp Meta)
 term0 = uncurry EVar <$> variable <|> literal
 
+-- |
+-- >>> parse term1 [tc KNum "1", tc KIdent "a", tc KNum "2"]
+-- EApp m:1:1 (EApp m:1:1 (ELit m:1:1 (LNum 1)) (EVar m:1:1 (Var "a"))) (ELit m:1:1 (LNum 2))
 term1 :: Parser (Exp Meta)
 term1 = eapp <$> position <*> some term0
 
+-- |
+-- >>> parse (snd <$> variable) [tc KIdent "_validIdent'"]
+-- Var "_validIdent'"
 variable :: Parser (Meta, Var)
 variable = second Var <$> capture KIdent
     <?> "a variable"
 
+-- |
+-- >>> parse literal [tc KNum "42"]
+-- ELit m:1:1 (LNum 42)
 literal :: Parser (Exp Meta)
 literal = boolean <|> string <|> number
 
