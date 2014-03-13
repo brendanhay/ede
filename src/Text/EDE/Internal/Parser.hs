@@ -61,6 +61,7 @@ fragment = do
             _  -> Text.concat (txt : map snd cs)
     <?> "a textual fragment"
 
+
 -- |
 -- >>> parse (snd <$> whitespace) [tc KWhiteSpace "   "]
 -- "   "
@@ -84,16 +85,24 @@ substitution = atom KIdentL *> term <* atom KIdentR
 
 sections :: Parser (Exp Meta)
 sections = choice
-    [ -- assign
+    [ assign
     ] <?> "a section"
 
-section :: String -> Parser a -> Parser a
-section n p = try (atom KSectionL *> p <* atom KSectionR) <?> n
+-- section :: String -> Parser a -> Parser a
+-- section n p = try (atom KSectionL *> p <* atom KSectionR) <?> n
 
--- assign :: Parser (Exp Meta)
--- assign = elet
---     <$> section "assign" (atom KAssign *> decls)
---     <*> (document <|> blank)
+-- |
+-- >>> parse assign [ta KSectionL, ta KAssign, tc KIdent "x", ta KEquals, tc KNum "9", ta KSectionR]
+-- ELet m:1:1 (Var "x") (ELit m:1:1 (LNum 9)) (ELit m:1:1 (LText ""))
+assign :: Parser (Exp Meta)
+assign = elet
+    <$  atom KSectionL
+    <*> atom KAssign
+    <*> (snd <$> identifier)
+    <*  atom KEquals
+    <*> term
+    <*  atom KSectionR
+    <*> (document <|> blank)
 
 -- loop
 -- include
@@ -124,6 +133,10 @@ term1 = eapp <$> position <*> some term0
 variable :: Parser (Meta, Var)
 variable = second Var <$> capture KIdent
     <?> "a variable"
+
+identifier :: Parser (Meta, Text)
+identifier = capture KIdent
+    <?> "an identifier"
 
 -- |
 -- >>> parse literal [tc KNum "42"]
