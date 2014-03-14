@@ -15,9 +15,11 @@
 module Text.EDE.Internal.Types where
 
 import Bound
+import Bound.Name
 import Control.Applicative
 import Control.Monad
 import Data.Foldable
+import Data.Monoid
 import Data.Text           (Text)
 import Data.Traversable
 import Prelude.Extras
@@ -28,18 +30,29 @@ data Meta = Meta !String !Int !Int
 class Metadata a where
     meta :: a -> Meta
 
+type Id = Text
+
+type Bind a = Scope (Name Id a) Exp
+
+data Type a
+    = TVar a
+    | TApp (Type a) (Type a)
+    | TBool
+    | TNum
+    | TText
+
 data Lit
-    = LBool    !Bool
-    | LInteger !Integer
-    | LText    !Text
+    = LBool !Bool
+    | LNum  !Integer
+    | LText !Text
       deriving (Eq, Show)
 
 data Exp a
     = EVar  a
-    | ELit  !Lit
+    | ELit  Lit
     | EApp  (Exp a) (Exp a)
-    | ELam  !Int    (Pat Exp a)       (Scope Int Exp a)
-    | ELet  !Int    [Scope Int Exp a] (Scope Int Exp a)
+    | ELam  (Bind () a)
+    | ELet  [Bind Int a] (Bind Int a)
     | ECase (Exp a) [Alt Exp a]
       deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -48,42 +61,43 @@ instance Applicative Exp where
     (<*>) = ap
 
 instance Monad Exp where
-    EVar  a      >>= f = f a
-    ELit  l      >>= _ = ELit l
-    EApp  x y    >>= f = EApp (x >>= f) (y >>= f)
-    ELam  n p e  >>= f = ELam n (p >>>= f) (e >>>= f)
-    ELet  n bs e >>= f = ELet n (map (>>>= f) bs) (e >>>= f)
-    ECase e as   >>= f = ECase (e >>= f) (map (>>>= f) as)
+    EVar  a    >>= f = f a
+    ELit  l    >>= _ = ELit  l
+    EApp  x y  >>= f = EApp  (x >>= f) (y >>= f)
+    ELam  e    >>= f = ELam  (e >>>= f)
+    ELet  bs e >>= f = ELet  (map (>>>= f) bs) (e >>>= f)
+    ECase e as >>= f = ECase (e >>= f) (map (>>>= f) as)
 
     return = EVar
 
 instance Eq1   Exp
 instance Show1 Exp
 
-data Pattern a = Pattern
-    { _pattern  :: [a] -> Pat Exp a
-    , _bindings :: [a]
-    }
+data Pat
+    = PWild
+    | PVar
+    | PLit Lit
+    | PAs  Pat
+      deriving (Eq, Show)
 
-data Pat f a
-    = PVar
-    | PLit  Lit
-    | PWild
-    | PAs   (Pat f a)
-    | PCon  String [Pat f a]
-    | PView (Scope Int f a) (Pat f a)
-      deriving (Eq, Show, Functor, Foldable, Traversable)
+data Path = PLeaf
+    deriving (Eq, Show)
 
-instance Bound Pat where
-    PVar       >>>= _ = PVar
-    PLit  l    >>>= _ = PLit l
-    PWild      >>>= _ = PWild
-    PAs   p    >>>= f = PAs (p >>>= f)
-    PCon  g ps >>>= f = PCon g (map (>>>= f) ps)
-    PView e p  >>>= f = PView (e >>>= f) (p >>>= f)
+leafPath :: Endo Path -> Path
+leafPath = flip appEndo PLeaf
 
-data Alt f a = Alt !Int (Pat f a) (Scope Int f a)
+paths :: Pat -> [Path]
+paths = go mempty
+  where
+    go p PVar = [leafPath p]
+    go _ _    = []
+
+data Alt f a = Alt Pat (Scope Path f a)
     deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Bound Alt where
-    Alt n p b >>>= f = Alt n (p >>>= f) (b >>>= f)
+    Alt p b >>>= f = Alt p (b >>>= f)
+
+data Binder a = Binder [a] Pat
+    deriving (Eq, Show, Functor, Foldable, Traversable)
+

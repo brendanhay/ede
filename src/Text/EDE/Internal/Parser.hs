@@ -106,19 +106,19 @@ term0 = EVar <$> identifier <|> literal
 term1 :: Parser (Exp Text)
 term1 = foldl1 EApp <$> some term0
 
-pattern :: Parser (Pattern Text)
-pattern = (varp <$> identifier) <|> (wildp <$ atom KUnderscore)
+pattern :: Parser (Binder Text)
+pattern = (pvar <$> identifier) <|> (pwild <$ atom KUnderscore)
     <?> "a pattern"
 
-pattern0 :: Parser (Pattern Text)
-pattern0 = asp <$> try (identifier <* atom KAt) <*> pattern0 <|> pattern
+pattern0 :: Parser (Binder Text)
+pattern0 = pas <$> try (identifier <* atom KAt) <*> pattern0 <|> pattern
 
 identifier :: Parser Text
 identifier = snd <$> capture KIdent
     <?> "an identifier"
 
 literal :: Parser (Exp a)
-literal = boolean <|> string <|> integer
+literal = boolean <|> string <|> number
 
 boolean :: Parser (Exp a)
 boolean = ELit . LBool <$>
@@ -129,15 +129,15 @@ string :: Parser (Exp a)
 string = ELit . LText . snd <$> capture KText
     <?> "a string"
 
-integer :: Parser (Exp a)
-integer = do
+number :: Parser (Exp a)
+number = do
     (_, txt) <- capture KNum
     either (fail . mappend "unexpected error parsing number: ")
            (uncurry parse)
            (Read.signed Read.decimal txt)
-    <?> "an integer"
+    <?> "a number"
   where
-    parse n "" = return $ ELit (LInteger n)
+    parse n "" = return $ ELit (LNum n)
     parse n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
 
 blank :: Parser (Exp Text)

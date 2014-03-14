@@ -53,15 +53,15 @@ library
       -- , Text.EDE.Internal.Parser
       -- , Text.EDE.Internal.Pretty
 
-
        Text.EDE.Internal.Types
+     , Text.EDE.Internal.AST
 
      , Text.EDE.Internal.Lexer
      , Text.EDE.Internal.Lexer.Tokens
 
      , Text.EDE.Internal.Parser
 
-    ghc-options:       -Wall
+    ghc-options:       -Wall -funbox-strict-fields
 
     build-tools:
         alex
