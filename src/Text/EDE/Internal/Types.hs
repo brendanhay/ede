@@ -100,4 +100,3 @@ instance Bound Alt where
 
 data Binder a = Binder [a] Pat
     deriving (Eq, Show, Functor, Foldable, Traversable)
-

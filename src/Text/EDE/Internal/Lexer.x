@@ -120,6 +120,7 @@ tokens :-
 <exp> \.              { atom KDot }
 <exp> \,              { atom KComma }
 <exp> \_              { atom KUnderscore }
+<exp> \@              { atom KAt }
 
 <com> "-}"            { begin 0 }
 <com> [. $newline]    { skip }

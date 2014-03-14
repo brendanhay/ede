@@ -14,6 +14,7 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
+import           Control.Arrow
 import           Data.Foldable                  (foldl')
 import           Data.Monoid
 import           Data.Text                      (Text)
@@ -101,35 +102,36 @@ term = term0 <|> term1
     <?> "a term"
 
 term0 :: Parser (Exp Text)
-term0 = EVar <$> identifier <|> literal
+term0 = EVar <$> identifier <|> ELit <$> literal
 
 term1 :: Parser (Exp Text)
 term1 = foldl1 EApp <$> some term0
 
 pattern :: Parser (Binder Text)
-pattern = (pvar <$> identifier) <|> (pwild <$ atom KUnderscore)
-    <?> "a pattern"
+pattern = pas <$> try (identifier <* atom KAt) <*> pattern <|> pattern0
 
 pattern0 :: Parser (Binder Text)
-pattern0 = pas <$> try (identifier <* atom KAt) <*> pattern0 <|> pattern
+pattern0 = pvar <$> identifier
+    <|> pwild <$ atom KUnderscore
+    <|> plit  <$> literal
+    <?> "a pattern"
 
 identifier :: Parser Text
 identifier = snd <$> capture KIdent
     <?> "an identifier"
 
-literal :: Parser (Exp a)
+literal :: Parser Lit
 literal = boolean <|> string <|> number
 
-boolean :: Parser (Exp a)
-boolean = ELit . LBool <$>
-    (atom KTrue *> return True <|> atom KFalse *> return False)
+boolean :: Parser Lit
+boolean = LBool <$> (atom KTrue *> return True <|> atom KFalse *> return False)
     <?> "a boolean"
 
-string :: Parser (Exp a)
-string = ELit . LText . snd <$> capture KText
+string :: Parser Lit
+string = LText . snd <$> capture KText
     <?> "a string"
 
-number :: Parser (Exp a)
+number :: Parser Lit
 number = do
     (_, txt) <- capture KNum
     either (fail . mappend "unexpected error parsing number: ")
@@ -137,7 +139,7 @@ number = do
            (Read.signed Read.decimal txt)
     <?> "a number"
   where
-    parse n "" = return $ ELit (LNum n)
+    parse n "" = return (LNum n)
     parse n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
 
 blank :: Parser (Exp Text)
