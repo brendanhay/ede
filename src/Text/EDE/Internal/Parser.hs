@@ -14,7 +14,6 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
-import           Control.Arrow
 import           Data.Foldable                  (foldl')
 import           Data.Monoid
 import           Data.Text                      (Text)

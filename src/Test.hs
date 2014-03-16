@@ -4,10 +4,11 @@ module Test where
 
 import           Control.Applicative
 import           Data.Monoid
-import qualified Data.Text                 as Text
+import qualified Data.Text                   as Text
+import           Text.EDE.Internal.AST
+import           Text.EDE.Internal.Evaluator
 import           Text.EDE.Internal.Lexer
 import           Text.EDE.Internal.Parser
-import           Text.EDE.Internal.Types
 
 f :: Show e => Either e a -> Either String a
 f x = either (Left . show) Right x

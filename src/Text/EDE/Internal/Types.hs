@@ -15,7 +15,6 @@
 module Text.EDE.Internal.Types where
 
 import Bound
-import Bound.Name
 import Control.Applicative
 import Control.Monad
 import Data.Foldable
@@ -32,14 +31,13 @@ class Metadata a where
 
 type Id = Text
 
-type Bind a = Scope (Name Id a) Exp
-
-data Type a
-    = TVar a
-    | TApp (Type a) (Type a)
+data Type
+    = TVar Int
+    | TApp Type Type
     | TBool
     | TNum
     | TText
+      deriving (Eq, Show)
 
 data Lit
     = LBool !Bool
@@ -50,9 +48,9 @@ data Lit
 data Exp a
     = EVar  a
     | ELit  Lit
+    | ELam  (Scope () Exp a)
     | EApp  (Exp a) (Exp a)
-    | ELam  (Bind () a)
-    | ELet  [Bind Int a] (Bind Int a)
+    | ELet  [Scope Int Exp a] (Scope Int Exp a)
     | ECase (Exp a) [Alt Exp a]
       deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -63,8 +61,8 @@ instance Applicative Exp where
 instance Monad Exp where
     EVar  a    >>= f = f a
     ELit  l    >>= _ = ELit  l
-    EApp  x y  >>= f = EApp  (x >>= f) (y >>= f)
     ELam  e    >>= f = ELam  (e >>>= f)
+    EApp  x y  >>= f = EApp  (x >>= f) (y >>= f)
     ELet  bs e >>= f = ELet  (map (>>>= f) bs) (e >>>= f)
     ECase e as >>= f = ECase (e >>= f) (map (>>>= f) as)
 

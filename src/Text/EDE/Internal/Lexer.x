@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards          #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -w                    #-}
 
 -- Module      : Text.EDE.Internal.Lexer
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>

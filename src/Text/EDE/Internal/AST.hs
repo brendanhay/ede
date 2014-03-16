@@ -15,18 +15,20 @@ module Text.EDE.Internal.AST
     ) where
 
 import Bound
-import Bound.Name
 import Data.List               (elemIndex)
 import Text.EDE.Internal.Types
 
-elam :: Id -> Exp Id -> Exp Id
-elam v = ELam . abstract1Name v
+elam :: Eq a => a -> Exp a -> Exp a
+elam v = ELam . abstract1 v
+
+eapp :: [Exp a] -> Exp a
+eapp = foldl1 EApp
 
 elet :: [(Id, Exp Id)] -> Exp Id -> Exp Id
 elet [] b = b
 elet bs b = ELet (map (f . snd) bs) (f b)
   where
-    f = abstractName (`elemIndex` map fst bs)
+    f = abstract (`elemIndex` map fst bs)
 
 eif :: Eq a => Exp a -> Exp a -> Exp a -> Exp a
 eif p x y = ECase p [true x, false y]
