@@ -40,16 +40,16 @@ false :: Eq a => Exp a -> Alt Exp a
 false = alt (plit $ LBool False)
 
 alt :: (Monad f, Eq a) => Binder a -> f a -> Alt f a
-alt (Binder vs p) = Alt p . abstract (`lookup` zip vs (paths p))
+alt (Binder p vs) = Alt (length vs) p . abstract (`elemIndex` vs)
 
 pwild :: Binder a
-pwild = Binder [] PWild
+pwild = Binder PWild []
 
 pvar :: a -> Binder a
-pvar v = Binder [v] PVar
+pvar = Binder PVar . (:[])
 
 plit :: Lit -> Binder a
-plit = Binder [] . PLit
+plit l = Binder (PLit l) []
 
-pas :: a -> Binder a -> Binder a
-pas v (Binder vs p) = Binder (v:vs) (PAs p)
+-- pas :: a -> Binder a -> Binder a
+-- pas v (Binder p vs) = Binder (PAs p) (v:vs)

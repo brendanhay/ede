@@ -22,12 +22,12 @@ import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Checker.Monad
 import           Text.EDE.Internal.Checker.Unify
 
--- Resolve all type variables, as far as possible
-recon :: (Eq v, Hashable v, IsString v) => Exp v -> Env v -> Either String Type
+-- Resolve all type aariables, as far as possible
+recon :: (Eq a, Hashable a, IsString a) => Exp a -> Env a -> Either String Type
 recon e env = evalCheck $ substitute <$> reconType e env <*> get
 
 -- Type reconstruction
-reconType :: (Eq v, Hashable v, IsString v) => Exp v -> Env v -> Check Type
+reconType :: (Eq a, Hashable a, IsString a) => Exp a -> Env a -> Check Type
 reconType (EVar v) env =
     maybe (throw "Unbound variable")
           return
@@ -37,12 +37,12 @@ reconType (ELam b) env = do
     tv <- freshTVar
     te <- reconType (instantiate1 (EVar "x") b) (Map.insert "x" tv env)
     return $ TApp tv te
-reconType (EApp e1 e2) env = do
-    t1  <- reconType e1 env
-    t2  <- reconType e2 env
-    t1r <- freshTVar
-    unify t1 (TApp t2 t1r)
-    return t1r
+reconType (EApp x y) env = do
+    tx <- reconType x env
+    ty <- reconType y env
+    t  <- freshTVar
+    unify tx (TApp ty t)
+    return t
 
 reconLit :: Lit -> Type
 reconLit (LBool _) = TBool

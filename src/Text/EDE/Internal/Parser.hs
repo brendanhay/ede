@@ -14,6 +14,7 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
+import           Control.Monad
 import           Data.Foldable                  (foldl')
 import           Data.Monoid
 import           Data.Text                      (Text)
@@ -23,6 +24,7 @@ import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Lexer.Tokens
 import           Text.Parsec                    (Parsec, (<?>), getState, try)
 import qualified Text.Parsec                    as Parsec
+import Text.Parsec.Expr
 import           Text.Parsec.Combinator
 import           Text.Parsec.Error
 
@@ -96,9 +98,14 @@ decls :: Parser [(Text, Exp Text)]
 decls = sepBy1 ((,) <$> identifier <* atom KEquals <*> term) (atom KNewLine)
     <?> "a declaration"
 
-term :: Parser (Exp Text)
-term = term0 <|> term1
-    <?> "a term"
+term = flip buildExpressionParser term1
+    [ [prefix "-", prefix "+"]
+    , [binary "*", binary "/"]
+    , [binary "+", binary "-"]
+    ]
+  where
+    prefix n = Prefix (operator n >> return (EApp (EVar n)))
+    binary n = Infix  (operator n >> return (\f a -> EApp (EApp (EVar n) f) a)) AssocLeft
 
 term0 :: Parser (Exp Text)
 term0 = EVar <$> identifier <|> ELit <$> literal
@@ -107,13 +114,22 @@ term1 :: Parser (Exp Text)
 term1 = foldl1 EApp <$> some term0
 
 pattern :: Parser (Binder Text)
-pattern = pas <$> try (identifier <* atom KAt) <*> pattern <|> pattern0
+-- pattern = pas <$> try (identifier <* atom KAt) <*> pattern <|> pattern0
+pattern = pattern0
 
 pattern0 :: Parser (Binder Text)
 pattern0 = pvar <$> identifier
     <|> pwild <$ atom KUnderscore
     <|> plit  <$> literal
     <?> "a pattern"
+
+operator :: Text -> Parser ()
+operator op = token f <?> "an operator"
+  where
+    f (TC _ y t)
+        | KOp == y
+        , op  == t = Just ()
+    f _            = Nothing
 
 identifier :: Parser Text
 identifier = snd <$> capture KIdent

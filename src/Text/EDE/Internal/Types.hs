@@ -16,9 +16,9 @@ module Text.EDE.Internal.Types where
 
 import Bound
 import Control.Applicative
+import Control.DeepSeq
 import Control.Monad
 import Data.Foldable
-import Data.Monoid
 import Data.Text           (Text)
 import Data.Traversable
 import Prelude.Extras
@@ -44,6 +44,11 @@ data Lit
     | LNum  !Integer
     | LText !Text
       deriving (Eq, Show)
+
+instance NFData Lit where
+    rnf (LBool b) = rnf b
+    rnf (LNum  n) = rnf n
+    rnf (LText t) = rnf t
 
 data Exp a
     = EVar  a
@@ -75,26 +80,14 @@ data Pat
     = PWild
     | PVar
     | PLit Lit
-    | PAs  Pat
+--    | PAs  Pat
       deriving (Eq, Show)
 
-data Path = PLeaf
-    deriving (Eq, Show)
-
-leafPath :: Endo Path -> Path
-leafPath = flip appEndo PLeaf
-
-paths :: Pat -> [Path]
-paths = go mempty
-  where
-    go p PVar = [leafPath p]
-    go _ _    = []
-
-data Alt f a = Alt Pat (Scope Path f a)
+data Alt f a = Alt !Int Pat (Scope Int f a)
     deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Bound Alt where
-    Alt p b >>>= f = Alt p (b >>>= f)
+    Alt n p b >>>= f = Alt n p (b >>>= f)
 
-data Binder a = Binder [a] Pat
+data Binder a = Binder Pat [a]
     deriving (Eq, Show, Functor, Foldable, Traversable)
