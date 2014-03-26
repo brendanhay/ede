@@ -22,6 +22,7 @@ import Data.Foldable
 import Data.Text           (Text)
 import Data.Traversable
 import Prelude.Extras
+import Data.Scientific
 
 data Meta = Meta !String !Int !Int
     deriving (Eq, Show)
@@ -41,7 +42,7 @@ data Type
 
 data Lit
     = LBool !Bool
-    | LNum  !Integer
+    | LNum  !Scientific
     | LText !Text
       deriving (Eq, Show)
 
@@ -64,14 +65,14 @@ instance Applicative Exp where
     (<*>) = ap
 
 instance Monad Exp where
+    return = EVar
+
     EVar  a    >>= f = f a
     ELit  l    >>= _ = ELit  l
     ELam  e    >>= f = ELam  (e >>>= f)
     EApp  x y  >>= f = EApp  (x >>= f) (y >>= f)
     ELet  bs e >>= f = ELet  (map (>>>= f) bs) (e >>>= f)
     ECase e as >>= f = ECase (e >>= f) (map (>>>= f) as)
-
-    return = EVar
 
 instance Eq1   Exp
 instance Show1 Exp
@@ -91,3 +92,4 @@ instance Bound Alt where
 
 data Binder a = Binder Pat [a]
     deriving (Eq, Show, Functor, Foldable, Traversable)
+    -- 

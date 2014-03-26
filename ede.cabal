@@ -76,10 +76,12 @@ library
         array
       , base            >= 4.6 && < 5
       , bound
+      , deepseq
       , hashable
       , parsec
       , prelude-extras
       , pretty
+      , scientific
       , text            >= 1.0
       , transformers
       , unordered-containers

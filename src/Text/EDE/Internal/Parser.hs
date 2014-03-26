@@ -17,6 +17,7 @@ import           Control.Applicative
 import           Control.Monad
 import           Data.Foldable                  (foldl')
 import           Data.Monoid
+import           Data.Scientific
 import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
 import qualified Data.Text.Read                 as Read
@@ -24,9 +25,9 @@ import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Lexer.Tokens
 import           Text.Parsec                    (Parsec, (<?>), getState, try)
 import qualified Text.Parsec                    as Parsec
-import Text.Parsec.Expr
 import           Text.Parsec.Combinator
 import           Text.Parsec.Error
+import           Text.Parsec.Expr
 
 type Parser = Parsec [Token] ParserState
 
@@ -151,10 +152,10 @@ number = do
     (_, txt) <- capture KNum
     either (fail . mappend "unexpected error parsing number: ")
            (uncurry parse)
-           (Read.signed Read.decimal txt)
+           (Read.double txt)
     <?> "a number"
   where
-    parse n "" = return (LNum n)
+    parse n "" = return $ LNum (fromFloatDigits n)
     parse n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
 
 blank :: Parser (Exp Text)
