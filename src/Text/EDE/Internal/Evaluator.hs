@@ -1,7 +1,6 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE OverloadedStrings    #-}
 
 -- Module      : Text.EDE.Internal.Evaluator
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -19,6 +18,7 @@ import           Bound
 import           Bound.Scope
 import           Bound.Var
 import           Control.Applicative
+import           Control.Arrow
 import           Control.DeepSeq
 import           Control.Monad
 import           Data.HashMap.Strict (HashMap)
@@ -34,10 +34,6 @@ import           Data.Text (Text)
 import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Checker
 
-data Value
-    = VLit Lit
-    | VLam (Value -> Value)
-
 literal :: Value -> Maybe Lit
 literal (VLit l) = Just l
 literal _        = Nothing
@@ -46,73 +42,120 @@ instance Show Value where
     show (VLit l)   = show l
     show (VLam _)   = "VLam <function>"
 
-eval :: Exp Id -> Value
+eval :: Exp Id -> Maybe Value
 eval = go env . nf
   where
-    go :: (a -> Value) -> Exp a -> Value
-    go _ (ELit l)   = VLit l
+    go :: (a -> Maybe Value) -> Exp a -> Maybe Value
+    go _ (ELit l)   = Just (VLit l)
     go g (EVar v)   = g v
-    go g (ELam b)   = VLam $ \x -> go (ext g x) (unscope b)
+    go g (ELam b)   = Just . VLam $ \x -> go (ext g x) (unscope b)
+    go g (EApp f a) = join $ vapp <$> go g f <*> go g a
 
-    go g (EApp f a) = vapp (go g f) (go g a)
-
-    ext _ x (B ()) = x
+    ext :: (a -> Maybe Value) -> Value -> Var () (Exp a) -> Maybe Value
+    ext _ x (B ()) = Just x
     ext g _ (F a)  = go g a
 
-vapp :: Value -> Value -> Value
+vapp :: Value -> Value -> Maybe Value
 vapp (VLam f) v = f v
-vapp f        a = error $ "vapp" ++ show (f, a)
+vapp f        a = Nothing
 
--- data Typed a
---     = FBool (Bool    -> a)
---     | FNum  (Integer -> a)
---     | FText (Text    -> a)
+-- class Quoted a where
+--     quote :: a -> Value
+-- --    typed :: a -> Type
 
--- instance Show (Typed a) where
---     show (FBool _) = "bool"
---     show (FNum  _) = "integer"
---     show (FText _) = "string"
+-- instance Quoted Value where
+--     quote = id
 
--- typed :: Typed a -> Maybe (Value -> Value) -> Value -> Either String a
--- typed t Nothing (VLam _)  = Left "Unapplied function instead of literal"
--- typed t (Just f) (VLam x) = f x
--- typed t _       (VLit l)  =
---     case (t, l) of
---         (FBool f, LBool n) -> Right (f n)
---         (FNum  f, LNum  n) -> Right (f n)
---         (FText f, LText n) -> Right (f n)
---         _ -> Left $ "Literal type mismatch: " ++ show (t, l)
+-- instance Quoted (Scientific -> Scientific) where
+--     quote f = VLam $ \x ->
+--         case x of
+--             VLit (LNum a) -> VLit $ LNum (f a)
+--             _             -> error $ "Numeric mismatch: " ++ show x
 
-class Quoted a where
+-- instance Quoted (Scientific -> Scientific -> Scientific) where
+--     quote f = VLam $ \x ->
+--         case x of
+--             VLit (LNum a) -> VLam $ \y ->
+--                 case y of
+--                     VLit (LNum b) -> VLit $ LNum (f a b)
+--                     VLit l        -> error $ "Invalid type: " ++ show l
+--                     VLam g        -> vapp (quote f) (g x)
+--             _ -> error $ "Numeric mismatch: " ++ show x
+
+data Value
+    = VLit Lit
+    | VLam (Value -> Maybe Value)
+
+class Quote a where
     quote :: a -> Value
 
-instance Quoted (Scientific -> Scientific -> Scientific) where
-    quote f = VLam $ \x ->
-        case x of
-            VLit (LNum a) -> VLam $ \y ->
-                case y of
-                    VLit (LNum b) -> VLit $ LNum (f a b)
-                    VLit l        -> error $ "Invalid type: " ++ show l
-                    VLam g        -> vapp (quote f) (g x)
-            _ -> error $ "Numeric mismatch: " ++ show x
+(@:) :: Quote a => Id -> a -> (Id, Value)
+k @: v = (k, quote v)
 
-env :: Id -> Value
-env k = fromMaybe
-    (error $ "Undefined variable: " ++ Text.unpack k)
-    (Map.lookup k m)
+instance Quote Value where
+    quote = id
+
+instance Quote Scientific where
+    quote = VLit . LNum
+
+class Unquote a where
+    unquote :: Value -> Maybe a
+
+instance Unquote Scientific where
+    unquote (VLit (LNum n)) = Just n
+    unquote _               = Nothing
+
+instance (Unquote a, Quote b) => Quote (a -> b) where
+    quote f = VLam (fmap (quote . f) . unquote)
+
+instance (Unquote a, Unquote b, Quote c) => Quote (a -> b -> c) where
+    quote f = VLam $ \x ->
+        Just . VLam $ \y ->
+            case y of
+                VLam g -> join $ vapp <$> pure (quote f) <*> g x
+                _      -> quote <$> (f <$> unquote x <*> unquote y)
+
+env :: Id -> Maybe Value
+env k = Map.lookup k prelude
   where
-    m = Map.fromList
-        [ ("+", quote ((+) :: Scientific -> Scientific -> Scientific))
-        , ("-", quote ((-) :: Scientific -> Scientific -> Scientific))
-        , ("/", quote ((/) :: Scientific -> Scientific -> Scientific))
-        , (".", dot)
+    prelude = Map.fromList $ num ++ realFrac -- @: "." compose : 
+
+    num =
+        [ "+"      @: binary (+)
+        , "-"      @: binary (-)
+        , "*"      @: binary (*)
+        , "abs"    @: unary abs
+        , "signum" @: unary signum
+        , "negate" @: unary negate
         ]
 
-    -- (.) :: (b -> c) -> (a -> b) -> a -> c
-    dot = VLam $ \f -> VLam $ \g ->
-        case (f, g) of
-            (VLam x, VLam y) -> VLam (x . y)
-            e                -> error $ "Argument mismatch to . " ++ show e
+    realFrac =
+        [ "truncate" @: unary (fromIntegral . truncate)
+        , "round"    @: unary (fromIntegral . round)
+        , "ceiling"  @: unary (fromIntegral . ceiling)
+        , "floor"    @: unary (fromIntegral . floor)
+        ]
+
+    unary :: (Scientific -> Scientific) -> Value
+    unary = quote
+
+    binary :: (Scientific -> Scientific -> Scientific) -> Value
+    binary = quote
+
+    ternary :: (Scientific -> Scientific -> Scientific -> Scientific) -> Value
+    ternary = quote
+
+    -- -- (.) :: (b -> c) -> (a -> b) -> a -> c
+    -- compose = VLam $ \f -> VLam $ \g ->
+    --     case (f, g) of
+    --         (VLam x, VLam y) -> VLam (x . y)
+    --         e                -> error $ "Argument mismatch to . " ++ show e
+
+-- integral :: HashMap Id Value
+-- integral = Map.fromList
+--     [ "quot" @: binary quot
+--     , "rem"  @: binary rem
+--     ]
 
 -- | Compute the normal form of an expression
 nf :: Exp a -> Exp a
