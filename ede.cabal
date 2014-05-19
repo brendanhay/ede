@@ -64,7 +64,7 @@ library
       , directory
       , filepath
       , parsec
-      , scientific
+      , scientific      >= 0.3.1
       , text            >= 1.0
       , text-format
       , transformers

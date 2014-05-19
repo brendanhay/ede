@@ -18,26 +18,27 @@
 module Text.EDE.Internal.Compiler where
 
 import           Control.Applicative
-import           Control.Arrow              (first)
+import           Control.Arrow                     (first)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
-import           Data.Aeson                 hiding (Result, Success)
-import           Data.Foldable              (Foldable, foldlM)
-import           Data.HashMap.Strict        (HashMap)
-import qualified Data.HashMap.Strict        as Map
-import           Data.List                  (sortBy)
+import           Data.Aeson                        hiding (Result, Success)
+import           Data.Foldable                     (Foldable, foldlM)
+import           Data.HashMap.Strict               (HashMap)
+import qualified Data.HashMap.Strict               as Map
+import           Data.List                         (sortBy)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
-import           Data.Scientific
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import qualified Data.Text.Buildable        as Build
-import           Data.Text.Format           (Format)
-import           Data.Text.Format.Params    (Params)
-import           Data.Text.Lazy.Builder     (Builder)
-import           Data.Vector                (Vector)
-import qualified Data.Vector                as Vector
+import           Data.Scientific                   (base10Exponent)
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
+import qualified Data.Text.Buildable               as Build
+import           Data.Text.Format                  (Format)
+import           Data.Text.Format.Params           (Params)
+import           Data.Text.Lazy.Builder            (Builder)
+import           Data.Text.Lazy.Builder.Scientific
+import           Data.Vector                       (Vector)
+import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.Types
 
 data Equal a b where
