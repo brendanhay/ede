@@ -41,6 +41,8 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.Types
 
+import Debug.Trace
+
 data Equal a b where
     Eq :: Equal a a
 
@@ -99,6 +101,12 @@ eval (UApp m (UFun _ (Id "show")) e) = do
     Shw       <- shw m et
     return $ Text.pack (show e') ::: TText
 
+eval (UApp m (UFun _ (Id "nil")) e@(UVar _ (Id k))) = do
+    p <- Map.member k . _variables <$> ask
+    return $ p ::: TBool
+eval (UApp m (UFun _ (Id "nil")) e) =
+    throw m "nil check not supported for: {}" [show e]
+
 eval (UApp m (UFun fm f) e) = do
     e' ::: et    <- eval e
     Fun xt yt f' <- function fm f
@@ -108,11 +116,20 @@ eval (UApp m (UFun fm f) e) = do
 eval (UApp _ e UNil) = eval e
 eval (UApp _ UNil e) = eval e
 
+-- eval (UApp _ v@(UVar m i@(Id n)) e) = variable m i >>= f
+--   where
+--     f (Object o) = bind (const o) e
+--     f x          = do
+--         _ ::: t <- eval v
+--         vs <- _variables <$> ask
+--         throw m "variable {} :: {} doesn't supported nested accessors.\n{}\n{}\n{}\n{}"
+--             [Text.unpack n, show x, show v, show e, show t, show vs]
+
 eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
   where
     f (o ::: TMap) = bind (const o) e
-    f (_ ::: t) =
-        throw m "variable {} :: {} does not supported nested accessors."
+    f (_ ::: t)    =
+        throw m "variable {} :: {} doesn't supported nested accessors."
             [Text.unpack i, show t]
 
 eval (UApp m a b) = do
