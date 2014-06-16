@@ -71,13 +71,17 @@ raw = do
     end = keyword "endraw"
 
 conditional :: Parser UExp
-conditional = UCond
-    <$> meta
-    <*> try (section $ reserved "if" >> (try operator <|> variable))
-    <*> consequent end
-    <*> alternative end
-     <* end
+conditional = do
+    m <- meta
+    UCond m
+        <$> try (section $ cond m)
+        <*> consequent end
+        <*> alternative end
+         <* end
   where
+    cond m = (reserved "if" >> (try operator <|> variable))
+         <|> (reserved "unless" >> UNeg m <$> (try operator <|> variable))
+
     end = keyword "endif"
 
 case' :: Parser UExp
