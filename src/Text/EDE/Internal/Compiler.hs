@@ -41,8 +41,6 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.Types
 
-import Debug.Trace
-
 data Equal a b where
     Eq :: Equal a a
 
@@ -79,7 +77,7 @@ render fs ts e o = flip runReaderT (Env fs ts o) $ do
     return v
 
 eval :: UExp -> Context TExp
-eval UNil        = return $ "" ::: TBld
+eval UNil        = return $ () ::: TNil
 eval (UText _ t) = return $ t  ::: TText
 eval (UBool _ b) = return $ b  ::: TBool
 eval (UNum  _ n) = return $ n  ::: TNum
@@ -87,7 +85,7 @@ eval (UBld  _ b) = return $ b  ::: TBld
 
 eval (UVar m i) = f <$> variable m i
   where
-    f Null       = "" ::: TBld
+    f Null       = () ::: TNil
     f (String t) = t  ::: TText
     f (Bool   b) = b  ::: TBool
     f (Number n) = n  ::: TNum
@@ -101,12 +99,6 @@ eval (UApp m (UFun _ (Id "show")) e) = do
     Shw       <- shw m et
     return $ Text.pack (show e') ::: TText
 
-eval (UApp m (UFun _ (Id "nil")) e@(UVar _ (Id k))) = do
-    p <- Map.member k . _variables <$> ask
-    return $ not p ::: TBool
-eval (UApp m (UFun _ (Id "nil")) e) =
-    throw m "nil check not supported for: {}" [show e]
-
 eval (UApp m (UFun fm f) e) = do
     e' ::: et    <- eval e
     Fun xt yt f' <- function fm f
@@ -115,15 +107,6 @@ eval (UApp m (UFun fm f) e) = do
 
 eval (UApp _ e UNil) = eval e
 eval (UApp _ UNil e) = eval e
-
--- eval (UApp _ v@(UVar m i@(Id n)) e) = variable m i >>= f
---   where
---     f (Object o) = bind (const o) e
---     f x          = do
---         _ ::: t <- eval v
---         vs <- _variables <$> ask
---         throw m "variable {} :: {} doesn't supported nested accessors.\n{}\n{}\n{}\n{}"
---             [Text.unpack n, show x, show v, show e, show t, show vs]
 
 eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
   where
@@ -277,7 +260,7 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
   where
     f (Success (_ ::: TNil))  = False
     f (Success (p ::: TBool)) = p
-    f (Success _)             = True
+    f (Success (_ ::: t))     = True
     f _                       = False
 
 variable :: Meta -> Id -> Context Value
