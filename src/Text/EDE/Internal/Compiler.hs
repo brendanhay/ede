@@ -103,7 +103,7 @@ eval (UApp m (UFun _ (Id "show")) e) = do
 
 eval (UApp m (UFun _ (Id "nil")) e@(UVar _ (Id k))) = do
     p <- Map.member k . _variables <$> ask
-    return $ p ::: TBool
+    return $ not p ::: TBool
 eval (UApp m (UFun _ (Id "nil")) e) =
     throw m "nil check not supported for: {}" [show e]
 
