@@ -53,7 +53,7 @@ data Meta = Meta
     } deriving (Eq, Ord)
 
 instance Show Meta where
-    show Meta{..} = metaSource ++ ":" ++ metaRow ++ "," metaColumn
+    show Meta{..} = metaSource ++ ":" ++ show metaRow ++ "," ++ show metaColumn
 
 -- | The result of running parsing or rendering steps.
 data Result a
