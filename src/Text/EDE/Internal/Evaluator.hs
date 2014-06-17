@@ -34,6 +34,10 @@ import           Data.Text (Text)
 import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Checker
 
+data Value
+    = VLit Lit
+    | VLam (Value -> Maybe Value)
+
 literal :: Value -> Maybe Lit
 literal (VLit l) = Just l
 literal _        = Nothing
@@ -59,32 +63,71 @@ vapp :: Value -> Value -> Maybe Value
 vapp (VLam f) v = f v
 vapp f        a = Nothing
 
--- class Quoted a where
---     quote :: a -> Value
--- --    typed :: a -> Type
+prelude :: Id -> Maybe Value
+prelude k = Map.lookup k prelude
+  where
+    prelude = Map.fromList $ base ++ num ++ realFrac
 
--- instance Quoted Value where
---     quote = id
+    base =
+        [ "." @: compose
+        ]
 
--- instance Quoted (Scientific -> Scientific) where
---     quote f = VLam $ \x ->
---         case x of
---             VLit (LNum a) -> VLit $ LNum (f a)
---             _             -> error $ "Numeric mismatch: " ++ show x
+    -- (.) :: (b -> c) -> (a -> b) -> a -> c
+    compose = VLam $ \f ->
+        Just . VLam $ \g ->
+            case (f, g) of
+                (VLam x, VLam y) -> Just $ VLam (y >=> x)
+                e                -> Nothing
 
--- instance Quoted (Scientific -> Scientific -> Scientific) where
---     quote f = VLam $ \x ->
---         case x of
---             VLit (LNum a) -> VLam $ \y ->
---                 case y of
---                     VLit (LNum b) -> VLit $ LNum (f a b)
---                     VLit l        -> error $ "Invalid type: " ++ show l
---                     VLam g        -> vapp (quote f) (g x)
---             _ -> error $ "Numeric mismatch: " ++ show x
 
-data Value
-    = VLit Lit
-    | VLam (Value -> Maybe Value)
+    num =
+        [ "+"      @: binary (+)
+        , "-"      @: binary (-)
+        , "*"      @: binary (*)
+        , "abs"    @: unary abs
+        , "signum" @: unary signum
+        , "negate" @: unary negate
+        ]
+
+    realFrac =
+        [ "truncate" @: unary (fromIntegral . truncate)
+        , "round"    @: unary (fromIntegral . round)
+        , "ceiling"  @: unary (fromIntegral . ceiling)
+        , "floor"    @: unary (fromIntegral . floor)
+        ]
+
+    unary :: (Scientific -> Scientific) -> Value
+    unary = quote
+
+    binary :: (Scientific -> Scientific -> Scientific) -> Value
+    binary = quote
+
+-- | Compute the normal form of an expression
+nf :: Exp a -> Exp a
+nf e@(ELit l) = l `deepseq` e
+nf e@EVar{}   = e
+nf (ELam b)   = ELam . toScope . nf $ fromScope b
+nf (EApp f a) =
+    case whnf f of
+        ELam b -> nf (instantiate1 a b)
+        f'     -> EApp (nf f') (nf a)
+nf (ELet bs b) = nf (inst b)
+  where
+    inst = instantiate (es !!)
+    es   = map inst bs
+
+whnf :: Exp a -> Exp a
+whnf e@ELit{}    = e
+whnf e@EVar{}    = e
+whnf e@ELam{}    = e
+whnf (EApp f a)  =
+    case whnf f of
+        ELam b -> whnf (instantiate1 a b)
+        f'     -> EApp f' a
+whnf (ELet bs b) = whnf (inst b)
+  where
+    inst = instantiate (es !!)
+    es   = map inst bs
 
 class Quote a where
     quote :: a -> Value
@@ -114,72 +157,3 @@ instance (Unquote a, Unquote b, Quote c) => Quote (a -> b -> c) where
             case y of
                 VLam g -> join $ vapp <$> pure (quote f) <*> g x
                 _      -> quote <$> (f <$> unquote x <*> unquote y)
-
-env :: Id -> Maybe Value
-env k = Map.lookup k prelude
-  where
-    prelude = Map.fromList $ num ++ realFrac -- @: "." compose : 
-
-    num =
-        [ "+"      @: binary (+)
-        , "-"      @: binary (-)
-        , "*"      @: binary (*)
-        , "abs"    @: unary abs
-        , "signum" @: unary signum
-        , "negate" @: unary negate
-        ]
-
-    realFrac =
-        [ "truncate" @: unary (fromIntegral . truncate)
-        , "round"    @: unary (fromIntegral . round)
-        , "ceiling"  @: unary (fromIntegral . ceiling)
-        , "floor"    @: unary (fromIntegral . floor)
-        ]
-
-    unary :: (Scientific -> Scientific) -> Value
-    unary = quote
-
-    binary :: (Scientific -> Scientific -> Scientific) -> Value
-    binary = quote
-
-    ternary :: (Scientific -> Scientific -> Scientific -> Scientific) -> Value
-    ternary = quote
-
-    -- -- (.) :: (b -> c) -> (a -> b) -> a -> c
-    -- compose = VLam $ \f -> VLam $ \g ->
-    --     case (f, g) of
-    --         (VLam x, VLam y) -> VLam (x . y)
-    --         e                -> error $ "Argument mismatch to . " ++ show e
-
--- integral :: HashMap Id Value
--- integral = Map.fromList
---     [ "quot" @: binary quot
---     , "rem"  @: binary rem
---     ]
-
--- | Compute the normal form of an expression
-nf :: Exp a -> Exp a
-nf e@(ELit l) = l `deepseq` e
-nf e@EVar{}   = e
-nf (ELam b)   = ELam . toScope . nf $ fromScope b
-nf (EApp f a) =
-    case whnf f of
-        ELam b -> nf (instantiate1 a b)
-        f'     -> EApp (nf f') (nf a)
-nf (ELet bs b) = nf (inst b)
-  where
-    inst = instantiate (es !!)
-    es   = map inst bs
-
-whnf :: Exp a -> Exp a
-whnf e@ELit{}    = e
-whnf e@EVar{}    = e
-whnf e@ELam{}    = e
-whnf (EApp f a)  =
-    case whnf f of
-        ELam b -> whnf (instantiate1 a b)
-        f'     -> EApp f' a
-whnf (ELet bs b) = whnf (inst b)
-  where
-    inst = instantiate (es !!)
-    es   = map inst bs
