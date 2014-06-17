@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RecordWildCards    #-}
@@ -20,8 +21,9 @@ import           Data.Aeson              hiding (Result, Success, Error)
 import           Data.Aeson.Types        (Pair)
 import           Data.HashMap.Strict     (HashMap)
 import           Data.List               (intercalate)
-import           Data.Monoid
+import           Data.Monoid             hiding ((<>))
 import           Data.Scientific
+import           Data.Semigroup
 import           Data.Text               (Text)
 import           Data.Text.Buildable
 import           Data.Text.Format        (Format, format)
@@ -31,6 +33,9 @@ import           Data.Text.Lazy.Builder
 
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Text -> Meta -> m (Result Template)
+
+instance Monad m => Semigroup (Resolver m) where
+    (<>) f g = \x y -> liftM2 mplus (f x y) (g x y)
 
 -- | A parsed and compiled template.
 data Template = Template
@@ -73,11 +78,17 @@ instance Applicative Result where
     (<*>) = ap
     {-# INLINE (<*>) #-}
 
+instance Alternative Result where
+    empty = fail "empty"
+    {-# INLINE empty #-}
+    (<|>) a@(Success _) _ = a
+    (<|>) _ b             = b
+    {-# INLINE (<|>) #-}
+
 instance MonadPlus Result where
     mzero = fail "mzero"
     {-# INLINE mzero #-}
-    mplus a@(Success _) _ = a
-    mplus _ b             = b
+    mplus = (<|>)
     {-# INLINE mplus #-}
 
 instance Monoid a => Monoid (Result a) where
