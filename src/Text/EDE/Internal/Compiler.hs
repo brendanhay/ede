@@ -260,7 +260,7 @@ predicate = mapReaderT (return . (::: TBool) . f) . eval
   where
     f (Success (_ ::: TNil))  = False
     f (Success (p ::: TBool)) = p
-    f (Success (_ ::: t))     = True
+    f (Success _)             = True
     f _                       = False
 
 variable :: Meta -> Id -> Context Value
