@@ -36,6 +36,7 @@ type Resolver m = Text -> Meta -> m (Result Template)
 
 instance Monad m => Semigroup (Resolver m) where
     (<>) f g = \x y -> liftM2 mplus (f x y) (g x y)
+    {-# INLINE (<>) #-}
 
 -- | A parsed and compiled template.
 data Template = Template
@@ -52,7 +53,7 @@ data Meta = Meta
     } deriving (Eq, Ord)
 
 instance Show Meta where
-    show _ = ""
+    show Meta{..} = metaSource ++ ":" ++ metaRow ++ "," metaColumn
 
 -- | The result of running parsing or rendering steps.
 data Result a
