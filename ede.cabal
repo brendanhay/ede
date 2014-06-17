@@ -65,6 +65,7 @@ library
       , filepath
       , parsec
       , scientific      >= 0.3.1
+      , semigroups
       , text            >= 1.0
       , text-format
       , transformers
