@@ -49,6 +49,7 @@ library
     exposed-modules:
         Text.EDE
       , Text.EDE.Filters
+      , Paths_ede
 
     other-modules:
         Text.EDE.Internal.Compiler
@@ -71,6 +72,23 @@ library
       , transformers
       , unordered-containers
       , vector
+
+executable ed-e
+    default-language:  Haskell2010
+    main-is:           src/Main.hs
+
+    ghc-options:       -Wall -rtsopts "-with-rtsopts=-T -I0"
+
+    build-depends:
+        aeson
+      , base            >= 4.6 && < 5
+      , bytestring
+      , conduit         == 1.1.*
+      , conduit-extra   == 1.1.*
+      , directory
+      , ede
+      , optparse-applicative
+      , text
 
 test-suite golden
     default-language:  Haskell2010
