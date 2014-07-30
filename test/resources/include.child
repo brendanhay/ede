@@ -1,1 +1,2 @@
-Hi, {{ var }}!
+{# FIXME: 'var' should be available here #}
+Hi, {{ scope }}!
