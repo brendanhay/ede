@@ -1,5 +1,5 @@
 name:                  ede
-version:               0.1.6
+version:               0.1.7
 synopsis:              Textual Templating Language
 homepage:              http://github.com/brendanhay/ede
 license:               OtherLicense
@@ -83,7 +83,7 @@ executable ed-e
         aeson
       , base            >= 4.6 && < 5
       , bytestring
-      , conduit         == 1.1.*
+      , conduit         == 1.2.*
       , conduit-extra   == 1.1.*
       , directory
       , ede
