@@ -34,11 +34,10 @@ parseOpts = Opts
        <|> argument str (metavar "FILE")
         )
     <*> optional
-        ( nullOption
+        ( option (eitherReader readJSON)
           ( short   'd'
          <> long    "data"
          <> metavar "JSON"
-         <> eitherReader readJSON
          <> help    ( "Bindings to make available in the environment, as JSON. "
                    ++ "If not given, standard input is read.")
           )
