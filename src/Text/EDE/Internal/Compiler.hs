@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TupleSections             #-}
+{-# LANGUAGE ViewPatterns              #-}
 
 -- Module      : Text.EDE.Internal.Compiler
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -26,6 +27,7 @@ import           Data.Foldable                     (Foldable, foldlM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
 import           Data.List                         (sortBy)
+import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
@@ -40,9 +42,13 @@ import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
 import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
+import           Debug.Trace
 import           Text.EDE.Internal.Types
 
 data TExp = forall a. Eq a => a ::: Type a
+
+instance Show TExp where
+    show (_ ::: t) = show t
 
 data Env = Env
     { _filters   :: HashMap Text Fun
@@ -72,42 +78,35 @@ eval (ELit _ l) = return $
 
 eval (EBld _ b) = return $ b ::: TBld
 
-eval (EVar m i) = (f <$> variable m i) <|> ((::: TFun) <$> function m i)
-  where
-    f Null       = () ::: TNil
-    f (Bool   b) = b  ::: TBool
-    f (Number n) = n  ::: TNum
-    f (Object o) = o  ::: TMap
-    f (Array  a) = a  ::: TList
-    f (String t) = LText.fromStrict t ::: TText
+eval (EVar _ v) = cast <$> variable v
 
--- eval (EFun m f) = (::: TFun) <$> function m f
+eval (EFun _ i) = (::: TFun) <$> function i
 
--- eval (EApp m (EFun _ (Id "show")) e) = do
---     e' ::: et <- eval e
---     Shw       <- shw m et
---     return $ Text.pack (show e') ::: TText
+eval (EApp m (EFun _ (Id _ "show")) e) = do
+    e' ::: et <- eval e
+    Shw       <- shw m et
+    return (LText.pack (show e') ::: TText)
 
--- eval (EApp m (EFun fm f) e) = do
---     e' ::: et    <- eval e
---     Fun xt yt f' <- function fm f
---     Eq           <- equal m et xt
---     return $ f' e' ::: yt
+eval (EApp m (EFun _ f) e) = do
+    e' ::: et    <- eval e
+    Fun xt yt f' <- function f
+    Eq           <- equal m et xt
+    return (f' e' ::: yt)
 
 -- eval (EApp _ e UNil) = eval e
 -- eval (EApp _ UNil e) = eval e
 
-eval (EApp _ v@(EVar m (Id i)) e) = eval v >>= f
-  where
-    f (o ::: TMap) = bind (const o) e
-    f (_ ::: t)    =
-        throw m "variable {} :: {} doesn't supported nested accessors."
-            [Text.unpack i, show t]
+-- eval (EApp _ v@(EVar m (Id i)) e) = eval v >>= f
+--   where
+--     f (o ::: TMap) = bind (const o) e
+--     f (_ ::: t)    =
+--         throw m "variable {} :: {} doesn't supported nested accessors."
+--             [Text.unpack i, show t]
 
 eval (EApp m a b) = do
     a' ::: TBld <- f a
     b' ::: TBld <- f b
-    return $ (a' <> b') ::: TBld
+    return ((a' <> b') ::: TBld)
   where
     f x = eval x >>= build m
 
@@ -141,34 +140,41 @@ eval (EApp m a b) = do
 --     p' ::: TBool <- predicate p
 --     eval $ if p' then a else b
 
-eval (ELet m (Id k) bdy) = do
-    v <- either cast (variable m) bdy
+eval (ELet _ (Id _ k) e) = do
+    v <- either reify variable e
     modify $ \s -> s { _variables = Map.insert k v (_variables s) }
     return (mempty ::: TBld)
   where
-    cast (LBool b) = return (Bool   b)
-    cast (LNum  n) = return (Number n)
-    cast (LText t) = return (String (LText.toStrict t))
+    reify (LBool b) = return (Bool   b)
+    reify (LNum  n) = return (Number n)
+    reify (LText t) = return (String (LText.toStrict t))
 
+-- FIXME: We have to recompute c everytime due to the predicate ..
 eval (ECase m p ws) = do
-    c <- eval p
-    r <- cond c ws
+    r <- cond ws
     eval (fromMaybe (EBld m mempty) r)
   where
-    cond _ []          = return Nothing
-    cond c ((a, e):as) =
+    cond []          = return Nothing
+    cond ((a, e):as) =
         case a of
             PWild  -> return (Just e)
-            PVar v -> eval (EVar m v) >>= match e as c
-            PLit l -> eval (ELit m l) >>= match e as c
+            PVar v -> eval (EVar m v) >>= match e as
+            PLit l -> eval (ELit m l) >>= match e as
 
-    match e as c@(x ::: xt) (y ::: yt) = do
-        Eq <- equal m xt yt
+    match e as (y ::: TBool) = do
+        x <- predicate p
+        if x == y
+            then return (Just e)
+            else cond as
+
+    match e as (y ::: yt) = do
+        x ::: xt <- eval p
+        Eq       <- equal m xt yt
         if x == y
            then return (Just e)
-           else cond c as
+           else cond as
 
-eval (ELoop m (Id k) v bdy a) = eval (EVar m v) >>= f >>= loop k bdy a
+eval (ELoop m (Id _ k) v bdy a) = eval (EVar m v) >>= f >>= loop k bdy a
   where
     f (x ::: TList) = return $ Col (Vector.length x) (vec x)
     f (x ::: TMap)  = return $ Col (Map.size x)      (hmap x)
@@ -183,7 +189,7 @@ eval (ELoop m (Id k) v bdy a) = eval (EVar m v) >>= f >>= loop k bdy a
 eval (EIncl m k mu) = do
     te <- template m k
     s  <- maybe (return global) local' mu
-    bind s te
+    bind s (eval te)
   where
     global o = fromPairs ["scope" .= o]
 
@@ -198,7 +204,7 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
   where
     iter (n, bld) x = do
         shadowed
-        a' ::: at <- bind (Map.insert k $ context n x) a
+        a' ::: at <- bind (Map.insert k $ context n x) (eval a)
         Eq        <- equal (meta a) at TBld
         return (n + 1, bld <> a')
 
@@ -271,27 +277,49 @@ js _ TMap  = return JS
 js _ TList = return JS
 js m t = throw m "constraint check of ToJSON a => a ~ {} failed." [show t]
 
-bind :: (Object -> Object) -> Exp -> Context TExp
-bind f = withStateT (\x -> x { _variables = f $ _variables x }) . eval
+bind :: (Object -> Object) -> Context a -> Context a
+bind f = withStateT (\x -> x { _variables = f $ _variables x })
 
-predicate :: Exp -> Context TExp
-predicate = mapStateT f . eval
+-- | A variable can be tested for truthiness, but a non-whnf expr cannot.
+predicate :: Exp -> Context Bool
+predicate e = do
+    r <- evalStateT (eval e) <$> get
+    case e of
+        EVar{} -> f r
+        _      -> g r
   where
-    f e@(Error    _ _) = e
-    f (Success (r, s)) =
-        Success . (,s) . (::: TBool) $
-            case r of
-                _ ::: TNil  -> False
-                p ::: TBool -> p
-                _           -> True
+    f :: Result TExp -> Context Bool
+    f (Success (_ ::: TNil))  = lift (Success False)
+    f (Success (p ::: TBool)) = lift (Success p)
+    f (Success _)             = lift (Success True)
+    f _                       = lift (Success False)
 
-variable :: Meta -> Id -> Context Value
-variable m (Id k) = do
-    mv <- Map.lookup k <$> gets _variables
-    maybe (throw m "binding {} doesn't exist." [k]) return mv
+    g :: Result TExp -> Context Bool
+    g (Error m es)         = lift (Error m es)
+    g (Success (p ::: pt)) = do
+        Eq <- equal (meta e) pt TBool
+        lift (Success p)
 
-function :: Meta -> Id -> Context Fun
-function m (Id k) = do
+variable :: Var -> Context Value
+variable (Var is) = gets _variables >>= go (NonEmpty.toList is) [] . Object
+  where
+    go []     _ v = return v
+    go (k:ks) r v = do
+        m <- nest v
+        maybe (throw (meta k) "binding {} doesn't exist." [fmt (k:r)])
+              (go ks (k:r))
+              (Map.lookup (idName k) m)
+      where
+        nest :: Value -> Context Object
+        nest (Object o)        = return o
+        nest (cast -> _ ::: t) =
+            throw (meta k) "variable {} :: {} doesn't supported nested accessors."
+                [fmt (k:r), show t]
+
+        fmt = Text.unpack . Text.intercalate "." . map idName
+
+function :: Id -> Context Fun
+function (Id m k) = do
     mf <- Map.lookup k <$> gets _filters
     maybe (throw m "filter {} doesn't exist." [k]) return mf
 
@@ -317,3 +345,12 @@ build m (_ ::: t)     = throw m "unable to render variable of type {}" [show t]
 
 throw :: Params ps => Meta -> Format -> ps -> Context a
 throw m f = lift . throwError m f
+
+cast :: Value -> TExp
+cast v = case v of
+    Null     -> () ::: TNil
+    Bool   b -> b  ::: TBool
+    Number n -> n  ::: TNum
+    Object o -> o  ::: TMap
+    Array  a -> a  ::: TList
+    String t -> LText.fromStrict t ::: TText

@@ -32,7 +32,7 @@ tokenEOF _           = False
 
 data Capture
     = KNum
-    | KIdent
+    | KVar
     | KText
     | KOp
     | KFrag
@@ -40,10 +40,10 @@ data Capture
       deriving (Eq, Show)
 
 data Atom
-    = KIdentL
-    | KIdentR
-    | KSectionL
-    | KSectionR
+    = KVarL
+    | KVarR
+    | KBlockL
+    | KBlockR
     | KParenL
     | KParenR
     | KBracketL

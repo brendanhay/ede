@@ -14,16 +14,20 @@
 module Text.EDE.Internal.AST where
 
 import Data.Foldable           (foldl', foldr')
+import Data.List.NonEmpty      (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
 import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
-evar :: Meta -> Text -> Exp
-evar m = EVar m . Id
+var :: Id -> Var
+var = Var . (:| [])
 
-epartial :: Meta -> Text -> (Exp -> Exp)
-epartial m t = EApp m (evar m t)
+evar :: Var -> Exp
+evar v = EVar (meta v) v
+
+efun :: Meta -> Text -> (Exp -> Exp)
+efun m = EApp m . EFun m . Id m
 
 eapp :: Exp -> [Exp] -> Exp
 eapp e [] = e

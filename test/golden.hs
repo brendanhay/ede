@@ -42,14 +42,14 @@ tests = files >>= mapM test
 
     test :: FilePath -> IO TestTree
     test f = do
-        (txt, name) <- (,)
+        (txt, n) <- (,)
             <$> LText.readFile f
             <*> pure (takeWhile (/= '.') f)
 
         let (js, src) = split txt
 
-        return . goldenVsStringDiff name diff (name ++ ".expected") $ do
-            t <- parseWith (includeFile resources) (Text.pack name) src
+        return . goldenVsStringDiff n diff (n ++ ".expected") $ do
+            t <- parseWith (includeFile resources) (Text.pack $ n ++ ".ede") src
             either error output
                 . eitherResult
                 $ t >>= (`render` input js)

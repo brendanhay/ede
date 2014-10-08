@@ -57,8 +57,8 @@ library
       , Text.EDE.Internal.Lexer
       , Text.EDE.Internal.Lexer.Tokens
       , Text.EDE.Internal.Parser
+      , Text.EDE.Internal.Pretty
       , Text.EDE.Internal.Types
---      , Text.EDE.Internal.Pretty
 
     ghc-options:       -Wall -funbox-strict-fields
 

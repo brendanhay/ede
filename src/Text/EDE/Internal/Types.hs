@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE RecordWildCards            #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -21,6 +22,8 @@ import           Data.Aeson              hiding (Result, Success, Error)
 import           Data.Aeson.Types        (Pair)
 import           Data.HashMap.Strict     (HashMap)
 import           Data.List               (intercalate)
+import           Data.List.NonEmpty      (NonEmpty)
+import qualified Data.List.NonEmpty      as NonEmpty
 import           Data.Monoid             hiding ((<>))
 import           Data.Scientific
 import           Data.Semigroup
@@ -30,6 +33,8 @@ import           Data.Text.Format        (Format, format)
 import           Data.Text.Format.Params (Params)
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
+import           Text.Parsec             (ParseError, SourcePos)
+import qualified Text.Parsec             as Parsec
 
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Text -> Meta -> m (Result Template)
@@ -54,6 +59,15 @@ class Metadata a where
 
 instance Metadata Meta where
     meta = id
+
+instance Metadata ParseError where
+    meta = meta . Parsec.errorPos
+
+instance Metadata SourcePos where
+    meta p = Meta
+        (Parsec.sourceName p)
+        (Parsec.sourceLine p)
+        (Parsec.sourceColumn p)
 
 -- | The result of running parsing or rendering steps.
 data Result a
@@ -125,16 +139,6 @@ success = return . Success
 failure :: Monad m => Meta -> [String] -> m (Result a)
 failure m = return . Error m
 
-newtype Id = Id Text
-    deriving (Eq, Show)
-
-instance Buildable Id where
-    build (Id i) = build i
-    {-# INLINE build #-}
-
-data Fun where
-    Fun :: (Eq a, Eq b) => Type a -> Type b -> (a -> b) -> Fun
-
 instance Eq Fun where
     _ == _ = False
 
@@ -151,23 +155,26 @@ data Type a where
 
 deriving instance Show (Type a)
 
--- data BinOp = And | Or
---     deriving (Eq, Show)
+data Fun where
+    Fun :: (Eq a, Eq b) => Type a -> Type b -> (a -> b) -> Fun
 
--- data RelOp
---     = Equal
---     | NotEqual
---     | Greater
---     | GreaterEqual
---     | Less
---     | LessEqual
---       deriving (Eq, Show)
+data Id = Id
+    { idMeta :: !Meta
+    , idName :: !Text
+    } deriving (Eq, Show)
 
--- data Op
---     = ONeg !Exp
---     | OBin !BinOp !Exp !Exp
---     | ORel !RelOp !Exp !Exp
---       deriving (Eq, Show)
+instance Metadata Id where
+    meta = idMeta
+
+instance Buildable Id where
+    build = build . idName
+    {-# INLINE build #-}
+
+newtype Var = Var { unVar :: NonEmpty Id }
+    deriving (Eq, Show, Semigroup)
+
+instance Metadata Var where
+    meta = meta . NonEmpty.head . unVar
 
 data Lit
     = LBool !Bool
@@ -177,35 +184,31 @@ data Lit
 
 data Pat
     = PWild
-    | PVar Id
+    | PVar Var
     | PLit Lit
       deriving (Eq, Show)
 
 type Alt = (Pat, Exp)
 
 data Exp
---    = ENil
     = ELit  !Meta !Lit
     | EBld  !Meta !Builder
-    | EVar  !Meta !Id
---    EFun  !Meta !Id
+    | EVar  !Meta !Var
+    | EFun  !Meta !Id
     | EApp  !Meta !Exp  !Exp
---    | EOp   !Meta !Op
-    | ELet  !Meta !Id   (Either Lit Id)
+    | ELet  !Meta !Id   (Either Lit Var)
     | ECase !Meta !Exp  [Alt]
-    | ELoop !Meta !Id   !Id  !Exp (Maybe Exp)
+    | ELoop !Meta !Id   !Var !Exp (Maybe Exp)
     | EIncl !Meta !Text (Maybe Exp)
       deriving (Eq, Show)
 
 instance Metadata Exp where
     meta x = case x of
---        ENil            -> mkMeta "Exp.meta"
         ELit  m _       -> m
         EBld  m _       -> m
         EVar  m _       -> m
---        EFun  m _       -> m
+        EFun  m _       -> m
         EApp  m _ _     -> m
---        EOp   m _       -> m
         ELet  m _ _     -> m
         ECase m _ _     -> m
         ELoop m _ _ _ _ -> m

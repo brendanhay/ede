@@ -59,16 +59,19 @@ $fragment    = [^\{]
 
 tokens :-
 
-<0> "{{"              { atom KIdentL `andBegin` exp }
-<0> "{%"              { atom KSectionL `andBegin` exp }
-<0> "{-"              { begin com }
+<0> "{#"              { begin com }
+<0> "{{"              { atom KVarL `andBegin` exp }
+<0> "{%"              { atom KBlockL `andBegin` exp }
 
 <0> $newline          { atom KNewLine }
 <0> $whitespace+      { capture KWhiteSpace }
 <0> .                 { captureFrag }
 
-<exp> "}}"            { atom KIdentR `andBegin` 0 }
-<exp> "%}"            { atom KSectionR `andBegin` 0 }
+<com> "#}"            { begin 0 }
+<com> [. $newline]    { skip }
+
+<exp> "}}"            { atom KVarR `andBegin` 0 }
+<exp> "%}"            { atom KBlockR `andBegin` 0 }
 <exp> $newline        { atom KNewLine }
 <exp> $white+         { skip }
 
@@ -98,7 +101,7 @@ tokens :-
 <exp> "endcapture"    { atom KEndCapture }
 
 <exp> $sign? @number  { capture KNum }
-<exp> $letter @ident* { capture KIdent }
+<exp> $letter @ident* { capture KVar }
 
 <exp> \" @string* \"  { scoped KText (LText.tail . LText.init) }
 
@@ -122,10 +125,6 @@ tokens :-
 <exp> \,              { atom KComma }
 <exp> \_              { atom KUnderscore }
 <exp> \@              { atom KAt }
-
-<com> "-}"            { begin 0 }
-<com> [. $newline]    { skip }
-
 {
 scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
 scoped k f inp len = return $

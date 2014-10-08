@@ -18,8 +18,9 @@ import           Control.Arrow                  (second)
 import           Control.Monad
 import           Data.HashMap.Strict            (HashMap)
 import qualified Data.HashMap.Strict            as Map
-import           Data.Monoid
+import           Data.List.NonEmpty             (NonEmpty(..))
 import           Data.Scientific
+import           Data.Semigroup
 import           Data.Text                      (Text)
 import qualified Data.Text.Lazy                 as LText
 import qualified Data.Text.Read                 as Read
@@ -27,7 +28,7 @@ import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Lexer.Tokens
 import           Text.EDE.Internal.Types
 import qualified Text.Parsec                    as Parsec
-import           Text.Parsec                    hiding (Error, (<|>), many, token, newline, string)
+import           Text.Parsec                    hiding (Error, (<|>), many, optional, token, newline, string)
 import           Text.Parsec.Expr
 
 type Parser = Parsec [Token] ParserState
@@ -42,15 +43,16 @@ runParser :: String -> [Token] -> Result (Exp, HashMap Text Meta)
 runParser n = either msg Success
     . Parsec.runParser tmpl (ParserState show n mempty) n
   where
-    msg e = Error (pos (errorPos e)) [show e]
-    pos s = Meta (sourceName s) (sourceLine s) (sourceColumn s)
+    msg e = Error (meta (errorPos e)) [show e]
 
-    tmpl = (,) <$> document <* eof <*> (stateIncl <$> getState)
+    tmpl = (,)
+        <$> document <* eof
+        <*> (stateIncl <$> getState)
 
 document :: Parser Exp
 document = eapp <$> p <*> many p
   where
-    p = fragment <|> substitution <|> sections
+    p = fragment <|> substitution <|> blocks
 
 fragment :: Parser Exp
 fragment = do
@@ -70,56 +72,64 @@ newline = (, "\n") <$> atom KNewLine
     <?> "a newline"
 
 substitution :: Parser Exp
-substitution = atom KIdentL *> term <* atom KIdentR
+substitution = atom KVarL *> term <* atom KVarR
     <?> "substitution"
 
-sections :: Parser Exp
-sections = choice
+blocks :: Parser Exp
+blocks = choice
     [ ifelsif
     , cases
     , assign
     , loop
     , include
-    ] <?> "a section"
+    ] <?> "a block"
 
-section :: String -> Parser a -> Parser a
-section n p = try (atom KSectionL *> p <* atom KSectionR) <?> n
+block :: String -> Parser a -> Parser a
+block n p = q
+    <?> n
+  where
+    q = try (atom KBlockL *> p <* atom KBlockR <* trim)
+
+    trim = optional newline
+
+    -- lstrip
 
 ifelsif :: Parser Exp
 ifelsif = eif
     <$> ((:) <$> branch "if" KIf <*> many (branch "elsif" KElseIf))
     <*> alternative
-    <*  section "endif" (atom KEndIf)
+    <*  block "endif" (atom KEndIf)
   where
     branch k a = (,)
-        <$> section k (atom a *> term)
+        <$> block k (atom a *> term)
         <*> document
 
 cases :: Parser Exp
 cases = ecase
-    <$> section "case" (atom KCase *> term)
-    <*> many (alt <$> section "when" (atom KWhen *> pattern) <*> document)
+    <$> block "case" (atom KCase *> term)
+    <*> many (alt <$> block "when" (atom KWhen *> pattern) <*> document)
     <*> alternative
-    <*  section "endcase" (atom KEndCase)
+    <*  block "endcase" (atom KEndCase)
 
 assign :: Parser Exp
-assign = section "assign" $ uncurry ELet
-    <$> (atom KAssign *> identifier)
-    <*> (atom KEquals *> (Left . snd <$> literal <|> Right . snd <$> identifier))
+assign = block "assign" $ ELet
+    <$> position
+    <*> (atom KAssign *> identifier)
+    <*> (atom KEquals *> (Left . snd <$> literal <|> Right <$> variable))
 
 loop :: Parser Exp
 loop = do
-    l <- section "for" $ do
-        (m, k) <- atom KFor *> identifier
-        (_, v) <- atom KIn  *> identifier
-        return (ELoop m k v)
+    l <- block "for" $ do
+        k <- atom KFor *> identifier
+        v <- atom KIn  *> variable
+        return (ELoop (meta k) k v)
     b <- document
     e <- alternative
-    void $ section "endfor" (atom KEndFor)
+    void $ block "endfor" (atom KEndFor)
     return (l b e)
 
 include :: Parser Exp
-include = section "include" $ do
+include = block "include" $ do
     (m, n) <- atom KInclude *> capture KText
     v      <- optionMaybe (atom KWith *> term)
     let k = LText.toStrict n
@@ -128,29 +138,32 @@ include = section "include" $ do
     return (EIncl m k v)
 
 alternative :: Parser (Maybe Exp)
-alternative = try $ optionMaybe (section "else" (atom KElse *> document))
+alternative = try $ optionMaybe (block "else" (atom KElse *> document))
 
 term :: Parser Exp
 term = flip buildExpressionParser term1
-    [ [prefix "-", prefix "+"]
+    [ [prefix "!"]
     , [binary "*", binary "/"]
-    , [binary "+", binary "-"]
+    , [prefix "-", prefix "+"]
+    , [binary "==", binary "/=", binary ">", binary ">=", binary "<", binary "<="]
+    , [binary "&&"]
+    , [binary "||"]
     ]
   where
-    prefix n = Prefix (operator n >>= \m -> return $ partial m n)
-    binary n = Infix  (operator n >>= \m -> return (\f a -> EApp m (partial m n $ f) a)) AssocLeft
+    prefix n = Prefix (operator n >>= \m -> return $ fun m n)
+    binary n = Infix  (operator n >>= \m -> return (\f a -> EApp m (fun m n $ f) a)) AssocLeft
 
-    partial m = epartial m . LText.toStrict
+    fun m = efun m . LText.toStrict
 
 term0 :: Parser Exp
-term0 = variable <|> uncurry ELit <$> literal
+term0 = evar <$> variable <|> uncurry ELit <$> literal
 
 term1 :: Parser Exp
 term1 = eapp <$> term0 <*> many term0
 
 pattern :: Parser Pat
 pattern = (PWild <$ atom KUnderscore)
-      <|> (PVar . snd <$> identifier)
+      <|> (PVar <$> variable)
       <|> (PLit . snd <$> literal)
     <?> "a pattern"
 
@@ -162,13 +175,14 @@ operator op = token f <?> "an operator"
         , op  == t = Just m
     f _            = Nothing
 
--- FIXME: parse nested . identifiers
-variable :: Parser Exp
-variable = uncurry EVar <$> identifier
+variable :: Parser Var
+variable = do
+    v:vs <- sepBy1 (var <$> identifier) (atom KDot)
+    return (sconcat (v :| vs))
     <?> "a variable"
 
-identifier :: Parser (Meta, Id)
-identifier = second (Id . LText.toStrict) <$> capture KIdent
+identifier :: Parser Id
+identifier = uncurry Id . second LText.toStrict <$> capture KVar
     <?> "an identifier"
 
 literal :: Parser (Meta, Lit)
@@ -211,3 +225,6 @@ atom x = token f
 
 token :: (Token -> Maybe a) -> Parser a
 token f = stateShow <$> getState >>= \g -> Parsec.token g tokenSourcePos f
+
+position :: Parser Meta
+position = meta <$> getPosition
