@@ -32,19 +32,18 @@ module Text.EDE.Filters
     , listLength
 
     -- * Filter signatures
-    , Fun   (..)
-    , TType (..)
+    , Fun  (..)
+    , Type (..)
     ) where
 
 import           Data.Char
-import           Data.HashMap.Strict        (HashMap)
-import qualified Data.HashMap.Strict        as Map
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as Map
 import           Data.Scientific
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import           Data.Text.Unsafe           (unsafeHead, unsafeTail)
-import           Data.Vector                (Vector)
-import qualified Data.Vector                as Vector
+import           Data.Text               (Text)
+import qualified Data.Text.Lazy          as LText
+import           Data.Vector             (Vector)
+import qualified Data.Vector             as Vector
 import           Text.EDE.Internal.Types
 
 -- FIXME: Create polymorphic filters
@@ -63,42 +62,42 @@ defaultFilters = Map.fromList
     , ("mapLength",   Fun TMap  TNum  mapLength)
     ]
 
-lower :: Text -> Text
-lower = Text.toLower
+lower :: LText.Text -> LText.Text
+lower = LText.toLower
 
-upper :: Text -> Text
-upper = Text.toUpper
+upper :: LText.Text -> LText.Text
+upper = LText.toUpper
 
-lowerFirst :: Text -> Text
+lowerFirst :: LText.Text -> LText.Text
 lowerFirst t
-    | Text.null t = t
-    | isUpper h   = toLower h `Text.cons` Text.tail t
+    | LText.null t = t
+    | isUpper h   = toLower h `LText.cons` LText.tail t
     | otherwise   = t
   where
-    h = Text.head t
+    h = LText.head t
 
-upperFirst :: Text -> Text
+upperFirst :: LText.Text -> LText.Text
 upperFirst t
-    | Text.null t = t
-    | isLower h   = toUpper h `Text.cons` Text.tail t
+    | LText.null t = t
+    | isLower h   = toUpper h `LText.cons` LText.tail t
     | otherwise   = t
   where
-    h = Text.head t
+    h = LText.head t
 
-titleize :: Text -> Text
-titleize = Text.toTitle
+titleize :: LText.Text -> LText.Text
+titleize = LText.toTitle
 
-pascalize :: Text -> Text
-pascalize = substitute . Text.concat . map Text.toTitle . split . upperFirst
+pascalize :: LText.Text -> LText.Text
+pascalize = substitute . LText.concat . map LText.toTitle . split . upperFirst
 
-camelize :: Text -> Text
+camelize :: LText.Text -> LText.Text
 camelize = lowerFirst . pascalize
 
-underscore :: Text -> Text
-underscore = Text.intercalate (Text.singleton '_') . split
+underscore :: LText.Text -> LText.Text
+underscore = LText.intercalate (LText.singleton '_') . split
 
-hyphenate :: Text -> Text
-hyphenate = Text.intercalate (Text.singleton '-') . split
+hyphenate :: LText.Text -> LText.Text
+hyphenate = LText.intercalate (LText.singleton '-') . split
 
 listLength :: Vector a -> Scientific
 listLength = fromIntegral . Vector.length
@@ -106,21 +105,21 @@ listLength = fromIntegral . Vector.length
 mapLength :: HashMap k v -> Scientific
 mapLength = fromIntegral . Map.size
 
-split :: Text -> [Text]
+split :: LText.Text -> [LText.Text]
 split t
-    | Text.null t = []
+    | LText.null t = []
     | otherwise   = filter (/= "") $ loop t
   where
     loop s
-        | Text.null s' = [l]
-        | otherwise    = l : g (loop $ unsafeTail s')
+        | LText.null s' = [l]
+        | otherwise    = l : g (loop $ LText.tail s')
       where
         g [] = []
         g x'@(x:xs)
-            | Just c <- snd . f $ unsafeHead s' = (c `Text.cons` x) : xs
+            | Just c <- snd . f $ LText.head s' = (c `LText.cons` x) : xs
             | otherwise = x'
 
-        (l, s') = Text.span (not . fst . f) s
+        (l, s') = LText.span (not . fst . f) s
 
     f ' '           = (True, Nothing)
     f '\n'          = (True, Nothing)
@@ -128,11 +127,11 @@ split t
     f c | isUpper c = (True,  Just c)
         | otherwise = (False, Nothing)
 
-substitute :: Text -> Text
-substitute = Text.concatMap f
+substitute :: LText.Text -> LText.Text
+substitute = LText.concatMap f
   where
     f '.' = "_"
     f '/' = "_"
     f '(' = "_"
     f ')' = ""
-    f  c  = Text.singleton c
+    f  c  = LText.singleton c

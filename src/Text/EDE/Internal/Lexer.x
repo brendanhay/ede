@@ -24,9 +24,8 @@ module Text.EDE.Internal.Lexer
 import           Control.Applicative
 import           Control.Monad
 import           Data.Monoid
-import           Data.Text                      (Text)
-import qualified Data.Text                      as Text
-import qualified Data.Text.Unsafe               as Text
+import           Data.Text.Lazy                 (Text)
+import qualified Data.Text.Lazy                 as LText
 import           Prelude                        hiding (exp)
 import           Text.EDE.Internal.Lexer.Tokens
 import           Text.EDE.Internal.Types
@@ -94,13 +93,14 @@ tokens :-
 <exp> "include"       { atom KInclude }
 <exp> "with"          { atom KWith }
 <exp> "assign"        { atom KAssign }
+<exp> "set"           { atom KAssign }
 <exp> "capture"       { atom KCapture }
 <exp> "endcapture"    { atom KEndCapture }
 
 <exp> $sign? @number  { capture KNum }
 <exp> $letter @ident* { capture KIdent }
 
-<exp> \" @string* \"  { scoped KText (Text.tail . Text.init) }
+<exp> \" @string* \"  { scoped KText (LText.tail . LText.init) }
 
 <exp> "-"             { capture KOp }
 <exp> "+"             { capture KOp }
@@ -128,32 +128,34 @@ tokens :-
 
 {
 scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
-scoped k f inp len = return $ TC (inpMeta inp) k (f . Text.take len $ inpText inp)
+scoped k f inp len = return $
+    TC (inpMeta inp) k (f . LText.take (fromIntegral len) $ inpText inp)
 
 capture :: Capture -> AlexInput -> Int -> Alex Token
-capture k inp len = return $ TC (inpMeta inp) k (Text.take len $ inpText inp)
+capture k inp len = return $
+    TC (inpMeta inp) k (LText.take (fromIntegral len) $ inpText inp)
 
 atom :: Atom -> AlexInput -> Int -> Alex Token
 atom k inp _ = return $ TA (inpMeta inp) k
 
 captureFrag AlexInput{..} _ = do
     setInput $ AlexInput
-        { inpMeta = Text.foldl' move inpMeta res
-        , inpText = Text.drop (Text.length res) inpText
+        { inpMeta = LText.foldl' move inpMeta res
+        , inpText = LText.drop (LText.length res) inpText
         }
     return $ TC inpMeta KFrag res
   where
     res = go inpText
 
     go txt =
-        let (x, y) = Text.break (== '{') txt
-            r      = fst <$> Text.uncons (Text.drop 1 y)
-         in case (Text.null y, r) of
+        let (x, y) = LText.break (== '{') txt
+            r      = fst <$> LText.uncons (LText.drop 1 y)
+         in case (LText.null y, r) of
                 (_,     Just '%') -> x
                 (_,     Just '-') -> x
                 (_,     Just '{') -> x
                 (True,  _)        -> x
-                (False, _)        -> x <> Text.take 2 y <> go (Text.drop 2 y)
+                (False, _)        -> x <> LText.take 2 y <> go (LText.drop 2 y)
 
 start :: String -> Meta
 start src = Meta src 1 1
@@ -165,7 +167,7 @@ move (Meta src l c) _    = Meta src  l      (c + 1)
 
 data AlexInput = AlexInput
     { inpMeta :: Meta
-    , inpText :: {-# UNPACK #-} !Text
+    , inpText :: Text
     } deriving (Show)
 
 data AlexState = AlexState
@@ -241,18 +243,20 @@ andBegin :: (AlexInput -> Int -> Alex a) -> Int -> AlexInput -> Int -> Alex a
 
 alexGetByte :: Num a => AlexInput -> Maybe (a, AlexInput)
 alexGetByte (AlexInput p t)
-    | Text.null t = Nothing
+    | LText.null t = Nothing
     | otherwise   = Just $! (c2w c, AlexInput (move p c) cs)
   where
-    (c, cs) = (Text.unsafeHead t, Text.unsafeTail t)
+    (c, cs) = (LText.head t, LText.tail t)
 
     -- | Unsafe conversion between 'Char' and 'Word8'. This is a no-op and
     -- silently truncates to 8 bits Chars > '\255'. It is provided as
     -- convenience for ByteString construction.
     c2w = fromIntegral . ord
 
-runLexer :: String -> Text -> Either String [Token]
-runLexer src txt = runAlex src txt loop
+runLexer :: String -> Text -> Result [Token]
+runLexer src txt = case runAlex src txt loop of
+    Left  e -> Error (Meta "lexer" 0 0) [e]
+    Right x -> Success x
   where
     loop = do
         t <- scan

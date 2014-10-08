@@ -45,7 +45,7 @@ module Text.EDE
 
     -- ** Filters
     , Fun    (..)
-    , TType  (..)
+    , Type   (..)
     , defaultFilters
 
     -- ** Either Variants
@@ -111,6 +111,7 @@ import           System.Directory
 import           System.FilePath
 import           Text.EDE.Filters           as Filters
 import qualified Text.EDE.Internal.Compiler as Compiler
+import qualified Text.EDE.Internal.Lexer    as Lexer
 import qualified Text.EDE.Internal.Parser   as Parser
 import           Text.EDE.Internal.Types
 
@@ -127,7 +128,7 @@ parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
       -> Result Template
 parse = join . parseWith (includeMap mempty) "Text.EDE.parse"
 
--- | Parse Lazy 'LText.Text' into a compiled 'Template'.
+-- | Parse 'Text' into a compiled 'Template'.
 --
 -- This function handles all @include@ expressions as 'FilePath's and performs
 -- recursive loading/parsing.
@@ -162,16 +163,19 @@ parseWith :: Monad m
           -> Text       -- ^ Strict 'Data.Text.Text' name.
           -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
           -> m (Result Template)
-parseWith f n = result failure resolve . Parser.runParser (Text.unpack n)
+parseWith f n t = result failure resolve $
+    Lexer.runLexer s t >>= Parser.runParser s
   where
+    s = Text.unpack n
+
     resolve (u, is) = do
         r <- foldrM include (Success $ Map.singleton n u) $ Map.toList is
         result failure (success . Template n u) r
 
      -- Presuming self is always in self's includes, see singleton above.
     include (_, _) (Error m xs) = failure m xs
-    include (k, m) (Success ss) =
-        f k m >>= result failure (success . mappend ss . tmplIncl)
+    include (k, m) (Success ss) = f k m >>=
+        result failure (success . mappend ss . tmplIncl)
 
 -- | 'HashMap' resolver for @include@ expressions.
 --
@@ -220,13 +224,11 @@ renderWith :: HashMap Text Fun -- ^ Filters to make available in the environment
 renderWith fs (Template _ u ts) = fmap toLazyText . Compiler.render fs ts u
 
 -- | See: 'parse'
-eitherParse :: LText.Text
-            -> Either String Template
+eitherParse :: LText.Text -> Either String Template
 eitherParse = eitherResult . parse
 
 -- | See: 'parseFile'
-eitherParseFile :: FilePath
-                -> IO (Either String Template)
+eitherParseFile :: FilePath -> IO (Either String Template)
 eitherParseFile = fmap eitherResult . parseFile
 
 -- | See: 'parseWith'

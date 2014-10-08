@@ -20,8 +20,8 @@ module Text.EDE.Internal.Compiler where
 import           Control.Applicative
 import           Control.Arrow                     (first)
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Reader
-import           Data.Aeson                        hiding (Result, Success)
+import           Control.Monad.Trans.State.Strict
+import           Data.Aeson                        hiding (Result, Success, Error)
 import           Data.Foldable                     (Foldable, foldlM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
@@ -35,167 +35,171 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
 import           Data.Text.Format                  (Format)
 import           Data.Text.Format.Params           (Params)
+import qualified Data.Text.Lazy                    as LText
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
 import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.Types
 
-data Equal a b where
-    Eq :: Equal a a
-
-data Order a where
-    Ord :: Ord a => Order a
-
-data Shw a where
-    Shw :: Show a => Shw a
-
-data JS a where
-    JS :: ToJSON a => JS a
-
-data Col where
-    Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col
-
-data TExp = forall a. Eq a => a ::: TType a
+data TExp = forall a. Eq a => a ::: Type a
 
 data Env = Env
     { _filters   :: HashMap Text Fun
-    , _templates :: HashMap Text UExp
+    , _templates :: HashMap Text Exp
     , _variables :: Object
     }
 
-type Context = ReaderT Env Result
+type Context = StateT Env Result
 
 render :: HashMap Text Fun
-       -> HashMap Text UExp
-       -> UExp
+       -> HashMap Text Exp
+       -> Exp
        -> Object
        -> Result Builder
-render fs ts e o = flip runReaderT (Env fs ts o) $ do
+render fs ts e o = flip evalStateT (Env fs ts o) $ do
     v ::: vt <- eval e >>= build (mkMeta "render")
-    Eq       <- equal (mkMeta "cast") TBld vt
+    Eq       <- equal (meta e) TBld vt
     return v
 
-eval :: UExp -> Context TExp
-eval UNil        = return $ () ::: TNil
-eval (UText _ t) = return $ t  ::: TText
-eval (UBool _ b) = return $ b  ::: TBool
-eval (UNum  _ n) = return $ n  ::: TNum
-eval (UBld  _ b) = return $ b  ::: TBld
+eval :: Exp -> Context TExp
 
-eval (UVar m i) = f <$> variable m i
+eval (ELit _ l) = return $
+    case l of
+        LBool b -> b ::: TBool
+        LNum  n -> n ::: TNum
+        LText t -> t ::: TText
+
+eval (EBld _ b) = return $ b ::: TBld
+
+eval (EVar m i) = (f <$> variable m i) <|> ((::: TFun) <$> function m i)
   where
     f Null       = () ::: TNil
-    f (String t) = t  ::: TText
     f (Bool   b) = b  ::: TBool
     f (Number n) = n  ::: TNum
     f (Object o) = o  ::: TMap
     f (Array  a) = a  ::: TList
+    f (String t) = LText.fromStrict t ::: TText
 
-eval (UFun m f) = (::: TFun) <$> function m f
+-- eval (EFun m f) = (::: TFun) <$> function m f
 
-eval (UApp m (UFun _ (Id "show")) e) = do
-    e' ::: et <- eval e
-    Shw       <- shw m et
-    return $ Text.pack (show e') ::: TText
+-- eval (EApp m (EFun _ (Id "show")) e) = do
+--     e' ::: et <- eval e
+--     Shw       <- shw m et
+--     return $ Text.pack (show e') ::: TText
 
-eval (UApp m (UFun fm f) e) = do
-    e' ::: et    <- eval e
-    Fun xt yt f' <- function fm f
-    Eq           <- equal m et xt
-    return $ f' e' ::: yt
+-- eval (EApp m (EFun fm f) e) = do
+--     e' ::: et    <- eval e
+--     Fun xt yt f' <- function fm f
+--     Eq           <- equal m et xt
+--     return $ f' e' ::: yt
 
-eval (UApp _ e UNil) = eval e
-eval (UApp _ UNil e) = eval e
+-- eval (EApp _ e UNil) = eval e
+-- eval (EApp _ UNil e) = eval e
 
-eval (UApp _ v@(UVar m (Id i)) e) = eval v >>= f
+eval (EApp _ v@(EVar m (Id i)) e) = eval v >>= f
   where
     f (o ::: TMap) = bind (const o) e
     f (_ ::: t)    =
         throw m "variable {} :: {} doesn't supported nested accessors."
             [Text.unpack i, show t]
 
-eval (UApp m a b) = do
+eval (EApp m a b) = do
     a' ::: TBld <- f a
     b' ::: TBld <- f b
     return $ (a' <> b') ::: TBld
   where
     f x = eval x >>= build m
 
-eval (UNeg _ e) = do
-    e' ::: TBool <- predicate e
-    return $ not e' ::: TBool
+-- eval (ENeg _ e) = do
+--     e' ::: TBool <- predicate e
+--     return $ not e' ::: TBool
 
-eval (UBin _ op a b) = do
-    a' ::: TBool <- predicate a
-    b' ::: TBool <- predicate b
-    return $ f op a' b' ::: TBool
+-- eval (EBin _ op a b) = do
+--     a' ::: TBool <- predicate a
+--     b' ::: TBool <- predicate b
+--     return $ f op a' b' ::: TBool
+--   where
+--     f And = (&&)
+--     f Or  = (||)
+
+-- eval (ERel m op a b) = do
+--     a' ::: at <- eval a
+--     b' ::: bt <- eval b
+--     Eq        <- equal m at bt
+--     Ord       <- order m at
+--     return $ f op a' b' ::: TBool
+--   where
+--     f Equal        = (==)
+--     f NotEqual     = (/=)
+--     f Greater      = (>)
+--     f GreaterEqual = (>=)
+--     f Less         = (<)
+--     f LessEqual    = (<=)
+
+-- eval (ECond _ p a b) = do
+--     p' ::: TBool <- predicate p
+--     eval $ if p' then a else b
+
+eval (ELet m (Id k) bdy) = do
+    v <- either cast (variable m) bdy
+    modify $ \s -> s { _variables = Map.insert k v (_variables s) }
+    return (mempty ::: TBld)
   where
-    f And = (&&)
-    f Or  = (||)
+    cast (LBool b) = return (Bool   b)
+    cast (LNum  n) = return (Number n)
+    cast (LText t) = return (String (LText.toStrict t))
 
-eval (URel m op a b) = do
-    a' ::: at <- eval a
-    b' ::: bt <- eval b
-    Eq        <- equal m at bt
-    Ord       <- order m at
-    return $ f op a' b' ::: TBool
+eval (ECase m p ws) = do
+    c <- eval p
+    r <- cond c ws
+    eval (fromMaybe (EBld m mempty) r)
   where
-    f Equal        = (==)
-    f NotEqual     = (/=)
-    f Greater      = (>)
-    f GreaterEqual = (>=)
-    f Less         = (<)
-    f LessEqual    = (<=)
+    cond _ []          = return Nothing
+    cond c ((a, e):as) =
+        case a of
+            PWild  -> return (Just e)
+            PVar v -> eval (EVar m v) >>= match e as c
+            PLit l -> eval (ELit m l) >>= match e as c
 
-eval (UCond _ p a b) = do
-    p' ::: TBool <- predicate p
-    eval $ if p' then a else b
+    match e as c@(x ::: xt) (y ::: yt) = do
+        Eq <- equal m xt yt
+        if x == y
+           then return (Just e)
+           else cond c as
 
-eval (UCase _ c as b) = do
-    c' <- eval c
-    ma <- anyM c' as
-    eval $ fromMaybe b ma
-  where
-    anyM _ [] = return Nothing
-    anyM p@(c' ::: ct) ((x, e) : xs) = do
-       x' ::: xt <- eval x
-       Eq        <- equal (_meta x) ct xt
-       if c' == x'
-           then return $ Just e
-           else anyM p xs
-
-eval (ULoop _ (Id i) v a b) = eval v >>= f >>= loop i a b
+eval (ELoop m (Id k) v bdy a) = eval (EVar m v) >>= f >>= loop k bdy a
   where
     f (x ::: TList) = return $ Col (Vector.length x) (vec x)
-    f (x ::: TMap)  = return $ Col (Map.size x) (hmap x)
-    f (_ ::: t)     = throw (_meta v) "invalid loop target {}" [show t]
+    f (x ::: TMap)  = return $ Col (Map.size x)      (hmap x)
+    f (_ ::: t)     = throw m "invalid loop target {}" [show t]
 
     vec :: Vector Value -> Vector (Maybe Text, Value)
     vec = Vector.map (Nothing,)
 
     hmap :: HashMap Text Value -> [(Maybe Text, Value)]
-    hmap  = map (first Just) . sortBy (comparing fst) . Map.toList
+    hmap = map (first Just) . sortBy (comparing fst) . Map.toList
 
-eval (UIncl m k mu) = do
+eval (EIncl m k mu) = do
     te <- template m k
     s  <- maybe (return global) local' mu
     bind s te
   where
     global o = fromPairs ["scope" .= o]
+
     local' u = do
         e ::: et <- eval u
         JS       <- js m et
         return . const $ fromPairs ["scope" .= e]
 
-loop :: Text -> UExp -> UExp -> Col -> Context TExp
-loop _ _ b (Col 0 _)  = eval b
+loop :: Text -> Exp -> Maybe Exp -> Col -> Context TExp
+loop _ a b (Col 0 _)  = eval (fromMaybe (EBld (meta a) mempty) b)
 loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
   where
     iter (n, bld) x = do
         shadowed
         a' ::: at <- bind (Map.insert k $ context n x) a
-        Eq        <- equal (_meta a) at TBld
+        Eq        <- equal (meta a) at TBld
         return (n + 1, bld <> a')
 
     context n (mk, v) = object $
@@ -213,10 +217,16 @@ loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
 
     shadowed =
         let f x = [Text.unpack k, show x]
-            g   = throw  (_meta a) "binding {} shadows existing variable {}." . f
-        in ask >>= maybe (return ()) g . Map.lookup k . _variables
+            g   = throw  (meta a) "binding {} shadows existing variable {}." . f
+        in gets _variables >>= maybe (return ()) g . Map.lookup k
 
-equal :: Meta -> TType a -> TType b -> Context (Equal a b)
+data Col where
+    Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col
+
+data Equal a b where
+    Eq :: Equal a a
+
+equal :: Meta -> Type a -> Type b -> Context (Equal a b)
 equal _ TNil  TNil  = return Eq
 equal _ TText TText = return Eq
 equal _ TBool TBool = return Eq
@@ -226,14 +236,20 @@ equal _ TMap  TMap  = return Eq
 equal _ TList TList = return Eq
 equal m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
 
-order :: Meta -> TType a -> Context (Order a)
+data Order a where
+    Ord :: Ord a => Order a
+
+order :: Meta -> Type a -> Context (Order a)
 order _ TNil  = return Ord
 order _ TText = return Ord
 order _ TBool = return Ord
 order _ TNum  = return Ord
 order m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
 
-shw :: Meta -> TType a -> Context (Shw a)
+data Shw a where
+    Shw :: Show a => Shw a
+
+shw :: Meta -> Type a -> Context (Shw a)
 shw _ TNil  = return Shw
 shw _ TText = return Shw
 shw _ TBool = return Shw
@@ -243,7 +259,10 @@ shw _ TMap  = return Shw
 shw _ TList = return Shw
 shw m t = throw m "constraint check of Show a => a ~ {} failed." [show t]
 
-js :: Meta -> TType a -> Context (JS a)
+data JS a where
+    JS :: ToJSON a => JS a
+
+js :: Meta -> Type a -> Context (JS a)
 js _ TNil  = return JS
 js _ TText = return JS
 js _ TBool = return JS
@@ -252,31 +271,35 @@ js _ TMap  = return JS
 js _ TList = return JS
 js m t = throw m "constraint check of ToJSON a => a ~ {} failed." [show t]
 
-bind :: (Object -> Object) -> UExp -> Context TExp
-bind f = withReaderT (\x -> x { _variables = f $ _variables x }) . eval
+bind :: (Object -> Object) -> Exp -> Context TExp
+bind f = withStateT (\x -> x { _variables = f $ _variables x }) . eval
 
-predicate :: UExp -> Context TExp
-predicate = mapReaderT (return . (::: TBool) . f) . eval
+predicate :: Exp -> Context TExp
+predicate = mapStateT f . eval
   where
-    f (Success (_ ::: TNil))  = False
-    f (Success (p ::: TBool)) = p
-    f (Success _)             = True
-    f _                       = False
+    f e@(Error    _ _) = e
+    f (Success (r, s)) =
+        Success . (,s) . (::: TBool) $
+            case r of
+                _ ::: TNil  -> False
+                p ::: TBool -> p
+                _           -> True
 
 variable :: Meta -> Id -> Context Value
 variable m (Id k) = do
-    mv <- Map.lookup k . _variables <$> ask
+    mv <- Map.lookup k <$> gets _variables
     maybe (throw m "binding {} doesn't exist." [k]) return mv
 
 function :: Meta -> Id -> Context Fun
 function m (Id k) = do
-    mf <- Map.lookup k . _filters <$> ask
+    mf <- Map.lookup k <$> gets _filters
     maybe (throw m "filter {} doesn't exist." [k]) return mf
 
-template :: Meta -> Text -> Context UExp
+template :: Meta -> Text -> Context Exp
 template m k = do
-    ts <- _templates <$> ask
-    maybe (throw m "template {} is not in scope: {}" [k, Text.intercalate "," $ Map.keys ts])
+    ts <- gets _templates
+    maybe (throw m "template {} is not in scope: {}"
+              [k, Text.intercalate "," $ Map.keys ts])
           return
           (Map.lookup k ts)
 

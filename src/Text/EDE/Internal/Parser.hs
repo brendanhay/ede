@@ -14,19 +14,20 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
+import           Control.Arrow                  (second)
 import           Control.Monad
-import           Data.Foldable                  (foldl')
+import           Data.HashMap.Strict            (HashMap)
+import qualified Data.HashMap.Strict            as Map
 import           Data.Monoid
 import           Data.Scientific
 import           Data.Text                      (Text)
-import qualified Data.Text                      as Text
+import qualified Data.Text.Lazy                 as LText
 import qualified Data.Text.Read                 as Read
 import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Lexer.Tokens
-import           Text.Parsec                    (Parsec, (<?>), getState, try)
+import           Text.EDE.Internal.Types
 import qualified Text.Parsec                    as Parsec
-import           Text.Parsec.Combinator
-import           Text.Parsec.Error
+import           Text.Parsec                    hiding (Error, (<|>), many, token, newline, string)
 import           Text.Parsec.Expr
 
 type Parser = Parsec [Token] ParserState
@@ -34,137 +35,169 @@ type Parser = Parsec [Token] ParserState
 data ParserState = ParserState
     { stateShow :: Token -> String
     , stateName :: String
+    , stateIncl :: HashMap Text Meta
     }
 
-runParser :: String -> Parser a -> [Token] -> Either ParseError a
-runParser src p = Parsec.runParser (p <* eof) (ParserState show src) src
+runParser :: String -> [Token] -> Result (Exp, HashMap Text Meta)
+runParser n = either msg Success
+    . Parsec.runParser tmpl (ParserState show n mempty) n
+  where
+    msg e = Error (pos (errorPos e)) [show e]
+    pos s = Meta (sourceName s) (sourceLine s) (sourceColumn s)
 
-document :: Parser (Exp Text)
-document = foldl1 (EApp . EApp (EVar "<>")) <$> many1
-    (fragment <|> substitution <|> sections)
+    tmpl = (,) <$> document <* eof <*> (stateIncl <$> getState)
 
-fragment :: Parser (Exp a)
+document :: Parser Exp
+document = eapp <$> p <*> many p
+  where
+    p = fragment <|> substitution <|> sections
+
+fragment :: Parser Exp
 fragment = do
-    (_, txt) : cs <- many1 (capture KFrag <|> whitespace <|> newline)
-    return . ELit . LText $
+    (m, txt) : cs <- many1 (capture KFrag <|> whitespace <|> newline)
+    return . ELit m . LText $
         case cs of
             [] -> txt
-            _  -> Text.concat (txt : map snd cs)
+            _  -> LText.concat (txt : map snd cs)
     <?> "a textual fragment"
 
-whitespace :: Parser (Meta, Text)
+whitespace :: Parser (Meta, LText.Text)
 whitespace = capture KWhiteSpace
     <?> "whitespace"
 
-newline :: Parser (Meta, Text)
+newline :: Parser (Meta, LText.Text)
 newline = (, "\n") <$> atom KNewLine
     <?> "a newline"
 
-substitution :: Parser (Exp Text)
+substitution :: Parser Exp
 substitution = atom KIdentL *> term <* atom KIdentR
     <?> "substitution"
 
-sections :: Parser (Exp Text)
+sections :: Parser Exp
 sections = choice
-    [ assign
-    , match
-    , conditional
+    [ ifelsif
+    , cases
+    , assign
+    , loop
+    , include
     ] <?> "a section"
 
 section :: String -> Parser a -> Parser a
 section n p = try (atom KSectionL *> p <* atom KSectionR) <?> n
 
-assign :: Parser (Exp Text)
-assign = elet
-    <$> section "assign" (atom KAssign *> decls)
-    <*> (document <|> blank)
+ifelsif :: Parser Exp
+ifelsif = eif
+    <$> ((:) <$> branch "if" KIf <*> many (branch "elsif" KElseIf))
+    <*> alternative
+    <*  section "endif" (atom KEndIf)
+  where
+    branch k a = (,)
+        <$> section k (atom a *> term)
+        <*> document
 
-match :: Parser (Exp Text)
-match = ECase
+cases :: Parser Exp
+cases = ecase
     <$> section "case" (atom KCase *> term)
-    <*> many1 (alt <$> section "when" (atom KWhen *> pattern) <*> document)
+    <*> many (alt <$> section "when" (atom KWhen *> pattern) <*> document)
+    <*> alternative
     <*  section "endcase" (atom KEndCase)
 
-conditional :: Parser (Exp Text)
-conditional = foldl' (\a (x, y) -> a . eif x y)
-    <$> (eif <$> section "if" (atom KIf *> term) <*> document)
-    <*> many ((,) <$> section "elsif" (atom KElseIf *> term) <*> document)
-    <*> (section "else" (atom KElse) *> document <|> blank)
-    <*  section "endif" (atom KEndIf)
+assign :: Parser Exp
+assign = section "assign" $ uncurry ELet
+    <$> (atom KAssign *> identifier)
+    <*> (atom KEquals *> (Left . snd <$> literal <|> Right . snd <$> identifier))
 
--- loop
--- include
+loop :: Parser Exp
+loop = do
+    l <- section "for" $ do
+        (m, k) <- atom KFor *> identifier
+        (_, v) <- atom KIn  *> identifier
+        return (ELoop m k v)
+    b <- document
+    e <- alternative
+    void $ section "endfor" (atom KEndFor)
+    return (l b e)
 
-decls :: Parser [(Text, Exp Text)]
-decls = sepBy1 ((,) <$> identifier <* atom KEquals <*> term) (atom KNewLine)
-    <?> "a declaration"
+include :: Parser Exp
+include = section "include" $ do
+    (m, n) <- atom KInclude *> capture KText
+    v      <- optionMaybe (atom KWith *> term)
+    let k = LText.toStrict n
+    modifyState $ \s ->
+        s { stateIncl = Map.insert k m (stateIncl s) }
+    return (EIncl m k v)
 
+alternative :: Parser (Maybe Exp)
+alternative = try $ optionMaybe (section "else" (atom KElse *> document))
+
+term :: Parser Exp
 term = flip buildExpressionParser term1
     [ [prefix "-", prefix "+"]
     , [binary "*", binary "/"]
     , [binary "+", binary "-"]
     ]
   where
-    prefix n = Prefix (operator n >> return (EApp (EVar n)))
-    binary n = Infix  (operator n >> return (\f a -> EApp (EApp (EVar n) f) a)) AssocLeft
+    prefix n = Prefix (operator n >>= \m -> return $ partial m n)
+    binary n = Infix  (operator n >>= \m -> return (\f a -> EApp m (partial m n $ f) a)) AssocLeft
 
-term0 :: Parser (Exp Text)
-term0 = EVar <$> identifier <|> ELit <$> literal
+    partial m = epartial m . LText.toStrict
 
-term1 :: Parser (Exp Text)
-term1 = foldl1 EApp <$> some term0
+term0 :: Parser Exp
+term0 = variable <|> uncurry ELit <$> literal
 
-pattern :: Parser (Binder Text)
--- pattern = pas <$> try (identifier <* atom KAt) <*> pattern <|> pattern0
-pattern = pattern0
+term1 :: Parser Exp
+term1 = eapp <$> term0 <*> many term0
 
-pattern0 :: Parser (Binder Text)
-pattern0 = pvar <$> identifier
-    <|> pwild <$ atom KUnderscore
-    <|> plit  <$> literal
+pattern :: Parser Pat
+pattern = (PWild <$ atom KUnderscore)
+      <|> (PVar . snd <$> identifier)
+      <|> (PLit . snd <$> literal)
     <?> "a pattern"
 
-operator :: Text -> Parser ()
+operator :: LText.Text -> Parser Meta
 operator op = token f <?> "an operator"
   where
-    f (TC _ y t)
+    f (TC m y t)
         | KOp == y
-        , op  == t = Just ()
+        , op  == t = Just m
     f _            = Nothing
 
-identifier :: Parser Text
-identifier = snd <$> capture KIdent
+-- FIXME: parse nested . identifiers
+variable :: Parser Exp
+variable = uncurry EVar <$> identifier
+    <?> "a variable"
+
+identifier :: Parser (Meta, Id)
+identifier = second (Id . LText.toStrict) <$> capture KIdent
     <?> "an identifier"
 
-literal :: Parser Lit
+literal :: Parser (Meta, Lit)
 literal = boolean <|> string <|> number
+    <?> "a literal"
 
-boolean :: Parser Lit
-boolean = LBool <$> (atom KTrue *> return True <|> atom KFalse *> return False)
+boolean :: Parser (Meta, Lit)
+boolean = ((,LBool True) <$> atom KTrue) <|> ((,LBool False) <$> atom KFalse)
     <?> "a boolean"
 
-string :: Parser Lit
-string = LText . snd <$> capture KText
+string :: Parser (Meta, Lit)
+string = second LText <$> capture KText
     <?> "a string"
 
-number :: Parser Lit
+number :: Parser (Meta, Lit)
 number = do
-    (_, txt) <- capture KNum
+    (m, txt) <- capture KNum
     either (fail . mappend "unexpected error parsing number: ")
-           (uncurry parse)
-           (Read.double txt)
+           (fmap (m,) . uncurry p)
+           (Read.double (LText.toStrict txt))
     <?> "a number"
   where
-    parse n "" = return $ LNum (fromFloatDigits n)
-    parse n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
-
-blank :: Parser (Exp Text)
-blank = return $ ELit (LText "")
+    p n "" = return $ LNum (fromFloatDigits n)
+    p n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
 
 parens :: Parser a -> Parser a
 parens p = atom KParenL *> p <* atom KParenR
 
-capture :: Capture -> Parser (Meta, Text)
+capture :: Capture -> Parser (Meta, LText.Text)
 capture x = token f
   where
     f (TC m y t) | x == y = Just (m, t)

@@ -10,12 +10,12 @@
 
 module Text.EDE.Internal.Lexer.Tokens where
 
-import Data.Text               (Text)
+import Data.Text.Lazy          (Text)
 import Text.EDE.Internal.Types
 import Text.Parsec.Pos
 
 data Token
-    = TC !Meta !Capture !Text
+    = TC !Meta !Capture Text
     | TA !Meta !Atom
       deriving (Eq, Show)
 

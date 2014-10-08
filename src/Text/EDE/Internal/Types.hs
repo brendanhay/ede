@@ -41,13 +41,13 @@ instance Monad m => Semigroup (Resolver m) where
 -- | A parsed and compiled template.
 data Template = Template
     { tmplName :: !Text
-    , tmplExpr :: UExp
-    , tmplIncl :: HashMap Text UExp
+    , tmplExpr :: Exp
+    , tmplIncl :: HashMap Text Exp
     } deriving (Eq)
 
 -- | Meta information describing the source position of an expression or error.
 data Meta = Meta !String !Int !Int
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Show)
 
 class Metadata a where
     meta :: a -> Meta
@@ -59,7 +59,7 @@ instance Metadata Meta where
 data Result a
     = Error !Meta [String]
     | Success a
-      deriving (Eq, Ord, Show)
+      deriving (Eq, Show)
 
 instance Functor Result where
     fmap _ (Error m e) = Error m e
@@ -126,88 +126,100 @@ failure :: Monad m => Meta -> [String] -> m (Result a)
 failure m = return . Error m
 
 newtype Id = Id Text
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Show)
 
 instance Buildable Id where
     build (Id i) = build i
     {-# INLINE build #-}
 
 data Fun where
-    Fun :: (Eq a, Eq b) => TType a -> TType b -> (a -> b) -> Fun
+    Fun :: (Eq a, Eq b) => Type a -> Type b -> (a -> b) -> Fun
 
 instance Eq Fun where
     _ == _ = False
 
-data TType a where
-    TNil  :: TType ()
-    TText :: TType Text
-    TBool :: TType Bool
-    TNum  :: TType Scientific
-    TBld  :: TType Builder
-    TMap  :: TType Object
-    TList :: TType Array
-    TFun  :: TType Fun
-    TVar  :: TType a
+data Type a where
+    TNil  :: Type ()
+    TText :: Type LText.Text
+    TBool :: Type Bool
+    TNum  :: Type Scientific
+    TBld  :: Type Builder
+    TMap  :: Type Object
+    TList :: Type Array
+    TFun  :: Type Fun
+    TVar  :: Type a
 
-deriving instance Show (TType a)
+deriving instance Show (Type a)
 
-data UExp
-    = UNil
-    | UText !Meta !Text
-    | UBool !Meta !Bool
-    | UNum  !Meta !Scientific
-    | UBld  !Meta !Builder
-    | UVar  !Meta !Id
-    | UFun  !Meta !Id
-    | UApp  !Meta !UExp !UExp
-    | UNeg  !Meta !UExp
-    | UBin  !Meta !BinOp !UExp !UExp
-    | URel  !Meta !RelOp !UExp !UExp
-    | UCond !Meta !UExp !UExp !UExp
-    | UCase !Meta !UExp [(UExp, UExp)] !UExp
-    | ULoop !Meta !Id !UExp !UExp !UExp
-    | UIncl !Meta !Text (Maybe UExp)
-      deriving (Eq, Ord, Show)
+-- data BinOp = And | Or
+--     deriving (Eq, Show)
+
+-- data RelOp
+--     = Equal
+--     | NotEqual
+--     | Greater
+--     | GreaterEqual
+--     | Less
+--     | LessEqual
+--       deriving (Eq, Show)
+
+-- data Op
+--     = ONeg !Exp
+--     | OBin !BinOp !Exp !Exp
+--     | ORel !RelOp !Exp !Exp
+--       deriving (Eq, Show)
+
+data Lit
+    = LBool !Bool
+    | LNum  !Scientific
+    | LText LText.Text
+      deriving (Eq, Show)
+
+data Pat
+    = PWild
+    | PVar Id
+    | PLit Lit
+      deriving (Eq, Show)
+
+type Alt = (Pat, Exp)
+
+data Exp
+--    = ENil
+    = ELit  !Meta !Lit
+    | EBld  !Meta !Builder
+    | EVar  !Meta !Id
+--    EFun  !Meta !Id
+    | EApp  !Meta !Exp  !Exp
+--    | EOp   !Meta !Op
+    | ELet  !Meta !Id   (Either Lit Id)
+    | ECase !Meta !Exp  [Alt]
+    | ELoop !Meta !Id   !Id  !Exp (Maybe Exp)
+    | EIncl !Meta !Text (Maybe Exp)
+      deriving (Eq, Show)
+
+instance Metadata Exp where
+    meta x = case x of
+--        ENil            -> mkMeta "Exp.meta"
+        ELit  m _       -> m
+        EBld  m _       -> m
+        EVar  m _       -> m
+--        EFun  m _       -> m
+        EApp  m _ _     -> m
+--        EOp   m _       -> m
+        ELet  m _ _     -> m
+        ECase m _ _     -> m
+        ELoop m _ _ _ _ -> m
+        EIncl m _ _     -> m
 
 -- FIXME:
 -- {% assign ... %}
 -- {% capture ... %}
-
-data BinOp = And | Or
-    deriving (Eq, Ord, Show)
-
-data RelOp
-    = Equal
-    | NotEqual
-    | Greater
-    | GreaterEqual
-    | Less
-    | LessEqual
-      deriving (Eq, Ord, Show)
 
 throwError :: Params ps => Meta -> Format -> ps -> Result a
 throwError m f = Error m . (:[]) . LText.unpack . format f
 
 mkMeta :: String -> Meta
 mkMeta n = Meta n 0 0
-
-_meta :: UExp -> Meta
-_meta u = case u of
-    UNil            -> mkMeta "_meta"
-    UText m _       -> m
-    UBool m _       -> m
-    UNum  m _       -> m
-    UBld  m _       -> m
-    UVar  m _       -> m
-    UFun  m _       -> m
-    UApp  m _ _     -> m
-    UNeg  m _       -> m
-    UBin  m _ _ _   -> m
-    URel  m _ _ _   -> m
-    UCond m _ _ _   -> m
-    UCase m _ _ _   -> m
-    ULoop m _ _ _ _ -> m
-    UIncl m _ _     -> m
 
 -- | Create an 'Object' from a list of name/value 'Pair's.
 -- See 'Aeson''s documentation for more details.
