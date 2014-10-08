@@ -46,14 +46,14 @@ data Template = Template
     } deriving (Eq)
 
 -- | Meta information describing the source position of an expression or error.
-data Meta = Meta
-    { metaSource :: !String
-    , metaRow    :: !Int
-    , metaColumn :: !Int
-    } deriving (Eq, Ord)
+data Meta = Meta !String !Int !Int
+    deriving (Eq, Ord, Show)
 
-instance Show Meta where
-    show Meta{..} = metaSource ++ ":" ++ show metaRow ++ "," ++ show metaColumn
+class Metadata a where
+    meta :: a -> Meta
+
+instance Metadata Meta where
+    meta = id
 
 -- | The result of running parsing or rendering steps.
 data Result a
@@ -103,9 +103,9 @@ instance Monoid a => Monoid (Result a) where
 eitherResult :: Result a -> Either String a
 eitherResult = result f Right
   where
-    f Meta{..} e = Left . concat $
+    f (Meta n r c) e = Left . concat $
         [ "ED-E error position: "
-        , concat [metaSource, ":(", show metaRow, ",", show metaColumn, ")"]
+        , concat [n, ":(", show r, ",", show c, ")"]
         , ", messages: " ++ intercalate ", " e
         ]
 

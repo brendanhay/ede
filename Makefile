@@ -11,7 +11,6 @@ IMG           := dist/image/$(NAME)
 
 FLAGS         := --disable-documentation --disable-library-coverage
 
-
 .PHONY: test bench lint doc dist deps
 
 all: build

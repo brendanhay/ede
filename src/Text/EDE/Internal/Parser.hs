@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -13,205 +13,168 @@
 
 module Text.EDE.Internal.Parser where
 
-import           Control.Applicative     ((<$>), (<*>), (<*), (*>))
+import           Control.Applicative
 import           Control.Monad
-import           Data.Foldable           (foldr')
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as Map
+import           Data.Foldable                  (foldl')
 import           Data.Monoid
 import           Data.Scientific
-import qualified Data.Text               as Text
-import qualified Data.Text.Lazy          as LText
-import           Data.Text.Lazy.Builder
-import           Text.EDE.Internal.Lexer
-import           Text.EDE.Internal.Types hiding (failure)
-import qualified Text.Parsec             as Parsec
-import           Text.Parsec             hiding (Error, runParser, parse, spaces)
+import           Data.Text                      (Text)
+import qualified Data.Text                      as Text
+import qualified Data.Text.Read                 as Read
+import           Text.EDE.Internal.AST
+import           Text.EDE.Internal.Lexer.Tokens
+import           Text.Parsec                    (Parsec, (<?>), getState, try)
+import qualified Text.Parsec                    as Parsec
+import           Text.Parsec.Combinator
+import           Text.Parsec.Error
 import           Text.Parsec.Expr
 
-runParser :: SourceName -> LText.Text -> Result (UExp, HashMap Text.Text Meta)
-runParser n = either failure Success . Parsec.runParser template mempty n
-  where
-    failure e = Error (positionMeta $ errorPos e) [show e]
+type Parser = Parsec [Token] ParserState
 
-    template = (,)
-        <$> pack (manyTill expression eof)
-        <*> getState
+data ParserState = ParserState
+    { stateShow :: Token -> String
+    , stateName :: String
+    }
 
-expression :: Parser UExp
-expression = choice
-    [ fragment
-    , substitution
-    , raw
+runParser :: String -> Parser a -> [Token] -> Either ParseError a
+runParser src p = Parsec.runParser (p <* eof) (ParserState show src) src
+
+document :: Parser (Exp Text)
+document = foldl1 (EApp . EApp (EVar "<>")) <$> many1
+    (fragment <|> substitution <|> sections)
+
+fragment :: Parser (Exp a)
+fragment = do
+    (_, txt) : cs <- many1 (capture KFrag <|> whitespace <|> newline)
+    return . ELit . LText $
+        case cs of
+            [] -> txt
+            _  -> Text.concat (txt : map snd cs)
+    <?> "a textual fragment"
+
+whitespace :: Parser (Meta, Text)
+whitespace = capture KWhiteSpace
+    <?> "whitespace"
+
+newline :: Parser (Meta, Text)
+newline = (, "\n") <$> atom KNewLine
+    <?> "a newline"
+
+substitution :: Parser (Exp Text)
+substitution = atom KIdentL *> term <* atom KIdentR
+    <?> "substitution"
+
+sections :: Parser (Exp Text)
+sections = choice
+    [ assign
+    , match
     , conditional
-    , case'
-    , loop
-    , include
+    ] <?> "a section"
+
+section :: String -> Parser a -> Parser a
+section n p = try (atom KSectionL *> p <* atom KSectionR) <?> n
+
+assign :: Parser (Exp Text)
+assign = elet
+    <$> section "assign" (atom KAssign *> decls)
+    <*> (document <|> blank)
+
+match :: Parser (Exp Text)
+match = ECase
+    <$> section "case" (atom KCase *> term)
+    <*> many1 (alt <$> section "when" (atom KWhen *> pattern) <*> document)
+    <*  section "endcase" (atom KEndCase)
+
+conditional :: Parser (Exp Text)
+conditional = foldl' (\a (x, y) -> a . eif x y)
+    <$> (eif <$> section "if" (atom KIf *> term) <*> document)
+    <*> many ((,) <$> section "elsif" (atom KElseIf *> term) <*> document)
+    <*> (section "else" (atom KElse) *> document <|> blank)
+    <*  section "endif" (atom KEndIf)
+
+-- loop
+-- include
+
+decls :: Parser [(Text, Exp Text)]
+decls = sepBy1 ((,) <$> identifier <* atom KEquals <*> term) (atom KNewLine)
+    <?> "a declaration"
+
+term = flip buildExpressionParser term1
+    [ [prefix "-", prefix "+"]
+    , [binary "*", binary "/"]
+    , [binary "+", binary "-"]
     ]
-
-fragment :: Parser UExp
-fragment = ("fragment" ??) $ do
-    "comment" ?? skipMany (comments <* optional newline)
-    notFollowedBy next
-    UBld <$> meta
-         <*> (fromString <$> manyTill1 anyChar (try . lookAhead $ next <|> eof))
   where
-    next = try (void $ string "{{") <|> void (spaces >> char '{' >> oneOf "%#")
+    prefix n = Prefix (operator n >> return (EApp (EVar n)))
+    binary n = Infix  (operator n >> return (\f a -> EApp (EApp (EVar n) f) a)) AssocLeft
 
-substitution :: Parser UExp
-substitution = "substitution" ?? try (between (symbol "{{") (string "}}") term)
+term0 :: Parser (Exp Text)
+term0 = EVar <$> identifier <|> ELit <$> literal
 
-raw :: Parser UExp
-raw = do
-    try $ keyword "raw"
-    UBld <$> meta
-         <*> (fromString <$> manyTill1 anyChar (try $ lookAhead end <|> eof))
-          <* end
+term1 :: Parser (Exp Text)
+term1 = foldl1 EApp <$> some term0
+
+pattern :: Parser (Binder Text)
+-- pattern = pas <$> try (identifier <* atom KAt) <*> pattern <|> pattern0
+pattern = pattern0
+
+pattern0 :: Parser (Binder Text)
+pattern0 = pvar <$> identifier
+    <|> pwild <$ atom KUnderscore
+    <|> plit  <$> literal
+    <?> "a pattern"
+
+operator :: Text -> Parser ()
+operator op = token f <?> "an operator"
   where
-    end = keyword "endraw"
+    f (TC _ y t)
+        | KOp == y
+        , op  == t = Just ()
+    f _            = Nothing
 
-conditional :: Parser UExp
-conditional = do
-    m <- meta
-    UCond m
-        <$> try (section $ cond m)
-        <*> consequent end
-        <*> alternative end
-         <* end
+identifier :: Parser Text
+identifier = snd <$> capture KIdent
+    <?> "an identifier"
+
+literal :: Parser Lit
+literal = boolean <|> string <|> number
+
+boolean :: Parser Lit
+boolean = LBool <$> (atom KTrue *> return True <|> atom KFalse *> return False)
+    <?> "a boolean"
+
+string :: Parser Lit
+string = LText . snd <$> capture KText
+    <?> "a string"
+
+number :: Parser Lit
+number = do
+    (_, txt) <- capture KNum
+    either (fail . mappend "unexpected error parsing number: ")
+           (uncurry parse)
+           (Read.double txt)
+    <?> "a number"
   where
-    cond m = (reserved "if" >> (try operator <|> variable))
-         <|> (reserved "unless" >> UNeg m <$> (try operator <|> variable))
+    parse n "" = return $ LNum (fromFloatDigits n)
+    parse n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
 
-    end = keyword "endif"
+blank :: Parser (Exp Text)
+blank = return $ ELit (LText "")
 
-case' :: Parser UExp
-case' = UCase
-    <$> meta
-    <*> try (control "case" <* manyTill anyChar (try . lookAhead $ symbol "{%"))
-    <*> many1 ((,)
-        <$> try (control "when")
-        <*> consequent (try (control "when" >> return ()) <|> end))
-    <*> alternative end
-     <* end
+parens :: Parser a -> Parser a
+parens p = atom KParenL *> p <* atom KParenR
+
+capture :: Capture -> Parser (Meta, Text)
+capture x = token f
   where
-    control n = section $ reserved n >> term
+    f (TC m y t) | x == y = Just (m, t)
+    f _                   = Nothing
 
-    end = keyword "endcase"
-
-loop :: Parser UExp
-loop = do
-    m <- meta
-    uncurry (ULoop m)
-        <$> (try $ section ((,)
-            <$> (reserved "for" >> ident)
-            <*> (reserved "in"  >> variable)))
-        <*> consequent end
-        <*> alternative end
-         <* end
+atom :: Atom -> Parser Meta
+atom x = token f
   where
-    end = keyword "endfor"
+    f (TA m y) | x == y = Just m
+    f _                 = Nothing
 
-include :: Parser UExp
-include = ("include" ??) $ do
-    m      <- meta
-    (k, v) <- try . section $ (,)
-        <$> (reserved "include" >> fmap Text.pack stringLiteral)
-        <*> optionMaybe (reserved "with" >> var)
-    modifyState $ Map.insertWith (const id) k m
-    return $ UIncl m k v
-  where
-    var = "variable" ?? pack (sepBy1 (UVar <$> meta <*> ident) (char '.'))
-
-section :: Parser a -> Parser a
-section p = "section" ?? try (between start end p)
-  where
-    start = spaces >> symbol "{%"
-    end   = try (void $ string "-%}") <|> (string "%}" >> spaces >> void newline)
-
-variable :: Parser UExp
-variable = "variable" ??
-    filtered (pack $ sepBy1 (UVar <$> meta <*> ident) (char '.'))
-
-filtered :: Parser UExp -> Parser UExp
-filtered p = try f <|> p
-  where
-    f = do
-        p' <- p
-        f' <- try (symbol "|") *> sepBy1 (UFun <$> meta <*> ident) (symbol "|")
-        pack . return . reverse $ p' : f'
-
-ident :: Parser Id
-ident = Id . Text.pack <$> identifier
-
-consequent :: Parser () -> Parser UExp
-consequent end = pack . manyTill expression . try . lookAhead $
-    try (keyword "else") <|> end
-
-alternative :: Parser () -> Parser UExp
-alternative end = pack . option mempty $
-    try (keyword "else") >> manyTill expression (try $ lookAhead end)
-
-keyword :: String -> Parser ()
-keyword = ("keyword" ??) . section . reserved
-
-operator :: Parser UExp
-operator = buildExpressionParser ops term <?> "operator"
-  where
-
-    ops = [ [Prefix $ op "!" UNeg]
-          , [Infix (bin "&&" And)          AssocLeft]
-          , [Infix (bin "||" Or)           AssocLeft]
-          , [Infix (rel "==" Equal)        AssocLeft]
-          , [Infix (rel "/=" NotEqual)     AssocLeft]
-          , [Infix (rel ">"  Greater)      AssocLeft]
-          , [Infix (rel ">=" GreaterEqual) AssocLeft]
-          , [Infix (rel "<"  Less)         AssocLeft]
-          , [Infix (rel "<=" LessEqual)    AssocLeft]
-          ]
-
-    bin o = op o . flip UBin
-    rel o = op o . flip URel
-
-    op o f = f <$> (reservedOp o >> meta)
-
-term :: Parser UExp
-term = try literal <|> variable
-
-literal :: Parser UExp
-literal = filtered $ do
-    m <- meta
-    "literal" ?? choice
-        [ try $ UBool m <$> (try true <|> false)
-        , try . fmap (UNum m) $ either fromIntegral fromFloatDigits <$> numberLiteral
-        , UText m . Text.pack <$> stringLiteral
-        ]
-
-true, false :: Parser Bool
-true  = res "True"  True
-false = res "False" False
-
-res :: String -> a -> Parser a
-res s = (reserved s >>) . return
-
-meta :: Parser Meta
-meta = positionMeta <$> getPosition
-
-positionMeta :: SourcePos -> Meta
-positionMeta p = Meta (sourceName p) (sourceLine p) (sourceColumn p)
-
-pack :: Parser [UExp] -> Parser UExp
-pack = fmap (foldr' (\a b -> UApp (_meta a) a b) UNil)
-
-manyTill1 :: Stream s m t
-          => ParsecT s u m a
-          -> ParsecT s u m b
-          -> ParsecT s u m [a]
-manyTill1 p end = liftM2 (:) p (manyTill p end)
-
-spaces :: (Stream s m Char) => ParsecT s u m ()
-spaces = skipMany $ satisfy (== ' ')
-
-infix 0 ??
-
-(??) :: String -> ParsecT s u m a -> ParsecT s u m a
-(??) = flip (<?>)
+token :: (Token -> Maybe a) -> Parser a
+token f = stateShow <$> getState >>= \g -> Parsec.token g tokenSourcePos f

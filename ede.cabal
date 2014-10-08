@@ -54,6 +54,7 @@ library
     other-modules:
         Text.EDE.Internal.Compiler
       , Text.EDE.Internal.Lexer
+      , Text.EDE.Internal.Lexer.Tokens
       , Text.EDE.Internal.Parser
       , Text.EDE.Internal.Types
 
@@ -61,6 +62,7 @@ library
 
     build-depends:
         aeson           >= 0.7
+      , array
       , base            >= 4.6 && < 5
       , directory
       , filepath
