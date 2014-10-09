@@ -1,0 +1,11 @@
+{ "var": "more" }
+---
+Some text
+
+
+More
+
+{{ var }} and ...
+
+
+

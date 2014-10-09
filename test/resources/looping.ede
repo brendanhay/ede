@@ -1,0 +1,26 @@
+{
+  "numbers": [1, 2, 3],
+  "strings": ["foo", "bar"],
+  "indexed": [false, true, false, false],
+  "keyed": {
+    "a": 1.0,
+    "b": 2.0,
+    "c": 3.0
+  }
+}
+---
+{% for n in numbers %}
+  {{ n.value }}
+{% endfor %}
+
+{% for var in strings %}
+  {{ var.value }}
+{% endfor %}
+
+{% for var in indexed %}
+  {{ var.index }}:{{ var.value }}
+{% endfor %}
+
+{% for var in keyed %}
+  {{ var.key }}:{{ var.value }}
+{% endfor %}

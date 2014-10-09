@@ -13,6 +13,7 @@
 
 module Text.EDE.Internal.Parser where
 
+import Debug.Trace
 import           Control.Applicative
 import           Control.Arrow                  (second)
 import           Control.Monad
@@ -183,48 +184,54 @@ alternative = try $ optionMaybe (block "else" (atom KElse *> document))
 --         return (eapp x xs)
 
 
+-- filtered :: Parser Exp -> Parser Exp
+-- filtered p = do
+--     x <- p
+--     go x <|> return x
+--   where
+--     go x = do
+--         xs <- try (operator "|") *> sepBy1 fun (operator "|")
+--         let (y:ys) = reverse (x:xs)
+--         return (eapp y ys)
+
+--     fun = do
+--         i <- identifier
+--         return (EFun (meta i) i)
+
 term :: Parser Exp
-term = do
-    x <- term'
-    filtered x <|> return x
-  where
-    filtered x = do
-        xs <- try (operator "|") *> sepBy1 fun (operator "|")
-        let (y:ys) = reverse (x:xs)
-        return (eapp y ys)
-
-    fun = do
-        i <- identifier
-        return (EFun (meta i) i)
-
-term' :: Parser Exp
-term' = buildExpressionParser table term0
+term = buildExpressionParser table term0
   where
     table =
         [ [prefix "!"]
-        , [binary "*", binary "/"]
-        , [binary "-", binary "+"]
-        , [binary "==", binary "!=", binary ">", binary ">=", binary "<", binary "<="]
-        , [binary "&&"]
-        , [binary "||"]
+        , [binaryl "*", binaryl "/"]
+        , [binaryl "-", binaryl "+"]
+        , [binaryl "==", binaryl "!=", binaryl ">", binaryl ">=", binaryl "<", binaryl "<="]
+        , [binaryl "&&"]
+        , [binaryl "||"]
+        , [Infix function AssocLeft]
         ]
 
+    binaryl = (`binary` AssocLeft)
+    binaryr = (`binary` AssocRight)
+
+    binary n = Infix (operator n >>= \m -> return (\l r -> EApp m (fun m n $ l) r))
     prefix n = Prefix (operator n >>= \m -> return $ fun m n)
-    binary n = Infix (operator n >>= \m -> return (\l r -> EApp m (fun m n $ l) r)) AssocLeft
 
     fun m = EApp m . EFun m . Id m . LText.toStrict
 
--- function :: Parser Exp
--- function = eapp
---     <$> (EFun <$ operator "|" <*> position <*> identifier)
---     <*> many term0
---     <?> "a filter"
+    function = do
+        m <- operator "|"
+        i <- try (lookAhead identifier)
+        return $ \l _ -> EApp m (EFun m i) l
+
+    -- function :: Parser Exp
+    -- function = eapp
+    --     <$> (EFun <$ operator "|" <*> position <*> identifier)
+    --     <*> many term0
+    --     <?> "a filter"
 
 term0 :: Parser Exp
-term0 = eapp <$> term1 <*> many term1
-
-term1 :: Parser Exp
-term1 = evar <$> variable <|> uncurry ELit <$> literal
+term0 = evar <$> variable <|> uncurry ELit <$> literal
 
 pattern :: Parser Pat
 pattern = (PWild <$ atom KUnderscore)

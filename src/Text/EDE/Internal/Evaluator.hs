@@ -75,9 +75,6 @@ render :: HashMap Text Quoted
        -> Result Builder
 render fs ts e o = evalStateT (eval e >>= lift . nf) (Env fs ts o)
   where
-    nf = \case
-        QLit v -> return (build v)
-        q      -> error "Nein!" -- _ qapp q zero >>= nf
 
     -- zero = quote (String mempty)
 
@@ -86,6 +83,11 @@ render fs ts e o = evalStateT (eval e >>= lift . nf) (Env fs ts o)
     build (Number n)
         | base10Exponent n == 0 = formatScientificBuilder Fixed (Just 0) n
         | otherwise             = scientificBuilder n
+
+    nf = \case
+        QLit v -> return (build v)
+        q      -> error "Nein!" -- _ qapp q zero >>= nf
+
 
 eval :: Exp -> Context Quoted
 eval (ELit _ l) = return (quote l)
@@ -98,11 +100,14 @@ eval (EFun m i) = do
           q
 
 eval (EApp _ a b) = do
-    x <- trace (pshow a) (eval a)
-    y <- trace (pshow b) (eval b)
+    x <- eval a
+    y <- eval b
     lift $ case (x, y) of
         (QLit l, QLit m) -> quote <$> liftM2 (<>) (build l) (build m)
         _                -> qapp x y
+    -- lift $ case (trace ("\n" ++ show a ++ "\n" ++ show b) x, y) of
+    --     (QLit l, QLit m) -> quote <$> liftM2 (<>) (build l) (build m)
+    --     _                -> trace ("qapp: " ++ show x ++ " -> " ++ show y) (qapp x y)
   where
     build Null       = return mempty
     build (String t) = return (Build.build t)
@@ -153,25 +158,33 @@ eval (ECase m p ws) = go ws
 --     hmap :: HashMap Text Value -> [(Maybe Text, Value)]
 --     hmap = map (first Just) . sortBy (comparing fst) . Map.toList
 
--- eval (EIncl m k mu) = do
---     te <- template m k
---     s  <- maybe (return global) local' mu
---     bind s (eval te)
---   where
---     global o = fromPairs ["scope" .= o]
+eval (EIncl m k mu) = do
+    te <- tmpl m k
+    s  <- maybe (return global) local' mu
+    bind s (eval te)
+  where
+    -- Use the global environment.
+    global o = fromPairs ["scope" .= o]
 
---     local' u = do
---         e ::: et <- eval u
---         JS       <- cjs m et
---         return . const $ fromPairs ["scope" .= e]
+    -- Ignore the global environment (const)
+    -- and set to the specified expression.
+    local' u = do
+        x <- case u of
+            ELit _ l -> return (enc l)
+            EVar _ v -> variable v
+            _        -> throw m "unexpected template scope {}" [meta u]
+        return . const $ fromPairs ["scope" .= x]
 
-    -- template :: Meta -> Text -> Context Exp
-    -- template m k = do
-    --     ts <- gets _templates
-    --     maybe (throw m "template {} is not in scope: {}"
-    --               [k, Text.intercalate "," $ Map.keys ts])
-    --           return
-    --           (Map.lookup k ts)
+    enc (LBool b) = toJSON b
+    enc (LNum  n) = toJSON n
+    enc (LText t) = toJSON t
+
+    tmpl m k = do
+        ts <- gets _templates
+        maybe (throw m "template {} is not in scope: {}"
+                  [k, Text.intercalate "," $ Map.keys ts])
+              return
+              (Map.lookup k ts)
 
 -- loop :: Text -> Exp -> Maybe Exp -> Col' -> Context TExp
 -- loop _ a b (Col 0 _)  = eval (fromMaybe (EBld (meta a) mempty) b)

@@ -1,0 +1,7 @@
+{ "redacted": null }
+---
+{% if redacted %}
+  Predicate/existence check should be false
+{% endif %}
+
+nothing to {{ redacted }} see here

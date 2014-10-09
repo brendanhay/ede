@@ -2,5 +2,6 @@ lorem ipsum
 LOREM IPSUM
 true
 TRUE
+1.0
 
 text | lower == "lorem ipsum"

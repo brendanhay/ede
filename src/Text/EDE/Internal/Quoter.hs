@@ -27,13 +27,14 @@ import qualified Data.Text.Lazy                    as LText
 import           Data.Text.Lazy.Builder
 import           Data.Text.Lazy.Builder.Scientific
 import           Text.EDE.Internal.Types
+import Debug.Trace
 
 tfun :: String
 tfun = "TFun"
 
 qapp :: Quoted -> Quoted -> Result Quoted
 qapp a b = case (a, b) of
-    (QLam f, x) -> f x
+    (QLam f, x) -> trace (show x) (f x)
     -- (QLit (String x), QLit (String y)) ->
     --     return (QLit (String (x <> y)))
     -- (QLit x, QLit y) ->

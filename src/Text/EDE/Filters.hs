@@ -39,10 +39,9 @@ module Text.EDE.Filters where
 -- --    , Type (..)
 --     ) where
 
-import Debug.Trace
 import           Control.Applicative      hiding (empty)
 import           Control.Monad
-import           Data.Aeson               (Value)
+import           Data.Aeson               (Value, encode)
 import           Data.Char                hiding (ord)
 import           Data.HashMap.Strict      (HashMap)
 import qualified Data.HashMap.Strict      as Map
@@ -50,8 +49,10 @@ import           Data.Scientific
 import           Data.Text                (Text)
 import qualified Data.Text                as Text
 import qualified Data.Text.Lazy           as LText
+import qualified Data.Text.Lazy.Encoding  as LText
 import           Data.Vector              (Vector)
 import qualified Data.Vector              as Vector
+import           Debug.Trace
 import           Text.EDE.Internal.Quoter
 import           Text.EDE.Internal.Types
 
@@ -93,27 +94,30 @@ defaultFilters = Map.fromList prelude
         -- Text
         , ("lower",      quote lower)
         , ("upper",      quote upper)
-        , ("lowerFirst", quote lowerFirst)
-        , ("upperFirst", quote upperFirst)
-        , ("titleize",   quote titleize)
-        , ("pascalize",  quote pascalize)
-        , ("camelize",   quote camelize)
-        , ("underscore", quote underscore)
-        , ("hyphenate",  quote hyphenate)
+        -- , ("lowerFirst", quote lowerFirst)
+        -- , ("upperFirst", quote upperFirst)
+        -- , ("titleize",   quote titleize)
+        -- , ("pascalize",  quote pascalize)
+        -- , ("camelize",   quote camelize)
+        -- , ("underscore", quote underscore)
+        -- , ("hyphenate",  quote hyphenate)
 
-        -- Sequences
-        , ("length", useq Text.length Map.size Vector.length)
-        , ("empty",  useq Text.null Map.null Vector.null)
+        -- -- Sequences
+        -- , ("length", useq Text.length Map.size Vector.length)
+        -- , ("empty",  useq Text.null Map.null Vector.null)
 
-        -- Collections
+        -- -- Collections
 
-        -- Poly
-        , ("show", quote (Text.pack . show :: Value -> Text))
-        , ("|", apply)
+        -- -- Poly
+        , ("show", quote value)
+        -- , ("|", apply)
         ]
 
     -- (.) :: (b -> c) -> (a -> b) -> a -> c
-    apply = QLam $ \f -> return . QLam $ \g -> trace (show (f, g)) (qapp f g)
+    -- apply = QLam $ \f -> return . QLam $ \g -> trace (show (f, g)) (qapp f g)
+
+value :: Value -> LText.Text
+value = LText.decodeUtf8 . encode
 
 lower :: LText.Text -> LText.Text
 lower = LText.toLower

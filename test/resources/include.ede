@@ -1,0 +1,3 @@
+{ "var": "Robert" }
+---
+{% include "include.child" with var %}

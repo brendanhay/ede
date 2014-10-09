@@ -1,12 +1,14 @@
 {
   "text": "Lorem Ipsum",
-  "bool": true
+  "bool": true,
+  "number": 1.0
 }
 ---
 {{ text | lower }}
 {{ text | lower | upper }}
 {{ bool | show | lower }}
 {{ bool | show | upper }}
+{{ number | show | lower | upper }}
 
 {% if text | lower == "lorem ipsum" %}
 text | lower == "lorem ipsum"
