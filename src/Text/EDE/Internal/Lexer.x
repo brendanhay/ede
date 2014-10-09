@@ -233,7 +233,7 @@ scan = do
 
     snip (inpText -> t)
         | LText.null t        = "<eof>"
-        | LText.length t >= 6 = LText.take 6 t -- Haha!
+        | LText.length t >= 6 = LText.take 6 t
         | LText.length t >= 3 = LText.take 3 t
         | otherwise           = LText.take 1 t
 
