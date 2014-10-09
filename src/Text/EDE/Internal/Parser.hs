@@ -16,6 +16,7 @@ module Text.EDE.Internal.Parser where
 import           Control.Applicative
 import           Control.Arrow                  (second)
 import           Control.Monad
+import           Data.Char                      (isSpace)
 import           Data.HashMap.Strict            (HashMap)
 import qualified Data.HashMap.Strict            as Map
 import           Data.List.NonEmpty             (NonEmpty(..))
@@ -29,6 +30,7 @@ import           Text.EDE.Internal.Lexer.Tokens
 import           Text.EDE.Internal.Types
 import qualified Text.Parsec                    as Parsec
 import           Text.Parsec                    hiding (Error, (<|>), many, optional, token, newline, string)
+import           Text.Parsec.Error              (errorMessages, showErrorMessages)
 import           Text.Parsec.Expr
 
 type Parser = Parsec [Token] ParserState
@@ -40,13 +42,18 @@ data ParserState = ParserState
     }
 
 runParser :: String -> [Token] -> Result (Exp, HashMap Text Meta)
-runParser n = either msg Success
+runParser n = either err Success
     . Parsec.runParser tmpl (ParserState show n mempty) n
   where
-    msg e = Error (meta (errorPos e)) [show e]
+    err e = Error (Parser (meta e) (msg e))
+
+    msg = lines
+        . dropWhile isSpace
+        . showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input"
+        . errorMessages
 
     tmpl = (,)
-        <$> document <* eof
+        <$> (document  <|> return (bld (Meta n 0 0))) <* eof
         <*> (stateIncl <$> getState)
 
 document :: Parser Exp
@@ -85,18 +92,16 @@ blocks = choice
     ] <?> "a block"
 
 block :: String -> Parser a -> Parser a
-block n p = q
+block n p = try (atom KBlockL *> p <* atom KBlockR <* trim)
     <?> n
   where
-    q = try (atom KBlockL *> p <* atom KBlockR <* trim)
-
     trim = optional newline
-
     -- lstrip
 
 ifelsif :: Parser Exp
 ifelsif = eif
-    <$> ((:) <$> branch "if" KIf <*> many (branch "elsif" KElseIf))
+    <$> branch "if" KIf
+    <*> many (branch "elsif" KElseIf)
     <*> alternative
     <*  block "endif" (atom KEndIf)
   where
@@ -140,26 +145,49 @@ include = block "include" $ do
 alternative :: Parser (Maybe Exp)
 alternative = try $ optionMaybe (block "else" (atom KElse *> document))
 
+-- term' :: Parser Exp
+-- term' 
+
+-- function :: Parser Exp
+-- function = do
+--     t  <- term0
+--     m  <- operator "|"
+--     i  <- identifier
+--     return (EApp m (EFun m i) t)
+
+-- filter' = do
+--     t  <- term
+--     m  <- operator "|"
+--     i  <- identifier
+--     return (EApp m (EFun m i) t)
+
 term :: Parser Exp
-term = flip buildExpressionParser term1
+term = flip buildExpressionParser term0
     [ [prefix "!"]
     , [binary "*", binary "/"]
-    , [prefix "-", prefix "+"]
-    , [binary "==", binary "/=", binary ">", binary ">=", binary "<", binary "<="]
+    , [binary "-", binary "+"]
+    , [binary "==", binary "!=", binary ">", binary ">=", binary "<", binary "<="]
     , [binary "&&"]
     , [binary "||"]
+    , [binary "|"]
     ]
   where
     prefix n = Prefix (operator n >>= \m -> return $ fun m n)
-    binary n = Infix  (operator n >>= \m -> return (\f a -> EApp m (fun m n $ f) a)) AssocLeft
+    binary n = Infix (operator n >>= \m -> return (\f a -> EApp m (fun m n $ f) a)) AssocLeft
 
-    fun m = efun m . LText.toStrict
+    fun m = EApp m . EFun m . Id m . LText.toStrict
+
+-- function :: Parser Exp
+-- function = eapp
+--     <$> (EFun <$ operator "|" <*> position <*> identifier)
+--     <*> many term0
+--     <?> "a filter"
 
 term0 :: Parser Exp
-term0 = evar <$> variable <|> uncurry ELit <$> literal
+term0 = eapp <$> term1 <*> many term1
 
 term1 :: Parser Exp
-term1 = eapp <$> term0 <*> many term0
+term1 = evar <$> variable <|> uncurry ELit <$> literal
 
 pattern :: Parser Pat
 pattern = (PWild <$ atom KUnderscore)

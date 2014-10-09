@@ -53,12 +53,13 @@ library
 
     other-modules:
         Text.EDE.Internal.AST
-      , Text.EDE.Internal.Compiler
+      , Text.EDE.Internal.Evaluator
       , Text.EDE.Internal.Lexer
       , Text.EDE.Internal.Lexer.Tokens
       , Text.EDE.Internal.Parser
-      , Text.EDE.Internal.Pretty
+      -- , Text.EDE.Internal.Pretty
       , Text.EDE.Internal.Types
+      , Text.EDE.Internal.Quoter
 
     ghc-options:       -Wall -funbox-strict-fields
 

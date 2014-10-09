@@ -51,6 +51,7 @@ data Atom
     | KAt
     | KDot
     | KComma
+    | KPipe
     | KUnderscore
     | KEquals
     | KComment

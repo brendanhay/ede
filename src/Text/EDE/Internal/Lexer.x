@@ -1,7 +1,8 @@
 {
 {-# LANGUAGE BangPatterns             #-}
-{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE RecordWildCards          #-}
+{-# LANGUAGE ViewPatterns             #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_GHC -w                    #-}
@@ -110,6 +111,7 @@ tokens :-
 <exp> "!"             { capture KOp }
 <exp> "&&"            { capture KOp }
 <exp> "||"            { capture KOp }
+<exp> "|"             { capture KOp }
 <exp> "=="            { capture KOp }
 <exp> "!="            { capture KOp }
 <exp> ">"             { capture KOp }
@@ -174,7 +176,7 @@ data AlexState = AlexState
     , stateCode  :: {-# UNPACK #-} !Int
     }
 
-newtype Alex a = Alex { unAlex :: AlexState -> Either String (AlexState, a) }
+newtype Alex a = Alex { unAlex :: AlexState -> Either Error (AlexState, a) }
 
 instance Monad Alex where
     return !x = Alex $ \s -> Right (s, x)
@@ -184,7 +186,7 @@ instance Monad Alex where
             Left  e       -> Left e
             Right (s', x) -> unAlex (k x) s'
 
-runAlex :: String -> Text -> Alex a -> Either String a
+runAlex :: String -> Text -> Alex a -> Either Error a
 runAlex src txt (Alex f) = snd `fmap` f state
   where
     state = AlexState
@@ -196,9 +198,6 @@ runAlex src txt (Alex f) = snd `fmap` f state
         { inpMeta = start src
         , inpText = txt
         }
-
-throw :: String -> Alex a
-throw !e = Alex $ const (Left e)
 
 getInput :: Alex AlexInput
 getInput = Alex $ \s -> Right (s, stateInput s)
@@ -218,15 +217,24 @@ scan = do
     c   <- getCode
     case alexScan inp c of
         AlexEOF ->
-            return $ TA (inpMeta inp) KEOF
+            return (TA (inpMeta inp) KEOF)
         AlexError inp' ->
-            throw $ "lexical error at: " ++ show inp'
+            Alex (const (Left (err inp inp')))
         AlexSkip inp' len -> do
             setInput inp'
             scan
         AlexToken inp' len action -> do
             setInput inp'
             action inp len
+  where
+    err p c = Lexer (inpMeta c)
+        ["lexical scanner error in ..`" ++ LText.unpack (snip p) ++ "`.."]
+
+    snip (inpText -> t)
+        | LText.null t        = "<eof>"
+        | LText.length t >= 6 = LText.take 6 t -- Haha!
+        | LText.length t >= 3 = LText.take 3 t
+        | otherwise           = LText.take 1 t
 
 -- | Ignore this token and scan another.
 skip :: AlexInput -> Int -> Alex Token
@@ -254,7 +262,7 @@ alexGetByte (AlexInput p t)
 
 runLexer :: String -> Text -> Result [Token]
 runLexer src txt = case runAlex src txt loop of
-    Left  e -> Error (Meta "lexer" 0 0) [e]
+    Left  e -> Error   e
     Right x -> Success x
   where
     loop = do

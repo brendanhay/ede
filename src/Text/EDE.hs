@@ -44,7 +44,7 @@ module Text.EDE
     , renderWith
 
     -- ** Filters
-    , Fun    (..)
+    , Quoted (..)
     , Type   (..)
     , defaultFilters
 
@@ -96,23 +96,23 @@ module Text.EDE
     ) where
 
 import           Control.Monad
-import           Data.Aeson                 ((.=))
-import           Data.Aeson.Types           (Object)
-import           Data.Foldable              (foldrM)
-import           Data.HashMap.Strict        (HashMap)
-import qualified Data.HashMap.Strict        as Map
+import           Data.Aeson                  ((.=))
+import           Data.Aeson.Types            (Object)
+import           Data.Foldable               (foldrM)
+import           Data.HashMap.Strict         (HashMap)
+import qualified Data.HashMap.Strict         as Map
 import           Data.Monoid
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import qualified Data.Text.Lazy             as LText
-import           Data.Text.Lazy.Builder     (toLazyText)
-import qualified Data.Text.Lazy.IO          as LText
+import           Data.Text                   (Text)
+import qualified Data.Text                   as Text
+import qualified Data.Text.Lazy              as LText
+import           Data.Text.Lazy.Builder      (toLazyText)
+import qualified Data.Text.Lazy.IO           as LText
 import           System.Directory
 import           System.FilePath
-import           Text.EDE.Filters           as Filters
-import qualified Text.EDE.Internal.Compiler as Compiler
-import qualified Text.EDE.Internal.Lexer    as Lexer
-import qualified Text.EDE.Internal.Parser   as Parser
+import           Text.EDE.Filters            as Filters
+import qualified Text.EDE.Internal.Evaluator as Evaluator
+import qualified Text.EDE.Internal.Lexer     as Lexer
+import qualified Text.EDE.Internal.Parser    as Parser
 import           Text.EDE.Internal.Types
 
 -- FIXME: detect include/import loops
@@ -173,7 +173,7 @@ parseWith f n t = result failure resolve $
         result failure (success . Template n u) r
 
      -- Presuming self is always in self's includes, see singleton above.
-    include (_, _) (Error m xs) = failure m xs
+    include (_, _) (Error    e) = failure e
     include (k, m) (Success ss) = f k m >>=
         result failure (success . mappend ss . tmplIncl)
 
@@ -187,7 +187,7 @@ includeMap :: Monad m
            -> Resolver m            -- ^ Resolver for 'parseWith'.
 includeMap ts k m
     | Just v <- Map.lookup k ts = success v
-    | otherwise = failure m ["unable to resolve " ++ Text.unpack k]
+    | otherwise = failure (Resolver m ["unable to resolve " ++ Text.unpack k])
 
 -- | 'FilePath' resolver for @include@ expressions.
 --
@@ -207,7 +207,7 @@ loadFile :: FilePath -> IO (Result LText.Text)
 loadFile p = do
     e <- doesFileExist p
     if not e
-        then failure (mkMeta p) ["file " ++ p ++ " doesn't exist."]
+        then failure (Resolver (Meta p 0 0) ["file " ++ p ++ " doesn't exist."])
         else LText.readFile p >>= success
 
 -- | Render an 'Object' using the supplied 'Template'.
@@ -217,11 +217,11 @@ render :: Template -- ^ Parsed 'Template' to render.
 render = renderWith defaultFilters
 
 -- | Render an 'Object' using the supplied 'Template'.
-renderWith :: HashMap Text Fun -- ^ Filters to make available in the environment.
-           -> Template         -- ^ Parsed 'Template' to render.
-           -> Object           -- ^ Bindings to make available in the environment.
+renderWith :: HashMap Text Quoted -- ^ Filters to make available in the environment.
+           -> Template            -- ^ Parsed 'Template' to render.
+           -> Object              -- ^ Bindings to make available in the environment.
            -> Result LText.Text
-renderWith fs (Template _ u ts) = fmap toLazyText . Compiler.render fs ts u
+renderWith fs (Template _ u ts) = fmap toLazyText . Evaluator.render fs ts u
 
 -- | See: 'parse'
 eitherParse :: LText.Text -> Either String Template
@@ -246,7 +246,7 @@ eitherRender :: Template
 eitherRender t = eitherResult . render t
 
 -- | See: 'renderWith'
-eitherRenderWith :: HashMap Text Fun
+eitherRenderWith :: HashMap Text Quoted
                  -> Template
                  -> Object
                  -> Either String LText.Text

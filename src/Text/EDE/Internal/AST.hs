@@ -17,7 +17,6 @@ import Data.Foldable           (foldl', foldr')
 import Data.List.NonEmpty      (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
-import Data.Text               (Text)
 import Text.EDE.Internal.Types
 
 var :: Id -> Var
@@ -26,9 +25,6 @@ var = Var . (:| [])
 evar :: Var -> Exp
 evar v = EVar (meta v) v
 
-efun :: Meta -> Text -> (Exp -> Exp)
-efun m = EApp m . EFun m . Id m
-
 eapp :: Exp -> [Exp] -> Exp
 eapp e [] = e
 eapp e xs = foldl' (\x -> EApp (meta x) x) e xs
@@ -36,8 +32,8 @@ eapp e xs = foldl' (\x -> EApp (meta x) x) e xs
 ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
 ecase p ws f = ECase (meta p) p (ws ++ maybe [] ((:[]) . wild) f)
 
-eif :: [(Exp, Exp)] -> Maybe Exp -> Exp
-eif ts f = foldr' c (fromMaybe bld f) ts
+eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
+eif t@(x, _) ts f = foldr' c (fromMaybe (bld (meta x)) f) (t:ts)
   where
     c (p, w) e = ECase (meta p) p [true w, false e]
 
@@ -49,5 +45,5 @@ false = alt (PLit (LBool False))
 alt :: Pat -> Exp -> Alt
 alt = (,)
 
-bld :: Exp
-bld = EBld (mkMeta "bld.meta") mempty
+bld :: Meta -> Exp
+bld = (`EBld` mempty)

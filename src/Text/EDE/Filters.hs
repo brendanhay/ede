@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ExtendedDefaultRules       #-}
+{-# LANGUAGE OverloadedStrings          #-}
+
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- Module      : Text.EDE.Filters
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -10,57 +13,107 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Filters
-    (
-    -- * Default filter table
-      defaultFilters
+module Text.EDE.Filters where
+--     (
+--     -- * Default filter table
+--       defaultFilters
 
-    -- * Textual
-    , lower
-    , upper
-    , lowerFirst
-    , upperFirst
-    , titleize
-    , pascalize
-    , underscore
-    , hyphenate
+--     -- * Textual
+--     , lower
+--     , upper
+--     , lowerFirst
+--     , upperFirst
+--     , titleize
+--     , pascalize
+--     , underscore
+--     , hyphenate
 
-    -- * HashMap
-    , mapLength
+--     -- * HashMap
+--     , mapLength
 
-    -- * Vector
-    , listLength
+--     -- * Vector
+--     , listLength
 
-    -- * Filter signatures
-    , Fun  (..)
-    , Type (..)
-    ) where
+--     -- * Filter signatures
+-- --    , Fun  (..)
+-- --    , Type (..)
+--     ) where
 
-import           Data.Char
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as Map
+import           Control.Applicative      hiding (empty)
+import           Control.Monad
+import           Data.Aeson               (Value)
+import           Data.Char                hiding (ord)
+import           Data.HashMap.Strict      (HashMap)
+import qualified Data.HashMap.Strict      as Map
 import           Data.Scientific
-import           Data.Text               (Text)
-import qualified Data.Text.Lazy          as LText
-import           Data.Vector             (Vector)
-import qualified Data.Vector             as Vector
+import           Data.Text                (Text)
+import qualified Data.Text                as Text
+import qualified Data.Text.Lazy           as LText
+import           Data.Vector              (Vector)
+import qualified Data.Vector              as Vector
+import           Text.EDE.Internal.Quoter
 import           Text.EDE.Internal.Types
 
--- FIXME: Create polymorphic filters
-defaultFilters :: HashMap Text Fun
-defaultFilters = Map.fromList
-    [ ("lower",       Fun TText TText lower)
-    , ("upper",       Fun TText TText upper)
-    , ("lowerFirst",  Fun TText TText lowerFirst)
-    , ("upperFirst",  Fun TText TText upperFirst)
-    , ("titleize",    Fun TText TText titleize)
-    , ("pascalize",   Fun TText TText pascalize)
-    , ("camelize",    Fun TText TText camelize)
-    , ("underscore",  Fun TText TText underscore)
-    , ("hyphenate",   Fun TText TText hyphenate)
-    , ("listLength",  Fun TList TNum  listLength)
-    , ("mapLength",   Fun TMap  TNum  mapLength)
-    ]
+default (Integer)
+
+defaultFilters :: HashMap Text Quoted
+defaultFilters = Map.fromList prelude
+  where
+    prelude =
+        -- Bool
+        [ ("!",  quote not)
+        , ("&&", quote (&&))
+        , ("||", quote (||))
+
+        -- Eq
+        , ("==", bpoly (==))
+        , ("!=", bpoly (/=))
+
+        -- Ord
+        , (">",  bnum (>))
+        , (">=", bnum (>=))
+        , ("<=", bnum (<=))
+        , ("<",  bnum (<))
+
+        -- Num
+        , ("+",      bnum (+))
+        , ("-",      bnum (-))
+        , ("*",      bnum (*))
+        , ("abs",    unum abs)
+        , ("signum", unum signum)
+        , ("negate", unum negate)
+
+        -- RealFrac
+        , ("truncate", unum (fromIntegral . truncate))
+        , ("round",    unum (fromIntegral . round))
+        , ("ceiling",  unum (fromIntegral . ceiling))
+        , ("floor",    unum (fromIntegral . floor))
+
+        -- Text
+        , ("lower",      quote lower)
+        , ("upper",      quote upper)
+        , ("lowerFirst", quote lowerFirst)
+        , ("upperFirst", quote upperFirst)
+        , ("titleize",   quote titleize)
+        , ("pascalize",  quote pascalize)
+        , ("camelize",   quote camelize)
+        , ("underscore", quote underscore)
+        , ("hyphenate",  quote hyphenate)
+
+        -- Sequences
+        , ("length", useq Text.length Map.size Vector.length)
+        , ("empty",  useq Text.null Map.null Vector.null)
+
+        -- Collections
+
+        -- Poly
+        , ("show", quote (Text.pack . show :: Value -> Text))
+
+        , ("|", apply)
+        ]
+
+    -- (.) :: (b -> c) -> (a -> b) -> a -> c
+    apply = QLam $ \f -> return . QLam $ \g -> qapp f g
 
 lower :: LText.Text -> LText.Text
 lower = LText.toLower
@@ -98,12 +151,6 @@ underscore = LText.intercalate (LText.singleton '_') . split
 
 hyphenate :: LText.Text -> LText.Text
 hyphenate = LText.intercalate (LText.singleton '-') . split
-
-listLength :: Vector a -> Scientific
-listLength = fromIntegral . Vector.length
-
-mapLength :: HashMap k v -> Scientific
-mapLength = fromIntegral . Map.size
 
 split :: LText.Text -> [LText.Text]
 split t
