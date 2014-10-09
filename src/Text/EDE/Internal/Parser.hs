@@ -13,7 +13,6 @@
 
 module Text.EDE.Internal.Parser where
 
-import Debug.Trace
 import           Control.Applicative
 import           Control.Arrow                  (second)
 import           Control.Monad
@@ -146,89 +145,35 @@ include = block "include" $ do
 alternative :: Parser (Maybe Exp)
 alternative = try $ optionMaybe (block "else" (atom KElse *> document))
 
--- term' :: Parser Exp
--- term' 
-
--- function :: Parser Exp
--- function = do
---     t  <- term0
---     m  <- operator "|"
---     i  <- identifier
---     return (EApp m (EFun m i) t)
-
--- filter' = do
---     t  <- term
---     m  <- operator "|"
---     i  <- identifier
---     return (EApp m (EFun m i) t)
-
--- term = do
---     t <- term'
---     try (function t) <|> return t
---   where
---     function t = do
---         m <- operator "|"
---         i <- identifier
---         return $ EApp m (EFun m i) t
--- --        (EApp m f <$> term) <|> return f
-
--- term = filtered term'
-
--- filtered :: Parser Exp -> Parser Exp
--- filtered p = try apply <|> p
---   where
---     apply = do
---         a  <- p
---         bs <- try (operator "|") *> sepBy1 (EFun (meta a) <$> identifier) (operator "|")
---         let (x:xs) = reverse (a:bs)
---         return (eapp x xs)
-
-
--- filtered :: Parser Exp -> Parser Exp
--- filtered p = do
---     x <- p
---     go x <|> return x
---   where
---     go x = do
---         xs <- try (operator "|") *> sepBy1 fun (operator "|")
---         let (y:ys) = reverse (x:xs)
---         return (eapp y ys)
-
---     fun = do
---         i <- identifier
---         return (EFun (meta i) i)
-
 term :: Parser Exp
 term = buildExpressionParser table term0
   where
     table =
         [ [prefix "!"]
-        , [binaryl "*", binaryl "/"]
-        , [binaryl "-", binaryl "+"]
-        , [binaryl "==", binaryl "!=", binaryl ">", binaryl ">=", binaryl "<", binaryl "<="]
-        , [binaryl "&&"]
-        , [binaryl "||"]
-        , [Infix function AssocLeft]
+        , [binary "*", binary "/"]
+        , [binary "-", binary "+"]
+        , [binary "==", binary "!=", binary ">", binary ">=", binary "<", binary "<="]
+        , [binary "&&"]
+        , [binary "||"]
+        , [filter']
         ]
 
-    binaryl = (`binary` AssocLeft)
-    binaryr = (`binary` AssocRight)
+    binary n = Infix (do
+        m <- operator n
+        return $ \l r ->
+            EApp m (fun m n $ l) r) AssocLeft
 
-    binary n = Infix (operator n >>= \m -> return (\l r -> EApp m (fun m n $ l) r))
-    prefix n = Prefix (operator n >>= \m -> return $ fun m n)
+    prefix n = Prefix (do
+        m <- operator n
+        return (fun m n))
 
     fun m = EApp m . EFun m . Id m . LText.toStrict
 
-    function = do
+    filter' = Infix (do
         m <- operator "|"
         i <- try (lookAhead identifier)
-        return $ \l _ -> EApp m (EFun m i) l
-
-    -- function :: Parser Exp
-    -- function = eapp
-    --     <$> (EFun <$ operator "|" <*> position <*> identifier)
-    --     <*> many term0
-    --     <?> "a filter"
+        return $ \l _ ->
+            EApp m (EFun m i) l) AssocLeft
 
 term0 :: Parser Exp
 term0 = evar <$> variable <|> uncurry ELit <$> literal
