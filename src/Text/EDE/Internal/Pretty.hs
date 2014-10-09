@@ -46,8 +46,8 @@ import           Text.PrettyPrint.Leijen.Text      hiding (list)
 -- ppLn :: PP a => a -> IO ()
 -- ppLn = putStrLn . pp
 
-pshow :: PP a => a -> IO ()
-pshow = putStrLn . show . pp 0
+pshow :: PP a => a -> String
+pshow = show . pp 0
 
 parensIf :: Bool -> Doc -> Doc
 parensIf True  = parens
@@ -107,7 +107,6 @@ instance PP (Type a) where
         TMap  -> "Object"
         TList -> "Array"
         TFun  -> "Fun"
-        TVar  -> "Var a"
 
 instance PP Lit where
     pp _ (LBool b) = bool b
@@ -131,7 +130,7 @@ instance PP Exp where
         ELit  _ l         -> pp d l
         EBld  _ b         -> dquotes (text (LText.toLazyText b))
         EVar  _ v         -> pp d v
-        EFun  _ f         -> parensIf True (pp d f)
+        EFun  _ f         -> pp d f
         EApp  _ x y       -> parensIf (d > appPrec) $ pp appPrec x <+> pp (appPrec + 1) y
         ELet  _ v e       -> "let" <+> pp 0 v <+> "=" <+> pp 0 e
         ECase _ p as      -> "case" <+> pp 0 p <+> "of" <> nest 4 (pp 0 as)

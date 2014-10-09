@@ -1,4 +1,5 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.AST
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -27,7 +28,10 @@ evar v = EVar (meta v) v
 
 eapp :: Exp -> [Exp] -> Exp
 eapp e [] = e
-eapp e xs = foldl' (\x -> EApp (meta x) x) e xs
+eapp e es = foldl' (\x -> EApp (meta x) x) e es
+
+eappend :: Exp -> [Exp] -> Exp
+eappend e es = eapp (EFun (meta e) (Id (meta e) "<>")) (e:es)
 
 ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
 ecase p ws f = ECase (meta p) p (ws ++ maybe [] ((:[]) . wild) f)

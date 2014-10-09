@@ -39,6 +39,7 @@ module Text.EDE.Filters where
 -- --    , Type (..)
 --     ) where
 
+import Debug.Trace
 import           Control.Applicative      hiding (empty)
 import           Control.Monad
 import           Data.Aeson               (Value)
@@ -108,12 +109,11 @@ defaultFilters = Map.fromList prelude
 
         -- Poly
         , ("show", quote (Text.pack . show :: Value -> Text))
-
         , ("|", apply)
         ]
 
     -- (.) :: (b -> c) -> (a -> b) -> a -> c
-    apply = QLam $ \f -> return . QLam $ \g -> qapp f g
+    apply = QLam $ \f -> return . QLam $ \g -> trace (show (f, g)) (qapp f g)
 
 lower :: LText.Text -> LText.Text
 lower = LText.toLower

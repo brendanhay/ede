@@ -161,19 +161,56 @@ alternative = try $ optionMaybe (block "else" (atom KElse *> document))
 --     i  <- identifier
 --     return (EApp m (EFun m i) t)
 
+-- term = do
+--     t <- term'
+--     try (function t) <|> return t
+--   where
+--     function t = do
+--         m <- operator "|"
+--         i <- identifier
+--         return $ EApp m (EFun m i) t
+-- --        (EApp m f <$> term) <|> return f
+
+-- term = filtered term'
+
+-- filtered :: Parser Exp -> Parser Exp
+-- filtered p = try apply <|> p
+--   where
+--     apply = do
+--         a  <- p
+--         bs <- try (operator "|") *> sepBy1 (EFun (meta a) <$> identifier) (operator "|")
+--         let (x:xs) = reverse (a:bs)
+--         return (eapp x xs)
+
+
 term :: Parser Exp
-term = flip buildExpressionParser term0
-    [ [prefix "!"]
-    , [binary "*", binary "/"]
-    , [binary "-", binary "+"]
-    , [binary "==", binary "!=", binary ">", binary ">=", binary "<", binary "<="]
-    , [binary "&&"]
-    , [binary "||"]
-    , [binary "|"]
-    ]
+term = do
+    x <- term'
+    filtered x <|> return x
   where
+    filtered x = do
+        xs <- try (operator "|") *> sepBy1 fun (operator "|")
+        let (y:ys) = reverse (x:xs)
+        return (eapp y ys)
+
+    fun = do
+        i <- identifier
+        return (EFun (meta i) i)
+
+term' :: Parser Exp
+term' = buildExpressionParser table term0
+  where
+    table =
+        [ [prefix "!"]
+        , [binary "*", binary "/"]
+        , [binary "-", binary "+"]
+        , [binary "==", binary "!=", binary ">", binary ">=", binary "<", binary "<="]
+        , [binary "&&"]
+        , [binary "||"]
+        ]
+
     prefix n = Prefix (operator n >>= \m -> return $ fun m n)
-    binary n = Infix (operator n >>= \m -> return (\f a -> EApp m (fun m n $ f) a)) AssocLeft
+    binary n = Infix (operator n >>= \m -> return (\l r -> EApp m (fun m n $ l) r)) AssocLeft
 
     fun m = EApp m . EFun m . Id m . LText.toStrict
 

@@ -26,7 +26,7 @@ import           Data.Aeson.Types        (Pair)
 import           Data.HashMap.Strict     (HashMap)
 import           Data.List.NonEmpty      (NonEmpty)
 import qualified Data.List.NonEmpty      as NonEmpty
-import           Data.Monoid          hiding ((<>))
+import           Data.Monoid             hiding ((<>))
 import           Data.Scientific
 import           Data.Semigroup
 import           Data.Text               (Text)
@@ -102,7 +102,7 @@ instance Show Error where
 data Result a
     = Success !a
     | Error   !Error
-      deriving (Eq)
+      deriving (Eq, Show)
 
 instance Functor Result where
     fmap f (Success x) = Success (f x)
