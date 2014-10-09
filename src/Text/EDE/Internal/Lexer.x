@@ -68,6 +68,7 @@ tokens :-
 <0> $whitespace+      { capture KWhiteSpace }
 <0> .                 { captureFrag }
 
+<com> "#}" $newline   { begin 0 }
 <com> "#}"            { begin 0 }
 <com> [. $newline]    { skip }
 
