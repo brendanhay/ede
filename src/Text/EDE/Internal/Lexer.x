@@ -22,6 +22,7 @@ module Text.EDE.Internal.Lexer
      , module Text.EDE.Internal.Lexer.Tokens
      ) where
 
+import Debug.Trace
 import           Control.Applicative
 import           Control.Monad
 import           Data.Monoid
@@ -58,81 +59,116 @@ $fragment    = [^\{]
 @ident       = [$digit $letter ']
 @string      = [. $newline] # [\"\\] | @escape
 
-tokens :-
+ede :-
 
-<0> "{#"                         { begin com }
-<0> "{{"                         { atom KVarL `andBegin` exp }
-<0> "{%+"                        { atom KBlockL `andBegin` exp }
-<0> $whitespace* "{%"            { atom KBlockL `andBegin` exp }
+-- start block
+<0> {
+    "{#"              / { jinja } { coml }
+    "{{"              / { jinja } { varl }
+    "{%+"             / { jinja } { blockl }
+    $whitespace* "{%" / { jinja } { blockl }
 
-<0> $newline                     { atom KNewLine }
-<0> $whitespace+                 { capture KWhiteSpace }
-<0> .                            { captureFrag }
+    "@*"              / { play } { coml }
+    "@@"              / { play } { varl }
+    "@(+"             / { play } { blockl }
+    $whitespace* "@(" / { play } { blockl }
+}
 
-<com> "#}" $newline              { begin 0 }
-<com> "#}"                       { begin 0 }
-<com> [. $newline]               { skip }
+-- fragments
+<0> $newline     { atom KNewLine }
+<0> $whitespace+ { capture KWhiteSpace }
+<0> .            { captureFrag }
 
-<exp> "}}"                       { atom KVarR `andBegin` 0 }
-<exp> "+%}"                      { atom KBlockR `andBegin` 0 }
-<exp> "%}" $whitespace* $newline { atom KBlockR `andBegin` 0 }
-<exp> "%}" $newline              { atom KBlockR `andBegin` 0 }
-<exp> "%}"                       { atom KBlockR `andBegin` 0 }
+<com> {
+    "#}" $whitespace+ $newline / { jinja } { comr }
+    "#}"                       / { jinja } { comr }
 
-<exp> $newline                   { atom KNewLine }
-<exp> $whitespace+               { skip }
+    "*@" $whitespace+ $newline / { play } { comr }
+    "*@"                       / { play } { comr }
+}
 
-<exp> "="                        { atom KEquals }
+<com> [. $newline] { skip }
 
-<exp> "True"                     { atom KTrue }
-<exp> "true"                     { atom KTrue }
-<exp> "False"                    { atom KFalse }
-<exp> "false"                    { atom KFalse }
+-- end block
+<exp> {
+    "}}"                       / { jinja } { varr }
+    "+%}"                      / { jinja } { blockr }
+    "%}" $whitespace* $newline / { jinja } { blockr }
+    "%}"                       / { jinja } { blockr }
 
-<exp> "else"                     { atom KElse }
-<exp> "if"                       { atom KIf }
-<exp> "elif"                     { atom KElseIf }
-<exp> "elsif"                    { atom KElseIf }
-<exp> "endif"                    { atom KEndIf }
-<exp> "case"                     { atom KCase }
-<exp> "when"                     { atom KWhen }
-<exp> "endcase"                  { atom KEndCase }
-<exp> "for"                      { atom KFor }
-<exp> "in"                       { atom KIn }
-<exp> "endfor"                   { atom KEndFor }
-<exp> "include"                  { atom KInclude }
-<exp> "with"                     { atom KWith }
-<exp> "let"                      { atom KLet }
-<exp> "endlet"                   { atom KEndLet }
+    "@@"                       / { play } { varr }
+    "+)@"                      / { play } { blockr }
+    ")@" $whitespace* $newline / { play } { blockr }
+    ")@"                       / { play } { blockr }
+}
 
-<exp> $sign? @number             { capture KNum }
-<exp> $letter @ident*            { capture KVar }
+-- expression
+<exp> $newline        { atom KNewLine }
+<exp> $whitespace+    { skip }
 
-<exp> \" @string* \"             { scoped KText (LText.tail . LText.init) }
+<exp> "="             { atom KEquals }
 
-<exp> "-"                        { capture KOp }
-<exp> "+"                        { capture KOp }
-<exp> "!"                        { capture KOp }
-<exp> "&&"                       { capture KOp }
-<exp> "||"                       { capture KOp }
-<exp> "|"                        { capture KOp }
-<exp> "=="                       { capture KOp }
-<exp> "!="                       { capture KOp }
-<exp> ">"                        { capture KOp }
-<exp> ">="                       { capture KOp }
-<exp> "<="                       { capture KOp }
-<exp> "<"                        { capture KOp }
+<exp> "True"          { atom KTrue }
+<exp> "true"          { atom KTrue }
+<exp> "False"         { atom KFalse }
+<exp> "false"         { atom KFalse }
 
-<exp> \(                         { atom KParenL }
-<exp> \)                         { atom KParenR }
-<exp> \[                         { atom KBracketL }
-<exp> \]                         { atom KBracketR }
-<exp> \.                         { atom KDot }
-<exp> \,                         { atom KComma }
-<exp> \_                         { atom KUnderscore }
-<exp> \@                         { atom KAt }
+<exp> "else"          { atom KElse }
+<exp> "if"            { atom KIf }
+<exp> "elif"          { atom KElseIf }
+<exp> "elsif"         { atom KElseIf }
+<exp> "endif"         { atom KEndIf }
+<exp> "case"          { atom KCase }
+<exp> "when"          { atom KWhen }
+<exp> "endcase"       { atom KEndCase }
+<exp> "for"           { atom KFor }
+<exp> "in"            { atom KIn }
+<exp> "endfor"        { atom KEndFor }
+<exp> "include"       { atom KInclude }
+<exp> "with"          { atom KWith }
+<exp> "let"           { atom KLet }
+<exp> "endlet"        { atom KEndLet }
+
+<exp> $sign? @number  { capture KNum }
+<exp> $letter @ident* { capture KVar }
+
+<exp> \" @string* \"  { scoped KText (LText.tail . LText.init) }
+
+<exp> "-"             { capture KOp }
+<exp> "+"             { capture KOp }
+<exp> "!"             { capture KOp }
+<exp> "&&"            { capture KOp }
+<exp> "||"            { capture KOp }
+<exp> "|"             { capture KOp }
+<exp> "=="            { capture KOp }
+<exp> "!="            { capture KOp }
+<exp> ">"             { capture KOp }
+<exp> ">="            { capture KOp }
+<exp> "<="            { capture KOp }
+<exp> "<"             { capture KOp }
+
+<exp> \(              { atom KParenL }
+<exp> \)              { atom KParenR }
+<exp> \[              { atom KBracketL }
+<exp> \]              { atom KBracketR }
+<exp> \.              { atom KDot }
+<exp> \_              { atom KUnderscore }
 
 {
+
+jinja, play :: a -> AlexInput -> Int -> AlexInput -> Bool
+jinja _ _ _ inp = inpSyntax inp == Jinja
+play  _ _ _ inp = inpSyntax inp == Play
+
+coml = begin com
+comr = begin 0
+
+varl = atom KVarL `andBegin` 0
+varr   = atom KVarR `andBegin` 0
+
+blockl = atom KBlockL `andBegin` 0
+blockr   = atom KBlockR `andBegin` 0
+
 scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
 scoped k f inp len = return $
     TC (inpMeta inp) k (f . LText.take (fromIntegral len) $ inpText inp)
@@ -144,24 +180,29 @@ capture k inp len = return $
 atom :: Atom -> AlexInput -> Int -> Alex Token
 atom k inp _ = return $ TA (inpMeta inp) k
 
-captureFrag AlexInput{..} _ = do
+captureFrag (AlexInput s m p t) _ = do
     setInput $ AlexInput
-        { inpMeta = LText.foldl' move inpMeta res
-        , inpText = LText.drop (LText.length res) inpText
+        { inpSyntax = s
+        , inpMeta   = LText.foldl' move m res
+        , inpPrev   = if LText.null prev then '\n' else LText.last prev
+        , inpText   = next
         }
-    return $ TC inpMeta KFrag res
+    return (TC m KFrag res)
   where
-    res = go inpText
+    (prev, next) = LText.splitAt (LText.length res) t
 
-    go txt =
-        let (x, y) = LText.break (== '{') txt
-            r      = fst <$> LText.uncons (LText.drop 1 y)
-         in case (LText.null y, r) of
-                (_,     Just '%') -> x
-                (_,     Just '-') -> x
-                (_,     Just '{') -> x
-                (True,  _)        -> x
-                (False, _)        -> x <> LText.take 2 y <> go (LText.drop 2 y)
+    res = go t
+
+    go txt = case z of
+        Just '%'         -> x
+        Just '-'         -> x
+        Just '{'         -> x
+        _ | LText.null y -> x
+        _                -> x <> LText.take 2 y <> go (LText.drop 2 y)
+      where
+        z = fst <$> LText.uncons (LText.drop 1 y)
+
+        (x, y) = LText.break (== '{') txt
 
 start :: String -> Meta
 start src = Meta src 1 1
@@ -169,30 +210,34 @@ start src = Meta src 1 1
 move :: Meta -> Char -> Meta
 move (Meta src l c) '\t' = Meta src  l      (((c + 7) `div` 8) * 8 + 1)
 move (Meta src l c) '\n' = Meta src (l + 1) 1
-move (Meta src l c) _    = Meta src  l      (c + 1)
+move (Meta src l c)  _   = Meta src  l      (c + 1)
 
 data AlexInput = AlexInput
-    { inpMeta :: Meta
-    , inpText :: Text
+    { inpSyntax :: !Syntax
+    , inpMeta   :: Meta
+    , inpPrev   :: !Char
+    , inpText   :: Text
     } deriving (Show)
 
 data AlexState = AlexState
     { stateInput :: AlexInput
-    , stateCode  :: {-# UNPACK #-} !Int
+    , stateCode  :: !Int
     }
 
 newtype Alex a = Alex { unAlex :: AlexState -> Either Error (AlexState, a) }
 
 instance Monad Alex where
     return !x = Alex $ \s -> Right (s, x)
+    {-# INLINE return #-}
 
     (>>=) !m !k = Alex $ \s ->
         case unAlex m s of
             Left  e       -> Left e
             Right (s', x) -> unAlex (k x) s'
+    {-# INLINE (>>=) #-}
 
-runAlex :: String -> Text -> Alex a -> Either Error a
-runAlex src txt (Alex f) = snd `fmap` f state
+runAlex :: String -> Syntax -> Text -> Alex a -> Either Error a
+runAlex src s txt (Alex f) = snd `fmap` f state
   where
     state = AlexState
         { stateInput = input
@@ -200,9 +245,14 @@ runAlex src txt (Alex f) = snd `fmap` f state
         }
 
     input = AlexInput
-        { inpMeta = start src
-        , inpText = txt
+        { inpSyntax = s
+        , inpMeta   = start src
+        , inpPrev   = '\n'
+        , inpText   = txt
         }
+
+alexInputPrevChar :: AlexInput -> Char
+alexInputPrevChar = inpPrev
 
 getInput :: Alex AlexInput
 getInput = Alex $ \s -> Right (s, stateInput s)
@@ -254,9 +304,9 @@ andBegin :: (AlexInput -> Int -> Alex a) -> Int -> AlexInput -> Int -> Alex a
 (a `andBegin` c) inp len = setCode c >> a inp len
 
 alexGetByte :: Num a => AlexInput -> Maybe (a, AlexInput)
-alexGetByte (AlexInput p t)
+alexGetByte (AlexInput s m p t)
     | LText.null t = Nothing
-    | otherwise   = Just $! (c2w c, AlexInput (move p c) cs)
+    | otherwise    = Just $! (c2w c, AlexInput s (move m c) c cs)
   where
     (c, cs) = (LText.head t, LText.tail t)
 
@@ -265,8 +315,8 @@ alexGetByte (AlexInput p t)
     -- convenience for ByteString construction.
     c2w = fromIntegral . ord
 
-runLexer :: String -> Text -> Result [Token]
-runLexer src txt = case runAlex src txt loop of
+runLexer :: String -> Syntax -> Text -> Result [Token]
+runLexer src s txt = case runAlex src s txt loop of
     Left  e -> Error   e
     Right x -> Success x
   where
