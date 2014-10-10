@@ -44,8 +44,6 @@ data Atom
     | KVarR
     | KBlockL
     | KBlockR
-    | KParenL
-    | KParenR
     | KBracketL
     | KBracketR
     | KDot

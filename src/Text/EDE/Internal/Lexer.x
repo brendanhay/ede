@@ -60,98 +60,95 @@ $letter      = [a-zA-Z_]
 
 ede :-
 
--- start block
 <0> {
-    "{#"              / { jinja } { coml }
-    "{{"              / { jinja } { varl }
-    "{%+"             / { jinja } { blockl }
-    $whitespace* "{%" / { jinja } { blockl }
+  -- start block
+  "{#"              / { jinja } { coml }
+  "{{"              / { jinja } { varl }
+  "{%+"             / { jinja } { blockl }
+  $whitespace* "{%" / { jinja } { blockl }
 
-    "@*"              / { play } { coml }
-    "@{"              / { play } { varl }
-    "@(+"             / { play } { blockl }
-    $whitespace* "@(" / { play } { blockl }
+  "@*"              / { play } { coml }
+  "@{"              / { play } { varl }
+  "@(+"             / { play } { blockl }
+  $whitespace* "@(" / { play } { blockl }
+
+  $newline     { atom KNewLine }
+  $whitespace+ { capture KWhiteSpace }
+
+  -- fragments
+  .            { fragment }
 }
 
--- fragments
-<0> $newline     { atom KNewLine }
-<0> $whitespace+ { capture KWhiteSpace }
-<0> .            { fragment }
+<exp> {
+  -- end block
+  "}}"                       / { jinja } { varr }
+  "+%}"                      / { jinja } { blockr }
+  "%}" $whitespace* $newline / { jinja } { blockr }
+  "%}"                       / { jinja } { blockr }
+
+  "}@"                       / { play } { varr }
+  "+)@"                      / { play } { blockr }
+  ")@" $whitespace* $newline / { play } { blockr }
+  ")@"                       / { play } { blockr }
+
+  $newline        { atom KNewLine }
+  $whitespace+    { skip }
+
+  -- expression
+  "="             { atom KEquals }
+
+  "True"          { atom KTrue }
+  "true"          { atom KTrue }
+  "False"         { atom KFalse }
+  "false"         { atom KFalse }
+
+  "else"          { atom KElse }
+  "if"            { atom KIf }
+  "elif"          { atom KElseIf }
+  "elsif"         { atom KElseIf }
+  "endif"         { atom KEndIf }
+  "case"          { atom KCase }
+  "when"          { atom KWhen }
+  "endcase"       { atom KEndCase }
+  "for"           { atom KFor }
+  "in"            { atom KIn }
+  "endfor"        { atom KEndFor }
+  "include"       { atom KInclude }
+  "with"          { atom KWith }
+  "let"           { atom KLet }
+  "endlet"        { atom KEndLet }
+
+  $sign? @number  { capture KNum }
+  $letter @ident* { capture KVar }
+
+  \" @string* \"  { scoped KText (LText.tail . LText.init) }
+
+  "-"             { capture KOp }
+  "+"             { capture KOp }
+  "!"             { capture KOp }
+  "&&"            { capture KOp }
+  "||"            { capture KOp }
+  "|"             { capture KOp }
+  "=="            { capture KOp }
+  "!="            { capture KOp }
+  ">"             { capture KOp }
+  ">="            { capture KOp }
+  "<="            { capture KOp }
+  "<"             { capture KOp }
+
+  \.              { atom KDot }
+  \_              { atom KUnderscore }
+}
 
 <com> {
-    "#}" $whitespace+ $newline / { jinja } { comr }
-    "#}"                       / { jinja } { comr }
+  "#}" $whitespace+ $newline / { jinja } { comr }
+  "#}"                       / { jinja } { comr }
 
-    "*@" $whitespace+ $newline / { play } { comr }
-    "*@"                       / { play } { comr }
+  "*@" $whitespace+ $newline / { play } { comr }
+  "*@"                       / { play } { comr }
+
+  [. $newline] { skip }
 }
-
-<com> [. $newline] { skip }
-
--- end block
-<exp> {
-    "}}"                       / { jinja } { varr }
-    "+%}"                      / { jinja } { blockr }
-    "%}" $whitespace* $newline / { jinja } { blockr }
-    "%}"                       / { jinja } { blockr }
-
-    "}@"                       / { play } { varr }
-    "+)@"                      / { play } { blockr }
-    ")@" $whitespace* $newline / { play } { blockr }
-    ")@"                       / { play } { blockr }
-}
-
--- expression
-<exp> $newline        { atom KNewLine }
-<exp> $whitespace+    { skip }
-
-<exp> "="             { atom KEquals }
-
-<exp> "True"          { atom KTrue }
-<exp> "true"          { atom KTrue }
-<exp> "False"         { atom KFalse }
-<exp> "false"         { atom KFalse }
-
-<exp> "else"          { atom KElse }
-<exp> "if"            { atom KIf }
-<exp> "elif"          { atom KElseIf }
-<exp> "elsif"         { atom KElseIf }
-<exp> "endif"         { atom KEndIf }
-<exp> "case"          { atom KCase }
-<exp> "when"          { atom KWhen }
-<exp> "endcase"       { atom KEndCase }
-<exp> "for"           { atom KFor }
-<exp> "in"            { atom KIn }
-<exp> "endfor"        { atom KEndFor }
-<exp> "include"       { atom KInclude }
-<exp> "with"          { atom KWith }
-<exp> "let"           { atom KLet }
-<exp> "endlet"        { atom KEndLet }
-
-<exp> $sign? @number  { capture KNum }
-<exp> $letter @ident* { capture KVar }
-
-<exp> \" @string* \"  { scoped KText (LText.tail . LText.init) }
-
-<exp> "-"             { capture KOp }
-<exp> "+"             { capture KOp }
-<exp> "!"             { capture KOp }
-<exp> "&&"            { capture KOp }
-<exp> "||"            { capture KOp }
-<exp> "|"             { capture KOp }
-<exp> "=="            { capture KOp }
-<exp> "!="            { capture KOp }
-<exp> ">"             { capture KOp }
-<exp> ">="            { capture KOp }
-<exp> "<="            { capture KOp }
-<exp> "<"             { capture KOp }
-
-<exp> \(              { atom KParenL }
-<exp> \)              { atom KParenR }
-<exp> \[              { atom KBracketL }
-<exp> \]              { atom KBracketR }
-<exp> \.              { atom KDot }
-<exp> \_              { atom KUnderscore }
 
 {
 jinja, play :: a -> AlexInput -> Int -> AlexInput -> Bool
@@ -161,9 +158,9 @@ play  _ _ _ inp = inpSyntax inp == Play
 coml, comr, blockl, blockr, varl, varr :: AlexInput -> Int -> Alex Token
 coml   = begin com
 comr   = begin 0
-blockl = atom KBlockL `andBegin` 0
+blockl = atom KBlockL `andBegin` exp
 blockr = atom KBlockR `andBegin` 0
-varl   = atom KVarL   `andBegin` 0
+varl   = atom KVarL   `andBegin` exp
 varr   = atom KVarR   `andBegin` 0
 
 scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
@@ -188,13 +185,11 @@ fragment (AlexInput s m t) _ = do
   where
     res = go t
 
-    go txt = case z of
+    go txt = case fst <$> LText.uncons (LText.drop 1 y) of
         Just c | match s c    -> x
         _      | LText.null y -> x
         _                     -> x <> LText.take 2 y <> go (LText.drop 2 y)
       where
-        z = fst <$> LText.uncons (LText.drop 1 y)
-
         (x, y) = LText.break (break s) txt
 
     break Jinja = (== '{')

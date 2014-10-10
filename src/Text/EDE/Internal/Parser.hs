@@ -223,9 +223,6 @@ number = do
     p n "" = return $ LNum (fromFloatDigits n)
     p n rs = fail $ "leftovers after parsing number: " ++ show (n, rs)
 
-parens :: Parser a -> Parser a
-parens p = atom KParenL *> p <* atom KParenR
-
 capture :: Capture -> Parser (Meta, LText.Text)
 capture x = token f
   where
