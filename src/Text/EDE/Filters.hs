@@ -53,7 +53,7 @@ import qualified Data.Text.Lazy.Encoding  as LText
 import           Data.Vector              (Vector)
 import qualified Data.Vector              as Vector
 import           Debug.Trace
-import           Text.EDE.Internal.Quoter
+import           Text.EDE.Internal.Quotes
 import           Text.EDE.Internal.Types
 
 default (Integer)

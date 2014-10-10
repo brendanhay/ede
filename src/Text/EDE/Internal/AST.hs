@@ -30,8 +30,8 @@ eapp :: Exp -> [Exp] -> Exp
 eapp e [] = e
 eapp e es = foldl' (\x -> EApp (meta x) x) e es
 
-eappend :: Exp -> [Exp] -> Exp
-eappend e es = eapp (EFun (meta e) (Id (meta e) "<>")) (e:es)
+elet :: Id -> Exp -> Exp -> Exp
+elet i = ELet (meta i) i
 
 ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
 ecase p ws f = ECase (meta p) p (ws ++ maybe [] ((:[]) . wild) f)
@@ -40,6 +40,9 @@ eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
 eif t@(x, _) ts f = foldr' c (fromMaybe (bld (meta x)) f) (t:ts)
   where
     c (p, w) e = ECase (meta p) p [true w, false e]
+
+eloop :: Id -> Var -> Exp -> Maybe Exp -> Exp
+eloop i = ELoop (meta i) i
 
 wild, true, false :: Exp -> Alt
 wild  = alt PWild

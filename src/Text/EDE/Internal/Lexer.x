@@ -97,10 +97,8 @@ tokens :-
 <exp> "endfor"        { atom KEndFor }
 <exp> "include"       { atom KInclude }
 <exp> "with"          { atom KWith }
-<exp> "assign"        { atom KAssign }
-<exp> "set"           { atom KAssign }
-<exp> "capture"       { atom KCapture }
-<exp> "endcapture"    { atom KEndCapture }
+<exp> "let"           { atom KLet }
+<exp> "endlet"        { atom KEndLet }
 
 <exp> $sign? @number  { capture KNum }
 <exp> $letter @ident* { capture KVar }

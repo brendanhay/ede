@@ -71,7 +71,6 @@ data Atom
     | KEndFor
     | KInclude
     | KWith
-    | KAssign
-    | KCapture
-    | KEndCapture
+    | KLet
+    | KEndLet
       deriving (Eq, Show)

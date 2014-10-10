@@ -4,7 +4,7 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE OverloadedStrings    #-}
 
--- Module      : Text.EDE.Internal.Quoter
+-- Module      : Text.EDE.Internal.Quotes
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -14,7 +14,7 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Quoter where
+module Text.EDE.Internal.Quotes where
 
 import           Control.Applicative
 import           Control.Monad
@@ -34,53 +34,10 @@ tfun = "TFun"
 
 qapp :: Quoted -> Quoted -> Result Quoted
 qapp a b = case (a, b) of
-    (QLam f, x) -> trace (show x) (f x)
-    -- (QLit (String x), QLit (String y)) ->
-    --     return (QLit (String (x <> y)))
-    -- (QLit x, QLit y) ->
-    --     throwError Quoter "unable to apply literals {} -> {}:\n{}\n{}"
-    --         [typeof x, typeof y, show x, show y]
+    (QLam f, x) -> f x
     (QLit x, _) ->
         throwError Quoter "unable to apply literal {} -> {}\n{}"
             [typeof x, tfun, show x]
-
--- qappend :: Quoted -> Result Quoted
--- qappend = qapp go
---   where
---     go :: Quoted
---     go = QLam $ \x ->
---         return . QLam $ \y ->
---             case (x, y) of
---                 (QLit a, QLit b) -> quote <$> liftM2 (<>) (build a) (build b)
---                 (QLam f, v) -> do
---                     r <- qapp (QLam f) v
---                     case r of
---                         QLit c -> quote <$> build c
---                         _      -> throwError Quoter "moo {}" [show v]
---                 _ ->
---                     throwError Quoter "unable to render literal {} {}"
---                         [show x, show y]
-
-    -- build (String t) = return (Build.build t)
-    -- build (Bool b)   = return (Build.build b)
-    -- build (Number n)
-    --     | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
-    --     | otherwise             = return (scientificBuilder n)
-    -- build x =
-    --     throwError Quoter "unable to render literal {}\n{}" [typeof x, show x]
-
--- qappend :: Show a => a -> Quoted -> Result Quoted
--- qappend z f@QLam{} = throwError Quoter "something\n{}" [show z]
--- qappend _ (QLit x) = return . QLam $ \case
---     QLit y -> quote <$> liftM2 (<>) (build x) (build y)
---     _      -> throwError Quoter "something {}" [show 1]
---   where
-
--- qeval :: (Show a, Quote a) => Id -> Quoted -> a -> Result Quoted
--- qeval k q x = qapp q (quote x) --
---              >>= \case
-    -- QLam _ -> throwError Quoter "unable to evaluate unapplied function {} :: {}" [show k, show x]
-    -- QLit v -> return v
 
 bpoly :: Quote a => (Value -> Value -> a) -> Quoted
 bpoly = quote
@@ -108,16 +65,6 @@ class Quote a where
 
 instance Quote Quoted where
     quote = id
-
--- instance Quote TExp where
---     quote = QLit . \case
---         _  ::: TNil  -> Null
---         b  ::: TBool -> Bool b
---         n  ::: TNum  -> Number n
---         o  ::: TMap  -> Object o
---         a  ::: TList -> Array a
---         t  ::: TText -> String (LText.toStrict t)
---         b  ::: TBld  -> String (LText.toStrict (toLazyText b)) -- FIXME: Grauugh!!
 
 instance Quote Lit where
     quote = \case
@@ -175,14 +122,6 @@ instance Unquote Scientific where
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
     quote f = QLam (fmap (quote . f) . unquote)
-
--- instance Quote a => Quote (Value -> Value -> a) where
---     quote f = QLam $ \x ->
---         Success . QLam $ \y ->
---             case (x, y) of
---                 (_,      QLam g) -> join (qapp <$> pure (quote f) <*> g x)
---                 (QLit a, QLit b) -> Success (quote (f a b))
---                 _                -> error "anus!"
 
 instance (Unquote a, Unquote b, Quote c) => Quote (a -> b -> c) where
     quote f = QLam $ \x ->

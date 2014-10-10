@@ -187,7 +187,7 @@ data Type a where
 deriving instance Show (Type a)
 
 typeof :: Value -> String
-typeof v = case v of
+typeof = \case
     Null     -> show TNil
     Bool   _ -> show TBool
     Number _ -> show TNum
@@ -241,20 +241,20 @@ data Exp
     | EVar  !Meta !Var
     | EFun  !Meta !Id
     | EApp  !Meta !Exp  !Exp
-    | ELet  !Meta !Id   (Either Lit Var)
+    | ELet  !Meta !Id   !Exp  !Exp
     | ECase !Meta !Exp  [Alt]
-    | ELoop !Meta !Id   !Var !Exp (Maybe Exp)
+    | ELoop !Meta !Id   !Var  !Exp (Maybe Exp)
     | EIncl !Meta !Text (Maybe Exp)
       deriving (Eq, Show)
 
 instance Metadata Exp where
-    meta x = case x of
+    meta = \case
         ELit  m _       -> m
         EBld  m _       -> m
         EVar  m _       -> m
         EFun  m _       -> m
         EApp  m _ _     -> m
-        ELet  m _ _     -> m
+        ELet  m _ _ _   -> m
         ECase m _ _     -> m
         ELoop m _ _ _ _ -> m
         EIncl m _ _     -> m

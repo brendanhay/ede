@@ -221,7 +221,7 @@ renderWith :: HashMap Text Quoted -- ^ Filters to make available in the environm
            -> Template            -- ^ Parsed 'Template' to render.
            -> Object              -- ^ Bindings to make available in the environment.
            -> Result LText.Text
-renderWith fs (Template _ u ts) = fmap toLazyText . Evaluator.render fs ts u
+renderWith fs (Template _ u ts) = fmap toLazyText . Evaluator.render ts fs u
 
 -- | See: 'parse'
 eitherParse :: LText.Text -> Either String Template

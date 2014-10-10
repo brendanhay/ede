@@ -23,7 +23,7 @@ import           Control.Applicative
 import           Control.Arrow                     (first)
 import           Control.Monad
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.State.Strict
+import           Control.Monad.Trans.Reader
 import           Data.Aeson                        hiding (Result, Success, Error)
 import           Data.Foldable                     (Foldable, foldlM)
 import           Data.HashMap.Strict               (HashMap)
@@ -39,96 +39,61 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
 import           Data.Text.Format                  (Format)
 import           Data.Text.Format.Params           (Params)
-import qualified Data.Text.Lazy                    as LText
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
 import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
-import           Debug.Trace
-import           Text.EDE.Internal.Pretty
-import           Text.EDE.Internal.Quoter
+import           Text.EDE.Internal.Quotes
 import           Text.EDE.Internal.Types
 
+-- FIXME: look at adding a whnf step to reduce everything before storing as a template
+-- (optimisation passes, case reducation etc.)
+-- maybe Exp -> Quoted (aka Val) is the first step, without substituting from
+-- env/filters
+
 data Env = Env
-    { _filters   :: HashMap Text Quoted
-    , _templates :: HashMap Text Exp
-    , _variables :: Object
+    { _templates :: HashMap Text Exp
+    , _quoted    :: HashMap Text Quoted
+    , _values    :: HashMap Text Value
     }
 
-type Context = StateT Env Result
+type Context = ReaderT Env Result
 
--- render :: HashMap Text Quoted
---        -> HashMap Text Exp
---        -> Exp
---        -> Object
---        -> Result Builder
--- render fs ts e o = flip evalStateT (Env fs ts o) $ do
---     v ::: vt <- eval e >>= build (Meta "render" 0 0)
--- -- 
---     Eq       <- ceq (meta e) TBld vt
---     return v
-
-render :: HashMap Text Quoted
-       -> HashMap Text Exp
+render :: HashMap Text Exp
+       -> HashMap Text Quoted
        -> Exp
-       -> Object
+       -> HashMap Text Value
        -> Result Builder
-render fs ts e o = evalStateT (eval e >>= lift . nf) (Env fs ts o)
+render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
   where
+    nf (QLit v) = build m v
+    nf _        = lift (Error (Evaluator m [err]))
 
-    -- zero = quote (String mempty)
+    err = "unable to evaluate partially applied template to normal form."
 
-    build (String t) = Build.build t
-    build (Bool b)   = Build.build b
-    build (Number n)
-        | base10Exponent n == 0 = formatScientificBuilder Fixed (Just 0) n
-        | otherwise             = scientificBuilder n
-
-    nf = \case
-        QLit v -> return (build v)
-        q      -> error "Nein!" -- _ qapp q zero >>= nf
-
+    m = meta e
 
 eval :: Exp -> Context Quoted
 eval (ELit _ l) = return (quote l)
 eval (EBld _ b) = return (quote b)
 eval (EVar _ v) = quote <$> variable v
 eval (EFun m i) = do
-    q <- Map.lookup (idName i) <$> gets _filters
-    maybe (throw m "filter {} doesn't exist." [i])
+    q <- Map.lookup (idName i) <$> asks _quoted
+    maybe (throw m "binding {} doesn't exist." [i])
           return
           q
 
-eval (EApp _ a b) = do
+eval (EApp m a b) = do
     x <- eval a
     y <- eval b
-    lift $ case (x, y) of
-        (QLit l, QLit m) -> quote <$> liftM2 (<>) (build l) (build m)
-        _                -> qapp x y
-    -- lift $ case (trace ("\n" ++ show a ++ "\n" ++ show b) x, y) of
-    --     (QLit l, QLit m) -> quote <$> liftM2 (<>) (build l) (build m)
-    --     _                -> trace ("qapp: " ++ show x ++ " -> " ++ show y) (qapp x y)
-  where
-    build Null       = return mempty
-    build (String t) = return (Build.build t)
-    build (Bool b)   = return (Build.build b)
-    build (Number n)
-        | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
-        | otherwise             = return (scientificBuilder n)
-    build x =
-        throwError Quoter "unable to render literal {}\n{}" [typeof x, show x]
+    qappend m x y
 
--- eval (ELet _ (Id _ k) e) = do
---     v <- either reify variable e
---     modify $ \s ->
---         s { _variables = Map.insert k v (_variables s) }
---     return (quote (LText ""))
---   where
---     reify (LBool b) = return (Bool   b)
---     reify (LNum  n) = return (Number n)
---     reify (LText t) = return (String (LText.toStrict t))
+eval (ELet _ (Id _ k) rhs bdy) = do
+    q <- eval rhs
+    v <- lift (unquote q)
+    bind (Map.insert k v) (eval bdy)
 
--- -- FIXME: We have to recompute c everytime due to the predicate ..
+-- FIXME: We have to recompute c everytime due to the predicate ..
 eval (ECase m p ws) = go ws
   where
     go []          = return (quote (LText mempty))
@@ -146,22 +111,29 @@ eval (ECase m p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
--- eval (ELoop m (Id _ k) v bdy a) = eval (EVar m v) >>= f >>= loop k bdy a
---   where
---     f (x ::: TList) = return $ Col (Vector.length x) (vec x)
---     f (x ::: TMap)  = return $ Col (Map.size x)      (hmap x)
---     f (_ ::: t)     = throw m "invalid loop target {}" [show t]
+eval (ELoop m (Id _ k) v bdy ma) = variable v >>= go >>= loop k bdy ma
+  where
+    go (Object o) = return (Col (Map.size o) (hmap o))
+    go (Array  a) = return (Col (Vector.length a) (vec a))
+    go x          =
+        throw m "invalid loop target {}, expected {} or {}"
+            [typeof x, typeof (Object mempty), typeof (Array mempty)]
 
---     vec :: Vector Value -> Vector (Maybe Text, Value)
---     vec = Vector.map (Nothing,)
+    hmap :: HashMap Text Value -> [(Maybe Text, Value)]
+    hmap = map (first Just) . sortBy (comparing fst) . Map.toList
 
---     hmap :: HashMap Text Value -> [(Maybe Text, Value)]
---     hmap = map (first Just) . sortBy (comparing fst) . Map.toList
+    vec :: Vector Value -> Vector (Maybe Text, Value)
+    vec = Vector.map (Nothing,)
 
 eval (EIncl m k mu) = do
-    te <- tmpl m k
+    ts <- asks _templates
+    t  <- maybe
+        (throw m "template {} is not in scope: {}"
+            [k, Text.intercalate "," $ Map.keys ts])
+        return
+        (Map.lookup k ts)
     s  <- maybe (return global) local' mu
-    bind s (eval te)
+    bind s (eval t)
   where
     -- Use the global environment.
     global o = fromPairs ["scope" .= o]
@@ -179,46 +151,11 @@ eval (EIncl m k mu) = do
     enc (LNum  n) = toJSON n
     enc (LText t) = toJSON t
 
-    tmpl m k = do
-        ts <- gets _templates
-        maybe (throw m "template {} is not in scope: {}"
-                  [k, Text.intercalate "," $ Map.keys ts])
-              return
-              (Map.lookup k ts)
-
--- loop :: Text -> Exp -> Maybe Exp -> Col' -> Context TExp
--- loop _ a b (Col 0 _)  = eval (fromMaybe (EBld (meta a) mempty) b)
--- loop k a _ (Col l xs) = fmap ((::: TBld) . snd) $ foldlM iter (1, mempty) xs
---   where
---     iter (n, bld) x = do
---         shadowed
---         a' ::: at <- bind (Map.insert k $ context n x) (eval a)
---         Eq        <- ceq (meta a) at TBld
---         return (n + 1, bld <> a')
-
---     context n (mk, v) = object $
---         [ "value"      .= v
---         , "length"     .= l
---         , "index"      .= n
---         , "index0"     .= (n - 1)
---         , "remainder"  .= (l - n)
---         , "remainder0" .= (l - n - 1)
---         , "first"      .= (n == 1)
---         , "last"       .= (n == l)
---         , "odd"        .= (n `mod` 2 == 1)
---         , "even"       .= (n `mod` 2 == 0)
---         ] ++ maybe [] (\x -> ["key" .= x]) mk
-
---     shadowed =
---         let f x = [Text.unpack k, show x]
---             g   = throw  (meta a) "binding {} shadows existing variable {}." . f
---         in gets _variables >>= maybe (return ()) g . Map.lookup k
-
 bind :: (Object -> Object) -> Context a -> Context a
-bind f = withStateT (\x -> x { _variables = f $ _variables x })
+bind f = withReaderT (\x -> x { _values = f (_values x) })
 
 variable :: Var -> Context Value
-variable (Var is) = gets _variables >>= go (NonEmpty.toList is) [] . Object
+variable (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
   where
     go []     _ v = return v
     go (k:ks) r v = do
@@ -228,17 +165,17 @@ variable (Var is) = gets _variables >>= go (NonEmpty.toList is) [] . Object
               (Map.lookup (idName k) m)
       where
         nest :: Value -> Context Object
-        nest (Object o)        = return o
-        nest (cast -> _ ::: t) =
+        nest (Object o) = return o
+        nest x          =
             throw (meta k) "variable {} :: {} doesn't supported nested accessors."
-                [fmt (k:r), show t]
+                [fmt (k:r), typeof x]
 
         fmt = Text.unpack . Text.intercalate "." . map idName
 
 -- | A variable can be tested for truthiness, but a non-whnf expr cannot.
 predicate :: Exp -> Context Quoted
 predicate x = do
-    r <- evalStateT (eval x) <$> get
+    r <- runReaderT (eval x) <$> ask
     lift $ case r of
         Success q
             | QLit(Bool{}) <- q -> Success q
@@ -247,69 +184,57 @@ predicate x = do
             | EVar{} <- x       -> Success (quote False)
         Error   e               -> Error   e
 
+data Collection where
+    Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
+
+loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Quoted
+loop _ a b (Col 0 _)  = eval (fromMaybe (EBld (meta a) mempty) b)
+loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+    -- FIXME: start of iteration needs a quoted function that will concat quoted chunks
+    -- until returning, when you apply an empty chunk to get the fully applied chunk.
+  where
+    iter (n, p) x = do
+        shadowed n
+        q <- bind (Map.insert k $ context n x) (eval a)
+        r <- qappend (meta a) q p
+        return (n + 1, r)
+
+    shadowed n = do
+        m <- asks _values
+        maybe (return ())
+              (\x -> throw (meta a) "binding {} shadows existing variable {} :: {}, {}"
+                  [Text.unpack k, show x, typeof x, show n])
+              (Map.lookup k m)
+
+    context n (mk, v) = object
+        [ "key"        .= mk -- FIXME: ensure null keys don't exist
+        , "value"      .= v
+        , "length"     .= l
+        , "index"      .= n
+        , "index0"     .= (n - 1)
+        , "remainder"  .= (l - n)
+        , "remainder0" .= (l - n - 1)
+        , "first"      .= (n == 1)
+        , "last"       .= (n == l)
+        , "odd"        .= (n `mod` 2 == 1)
+        , "even"       .= (n `mod` 2 == 0)
+        ]
+
+qappend :: Meta -> Quoted -> Quoted -> Context Quoted
+qappend m x y =
+    case (x, y) of
+        (QLit l, QLit r) -> quote <$> liftM2 (<>) (build m l) (build m r)
+        _                -> lift (qapp x y)
+
+build :: Meta -> Value -> Context Builder
+build _ Null       = return mempty
+build _ (String t) = return (Build.build t)
+build _ (Bool b)   = return (Build.build b)
+build _ (Number n)
+    | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
+    | otherwise             = return (scientificBuilder n)
+build m x =
+    throw m "unable to render literal {}\n{}" [typeof x, show x]
+
 throw :: Params ps => Meta -> Format -> ps -> Context a
 throw m f = lift . throwError (Evaluator m) f
-
-cast :: Value -> TExp
-cast v = case v of
-    Null     -> () ::: TNil
-    Bool   b -> b  ::: TBool
-    Number n -> n  ::: TNum
-    Object o -> o  ::: TMap
-    Array  a -> a  ::: TList
-    String t -> LText.fromStrict t ::: TText
-
-
-
-
-
--- data Col' where
---     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Col'
-
--- data Eq' a b where
---     Eq :: Eq' a a
-
--- ceq :: Meta -> Type a -> Type b -> Context (Eq' a b)
--- ceq _ TNil  TNil  = return Eq
--- ceq _ TText TText = return Eq
--- ceq _ TBool TBool = return Eq
--- ceq _ TNum  TNum  = return Eq
--- ceq _ TBld  TBld  = return Eq
--- ceq _ TMap  TMap  = return Eq
--- ceq _ TList TList = return Eq
--- ceq m a b = throw m "type equality check of {} ~ {} failed." [show a, show b]
-
--- data Ord' a where
---     Ord :: Ord a => Ord' a
-
--- cord :: Meta -> Type a -> Context (Ord' a)
--- cord _ TNil  = return Ord
--- cord _ TText = return Ord
--- cord _ TBool = return Ord
--- cord _ TNum  = return Ord
--- cord m t = throw m "constraint check of Ord a => a ~ {} failed." [show t]
-
--- data Show' a where
---     Show :: Show a => Show' a
-
--- cshow :: Meta -> Type a -> Context (Show' a)
--- cshow _ TNil  = return Show
--- cshow _ TText = return Show
--- cshow _ TBool = return Show
--- cshow _ TNum  = return Show
--- cshow _ TBld  = return Show
--- cshow _ TMap  = return Show
--- cshow _ TList = return Show
--- cshow m t = throw m "constraint check of Show a => a ~ {} failed." [show t]
-
--- data JS' a where
---     JS :: ToJSON a => JS' a
-
--- cjs :: Meta -> Type a -> Context (JS' a)
--- cjs _ TNil  = return JS
--- cjs _ TText = return JS
--- cjs _ TBool = return JS
--- cjs _ TNum  = return JS
--- cjs _ TMap  = return JS
--- cjs _ TList = return JS
--- cjs m t = throw m "constraint check of ToJSON a => a ~ {} failed." [show t]

@@ -15,7 +15,6 @@ module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
 import           Control.Arrow                  (second)
-import           Control.Monad
 import           Data.Char                      (isSpace)
 import           Data.HashMap.Strict            (HashMap)
 import qualified Data.HashMap.Strict            as Map
@@ -53,13 +52,15 @@ runParser n = either err Success
         . errorMessages
 
     tmpl = (,)
-        <$> (document  <|> return (bld (Meta n 0 0))) <* eof
+        <$> (document  <|> return def) <* eof
         <*> (stateIncl <$> getState)
+
+    def = bld (Meta n 0 0)
 
 document :: Parser Exp
 document = eapp <$> p <*> many p
   where
-    p = fragment <|> substitution <|> blocks
+    p = blocks <|> fragment <|> substitution
 
 fragment :: Parser Exp
 fragment = do
@@ -68,7 +69,7 @@ fragment = do
         case cs of
             [] -> txt
             _  -> LText.concat (txt : map snd cs)
-    <?> "a textual fragment"
+    <?> "textual fragment"
 
 whitespace :: Parser (Meta, LText.Text)
 whitespace = capture KWhiteSpace
@@ -86,17 +87,17 @@ blocks :: Parser Exp
 blocks = choice
     [ ifelsif
     , cases
-    , assign
+    , binding
     , loop
     , include
-    ] <?> "a block"
+    ]
 
 block :: String -> Parser a -> Parser a
 block n p = try (atom KBlockL *> p <* atom KBlockR <* trim)
-    <?> n
+    <?> "a valid '" ++ n ++ "' block"
   where
-    trim = optional newline
-    -- lstrip
+    trim   = optional newline
+--    lstrip = optional skipMany whitespace
 
 ifelsif :: Parser Exp
 ifelsif = eif
@@ -116,26 +117,26 @@ cases = ecase
     <*> alternative
     <*  block "endcase" (atom KEndCase)
 
-assign :: Parser Exp
-assign = block "assign" $ ELet
-    <$> position
-    <*> (atom KAssign *> identifier)
-    <*> (atom KEquals *> (Left . snd <$> literal <|> Right <$> variable))
+binding :: Parser Exp
+binding = uncurry elet
+    <$> block "let"
+        ((,) <$> (atom KLet    *> identifier)
+             <*> (atom KEquals *> term))
+    <*> document
+    <*  block "endlet" (atom KEndLet)
 
 loop :: Parser Exp
-loop = do
-    l <- block "for" $ do
-        k <- atom KFor *> identifier
-        v <- atom KIn  *> variable
-        return (ELoop (meta k) k v)
-    b <- document
-    e <- alternative
-    void $ block "endfor" (atom KEndFor)
-    return (l b e)
+loop = uncurry eloop
+    <$> block "for"
+        ((,) <$> (atom KFor *> identifier)
+             <*> (atom KIn  *> variable))
+    <*> document
+    <*> alternative
+    <*  block "endfor" (atom KEndFor)
 
 include :: Parser Exp
 include = block "include" $ do
-    (m, n) <- atom KInclude *> capture KText
+    (m, n) <- atom KInclude *> capture KText <?> "template identifier"
     v      <- optionMaybe (atom KWith *> term)
     let k = LText.toStrict n
     modifyState $ \s ->
