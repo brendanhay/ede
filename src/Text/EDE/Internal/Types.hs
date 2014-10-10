@@ -38,6 +38,11 @@ import           Data.Text.Lazy.Builder
 import           Text.Parsec             (ParseError, SourcePos)
 import qualified Text.Parsec             as Parsec
 
+data Syntax
+    = Jinja
+    | Play
+      deriving (Eq, Show)
+
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Text -> Meta -> m (Result Template)
 

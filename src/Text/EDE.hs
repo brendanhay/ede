@@ -164,7 +164,7 @@ parseWith :: Monad m
           -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
           -> m (Result Template)
 parseWith f n t = result failure resolve $
-    Lexer.runLexer s t >>= Parser.runParser s
+    Lexer.runLexer s Play t >>= Parser.runParser s
   where
     s = Text.unpack n
 

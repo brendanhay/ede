@@ -14,11 +14,6 @@ import Data.Text.Lazy          (Text)
 import Text.EDE.Internal.Types
 import Text.Parsec.Pos
 
-data Syntax
-    = Jinja
-    | Play
-      deriving (Enum, Eq, Show)
-
 data Token
     = TC !Meta !Capture Text
     | TA !Meta !Atom

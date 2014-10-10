@@ -53,7 +53,6 @@ $octit       = 0-7
              | 0[xX] @hexadecimal
 
 $letter      = [a-zA-Z_]
-$fragment    = [^\{]
 
 @escape      = \\ ([ntvbrfaeE\\\?\"] | $octit{1,3} | x@hexit+ | X@hexit+)
 @ident       = [$digit $letter ']
@@ -69,7 +68,7 @@ ede :-
     $whitespace* "{%" / { jinja } { blockl }
 
     "@*"              / { play } { coml }
-    "@@"              / { play } { varl }
+    "@{"              / { play } { varl }
     "@(+"             / { play } { blockl }
     $whitespace* "@(" / { play } { blockl }
 }
@@ -77,7 +76,7 @@ ede :-
 -- fragments
 <0> $newline     { atom KNewLine }
 <0> $whitespace+ { capture KWhiteSpace }
-<0> .            { captureFrag }
+<0> .            { fragment }
 
 <com> {
     "#}" $whitespace+ $newline / { jinja } { comr }
@@ -96,7 +95,7 @@ ede :-
     "%}" $whitespace* $newline / { jinja } { blockr }
     "%}"                       / { jinja } { blockr }
 
-    "@@"                       / { play } { varr }
+    "}@"                       / { play } { varr }
     "+)@"                      / { play } { blockr }
     ")@" $whitespace* $newline / { play } { blockr }
     ")@"                       / { play } { blockr }
@@ -155,19 +154,17 @@ ede :-
 <exp> \_              { atom KUnderscore }
 
 {
-
 jinja, play :: a -> AlexInput -> Int -> AlexInput -> Bool
 jinja _ _ _ inp = inpSyntax inp == Jinja
 play  _ _ _ inp = inpSyntax inp == Play
 
-coml = begin com
-comr = begin 0
-
-varl = atom KVarL `andBegin` 0
-varr   = atom KVarR `andBegin` 0
-
+coml, comr, blockl, blockr, varl, varr :: AlexInput -> Int -> Alex Token
+coml   = begin com
+comr   = begin 0
 blockl = atom KBlockL `andBegin` 0
-blockr   = atom KBlockR `andBegin` 0
+blockr = atom KBlockR `andBegin` 0
+varl   = atom KVarL   `andBegin` 0
+varr   = atom KVarR   `andBegin` 0
 
 scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
 scoped k f inp len = return $
@@ -180,29 +177,31 @@ capture k inp len = return $
 atom :: Atom -> AlexInput -> Int -> Alex Token
 atom k inp _ = return $ TA (inpMeta inp) k
 
-captureFrag (AlexInput s m p t) _ = do
+fragment :: AlexInput -> a -> Alex Token
+fragment (AlexInput s m t) _ = do
     setInput $ AlexInput
         { inpSyntax = s
         , inpMeta   = LText.foldl' move m res
-        , inpPrev   = if LText.null prev then '\n' else LText.last prev
-        , inpText   = next
+        , inpText   = LText.drop (LText.length res) t
         }
     return (TC m KFrag res)
   where
-    (prev, next) = LText.splitAt (LText.length res) t
-
     res = go t
 
     go txt = case z of
-        Just '%'         -> x
-        Just '-'         -> x
-        Just '{'         -> x
-        _ | LText.null y -> x
-        _                -> x <> LText.take 2 y <> go (LText.drop 2 y)
+        Just c | match s c    -> x
+        _      | LText.null y -> x
+        _                     -> x <> LText.take 2 y <> go (LText.drop 2 y)
       where
         z = fst <$> LText.uncons (LText.drop 1 y)
 
-        (x, y) = LText.break (== '{') txt
+        (x, y) = LText.break (break s) txt
+
+    break Jinja = (== '{')
+    break Play  = (== '@')
+
+    match Jinja c = c == '{' || c == '#' || c == '%' || c == '+'
+    match Play  c = c == '{' || c == '*' || c == '(' || c == '+'
 
 start :: String -> Meta
 start src = Meta src 1 1
@@ -215,7 +214,6 @@ move (Meta src l c)  _   = Meta src  l      (c + 1)
 data AlexInput = AlexInput
     { inpSyntax :: !Syntax
     , inpMeta   :: Meta
-    , inpPrev   :: !Char
     , inpText   :: Text
     } deriving (Show)
 
@@ -247,12 +245,11 @@ runAlex src s txt (Alex f) = snd `fmap` f state
     input = AlexInput
         { inpSyntax = s
         , inpMeta   = start src
-        , inpPrev   = '\n'
         , inpText   = txt
         }
 
 alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar = inpPrev
+alexInputPrevChar = const '\n'
 
 getInput :: Alex AlexInput
 getInput = Alex $ \s -> Right (s, stateInput s)
@@ -304,9 +301,9 @@ andBegin :: (AlexInput -> Int -> Alex a) -> Int -> AlexInput -> Int -> Alex a
 (a `andBegin` c) inp len = setCode c >> a inp len
 
 alexGetByte :: Num a => AlexInput -> Maybe (a, AlexInput)
-alexGetByte (AlexInput s m p t)
+alexGetByte (AlexInput s m t)
     | LText.null t = Nothing
-    | otherwise    = Just $! (c2w c, AlexInput s (move m c) c cs)
+    | otherwise    = Just $! (c2w c, AlexInput s (move m c) cs)
   where
     (c, cs) = (LText.head t, LText.tail t)
 
