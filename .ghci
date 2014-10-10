@@ -10,5 +10,5 @@ import qualified Data.Text.Lazy.IO          as LText
 import qualified Text.Parsec                as P
 
 :l Text.EDE.Internal.Types
-:l Text.EDE.Internal.Compiler
+:l Text.EDE.Internal.Evaluator
 :l Text.EDE.Internal.Parser

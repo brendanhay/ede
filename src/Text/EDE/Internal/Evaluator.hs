@@ -190,8 +190,6 @@ data Collection where
 loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Quoted
 loop _ a b (Col 0 _)  = eval (fromMaybe (EBld (meta a) mempty) b)
 loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
-    -- FIXME: start of iteration needs a quoted function that will concat quoted chunks
-    -- until returning, when you apply an empty chunk to get the fully applied chunk.
   where
     iter (n, p) x = do
         shadowed n

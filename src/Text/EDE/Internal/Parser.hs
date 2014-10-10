@@ -93,11 +93,8 @@ blocks = choice
     ]
 
 block :: String -> Parser a -> Parser a
-block n p = try (atom KBlockL *> p <* atom KBlockR <* trim)
+block n p = try (atom KBlockL *> p <* atom KBlockR)
     <?> "a valid '" ++ n ++ "' block"
-  where
-    trim   = optional newline
---    lstrip = optional skipMany whitespace
 
 ifelsif :: Parser Exp
 ifelsif = eif

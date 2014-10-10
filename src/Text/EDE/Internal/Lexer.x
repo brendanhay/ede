@@ -60,72 +60,78 @@ $fragment    = [^\{]
 
 tokens :-
 
-<0> "{#"              { begin com }
-<0> "{{"              { atom KVarL `andBegin` exp }
-<0> "{%"              { atom KBlockL `andBegin` exp }
+<0> "{#"                         { begin com }
+<0> "{{"                         { atom KVarL `andBegin` exp }
+<0> "{%+"                        { atom KBlockL `andBegin` exp }
+<0> $whitespace* "{%"            { atom KBlockL `andBegin` exp }
 
-<0> $newline          { atom KNewLine }
-<0> $whitespace+      { capture KWhiteSpace }
-<0> .                 { captureFrag }
+<0> $newline                     { atom KNewLine }
+<0> $whitespace+                 { capture KWhiteSpace }
+<0> .                            { captureFrag }
 
-<com> "#}" $newline   { begin 0 }
-<com> "#}"            { begin 0 }
-<com> [. $newline]    { skip }
+<com> "#}" $newline              { begin 0 }
+<com> "#}"                       { begin 0 }
+<com> [. $newline]               { skip }
 
-<exp> "}}"            { atom KVarR `andBegin` 0 }
-<exp> "%}"            { atom KBlockR `andBegin` 0 }
-<exp> $newline        { atom KNewLine }
-<exp> $white+         { skip }
+<exp> "}}"                       { atom KVarR `andBegin` 0 }
+<exp> "+%}"                      { atom KBlockR `andBegin` 0 }
+<exp> "%}" $whitespace* $newline { atom KBlockR `andBegin` 0 }
+<exp> "%}" $newline              { atom KBlockR `andBegin` 0 }
+<exp> "%}"                       { atom KBlockR `andBegin` 0 }
 
-<exp> "="             { atom KEquals }
+<exp> $newline                   { atom KNewLine }
+<exp> $whitespace+               { skip }
 
-<exp> "True"          { atom KTrue }
-<exp> "true"          { atom KTrue }
-<exp> "False"         { atom KFalse }
-<exp> "false"         { atom KFalse }
+<exp> "="                        { atom KEquals }
 
-<exp> "else"          { atom KElse }
-<exp> "if"            { atom KIf }
-<exp> "elif"          { atom KElseIf }
-<exp> "elsif"         { atom KElseIf }
-<exp> "endif"         { atom KEndIf }
-<exp> "case"          { atom KCase }
-<exp> "when"          { atom KWhen }
-<exp> "endcase"       { atom KEndCase }
-<exp> "for"           { atom KFor }
-<exp> "in"            { atom KIn }
-<exp> "endfor"        { atom KEndFor }
-<exp> "include"       { atom KInclude }
-<exp> "with"          { atom KWith }
-<exp> "let"           { atom KLet }
-<exp> "endlet"        { atom KEndLet }
+<exp> "True"                     { atom KTrue }
+<exp> "true"                     { atom KTrue }
+<exp> "False"                    { atom KFalse }
+<exp> "false"                    { atom KFalse }
 
-<exp> $sign? @number  { capture KNum }
-<exp> $letter @ident* { capture KVar }
+<exp> "else"                     { atom KElse }
+<exp> "if"                       { atom KIf }
+<exp> "elif"                     { atom KElseIf }
+<exp> "elsif"                    { atom KElseIf }
+<exp> "endif"                    { atom KEndIf }
+<exp> "case"                     { atom KCase }
+<exp> "when"                     { atom KWhen }
+<exp> "endcase"                  { atom KEndCase }
+<exp> "for"                      { atom KFor }
+<exp> "in"                       { atom KIn }
+<exp> "endfor"                   { atom KEndFor }
+<exp> "include"                  { atom KInclude }
+<exp> "with"                     { atom KWith }
+<exp> "let"                      { atom KLet }
+<exp> "endlet"                   { atom KEndLet }
 
-<exp> \" @string* \"  { scoped KText (LText.tail . LText.init) }
+<exp> $sign? @number             { capture KNum }
+<exp> $letter @ident*            { capture KVar }
 
-<exp> "-"             { capture KOp }
-<exp> "+"             { capture KOp }
-<exp> "!"             { capture KOp }
-<exp> "&&"            { capture KOp }
-<exp> "||"            { capture KOp }
-<exp> "|"             { capture KOp }
-<exp> "=="            { capture KOp }
-<exp> "!="            { capture KOp }
-<exp> ">"             { capture KOp }
-<exp> ">="            { capture KOp }
-<exp> "<="            { capture KOp }
-<exp> "<"             { capture KOp }
+<exp> \" @string* \"             { scoped KText (LText.tail . LText.init) }
 
-<exp> \(              { atom KParenL }
-<exp> \)              { atom KParenR }
-<exp> \[              { atom KBracketL }
-<exp> \]              { atom KBracketR }
-<exp> \.              { atom KDot }
-<exp> \,              { atom KComma }
-<exp> \_              { atom KUnderscore }
-<exp> \@              { atom KAt }
+<exp> "-"                        { capture KOp }
+<exp> "+"                        { capture KOp }
+<exp> "!"                        { capture KOp }
+<exp> "&&"                       { capture KOp }
+<exp> "||"                       { capture KOp }
+<exp> "|"                        { capture KOp }
+<exp> "=="                       { capture KOp }
+<exp> "!="                       { capture KOp }
+<exp> ">"                        { capture KOp }
+<exp> ">="                       { capture KOp }
+<exp> "<="                       { capture KOp }
+<exp> "<"                        { capture KOp }
+
+<exp> \(                         { atom KParenL }
+<exp> \)                         { atom KParenR }
+<exp> \[                         { atom KBracketL }
+<exp> \]                         { atom KBracketR }
+<exp> \.                         { atom KDot }
+<exp> \,                         { atom KComma }
+<exp> \_                         { atom KUnderscore }
+<exp> \@                         { atom KAt }
+
 {
 scoped :: Capture -> (Text -> Text) -> AlexInput -> Int -> Alex Token
 scoped k f inp len = return $
