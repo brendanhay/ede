@@ -54,8 +54,8 @@ library
     other-modules:
         Text.EDE.Internal.AST
       , Text.EDE.Internal.Evaluator
-      , Text.EDE.Internal.Lexer
-      , Text.EDE.Internal.Lexer.Tokens
+      -- , Text.EDE.Internal.Lexer
+      -- , Text.EDE.Internal.Lexer.Tokens
       , Text.EDE.Internal.Parser
 --      , Text.EDE.Internal.Pretty
       , Text.EDE.Internal.Types
@@ -65,19 +65,19 @@ library
 
     build-depends:
         aeson                 >= 0.7
-      , array
       , base                  >= 4.6 && < 5
+      , bytestring
       , directory
       , filepath
-      , parsec
+      , parsers
       , scientific            >= 0.3.1
       , semigroups
       , text                  >= 1.0
       , text-format
       , transformers
+      , trifecta
       , unordered-containers
       , vector
-      , wl-pprint-text
 
 -- executable ed-e
 --     default-language:  Haskell2010
