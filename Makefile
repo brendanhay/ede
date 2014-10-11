@@ -1,11 +1,11 @@
-SHELL        := /usr/bin/env bash
-SANDBOX      ?= $(CURDIR)/.cabal-sandbox
-FLAGS        := --enable-tests --enable-benchmarks
-NAME         := ede
-VERSION      := $(shell sed -n 's/^version: *\(.*\)$$/\1/p' $(NAME).cabal)
-BUILD_NUMBER ?= 0
-DEB          := dist/$(NAME)_$(VERSION)+$(BUILD_NUMBER)_amd64.deb
-BIN          := dist/release/$(NAME)
+SHELL         := /usr/bin/env bash
+CABAL_SANDBOX ?= $(CURDIR)/.cabal-sandbox
+FLAGS         := --enable-tests --enable-benchmarks
+NAME          := ede
+VERSION       := $(shell sed -n 's/^version: *\(.*\)$$/\1/p' $(NAME).cabal)
+BUILD_NUMBER  ?= 0
+DEB           := dist/$(NAME)_$(VERSION)+$(BUILD_NUMBER)_amd64.deb
+BIN           := dist/release/$(NAME)
 
 .PHONY: test doc
 
@@ -25,7 +25,7 @@ install: cabal.sandbox.config
  --disable-library-coverage
 
 cabal.sandbox.config:
-	cabal sandbox init --sandbox=$(SANDBOX)
+	cabal sandbox init --sandbox=$(CABAL_SANDBOX)
 
 clean:
 	-rm -rf bin lib dist cabal.sandbox.config .cabal-sandbox
