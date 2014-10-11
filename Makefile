@@ -1,12 +1,13 @@
 SHELL        := /usr/bin/env bash
 SANDBOX      ?= $(CURDIR)/.cabal-sandbox
+FLAGS        := --enable-tests --enable-benchmarks
 NAME         := ede
 VERSION      := $(shell sed -n 's/^version: *\(.*\)$$/\1/p' $(NAME).cabal)
 BUILD_NUMBER ?= 0
 DEB          := dist/$(NAME)_$(VERSION)+$(BUILD_NUMBER)_amd64.deb
 BIN          := dist/release/$(NAME)
 
-.PHONY: install test doc
+.PHONY: test doc
 
 build: dist/setup-config
 	cabal build $(addprefix -,$(findstring j,$(MAKEFLAGS)))
@@ -15,17 +16,13 @@ all:
 	make clean; make install && make build
 
 dist/setup-config: install
-	cabal configure \
- --bindir=bin \
- --libdir=lib \
- --enable-tests \
- --enable-benchmarks
+	cabal configure $(FLAGS) --bindir=bin --libdir=lib
 
 install: cabal.sandbox.config
-	cabal install -j \
+	cabal install -j $(FLAGS) \
+ --only-dependencies \
  --disable-documentation \
- --disable-library-coverage \
- --only-dependencies
+ --disable-library-coverage
 
 cabal.sandbox.config:
 	cabal sandbox init --sandbox=$(SANDBOX)
@@ -35,8 +32,7 @@ clean:
 	cabal clean
 
 test:
-	cabal install --enable-tests && \
- ./dist/build/golden/golden
+	cabal test
 
 doc:
 	cabal haddock
