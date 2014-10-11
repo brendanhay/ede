@@ -17,13 +17,14 @@ module Text.EDE.Internal.Parser where
 import           Control.Applicative
 import           Control.Arrow              (second)
 import           Control.Lens
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import           Data.ByteString            (ByteString)
 import           Data.ByteString.UTF8       as UTF8
 import           Data.Char                  (isSpace)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import qualified Data.HashSet               as Set
+import           Data.HashSet               (HashSet)
 import           Data.List.NonEmpty         (NonEmpty(..))
 import           Data.Scientific
 import           Data.Semigroup
@@ -35,19 +36,27 @@ import qualified Text.EDE.Internal.Keywords as Keywords
 import qualified Text.EDE.Internal.Style    as Style
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
-import           Text.Trifecta              hiding (render)
+import qualified Text.Trifecta              as Tri
+import           Text.Trifecta              hiding (Result(..), render)
 import           Text.Trifecta.Delta
 
 type Parse m =
     ( Monad m
     , TokenParsing m
     , DeltaParsing m
---    , MonadState (HashMap Text Delta) m
+    , MonadState (HashMap Text (HashSet Delta)) m
     )
 
 --runParser :: String -> ByteString -> Result (Exp, HashMap Text Delta)
-runParser bs =
-    print $ parseByteString template (Directed (UTF8.fromString "parse") 0 0 0 0) bs
+runParser n = res . parseByteString tmpl pos
+  where
+    pos = Directed (UTF8.fromString n) 0 0 0 0
+
+    res (Tri.Success x) = Success x
+    res (Tri.Failure e) = Failure e
+
+    tmpl :: Parse m => m (Exp, HashMap Text (HashSet Delta))
+    tmpl = runState template mempty
 
   -- where
   --   res (Success x) = return x
@@ -112,7 +121,7 @@ include :: Parse m => m Exp
 include = do
     d  <- position
     k  <- stringLiteral
---    id %= Map.insert k d
+    id %= Map.insertWith (<>) k (Set.singleton d)
     EIncl d k <$> optional (keyword "with" *> term)
 
 binding :: Parse m => m Exp

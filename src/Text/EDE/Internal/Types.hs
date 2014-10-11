@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
@@ -21,20 +24,23 @@ module Text.EDE.Internal.Types where
 
 import           Control.Applicative
 import           Control.Monad
-import           Data.Aeson              hiding (Result, Success, Error)
-import           Data.Aeson.Types        (Pair)
-import           Data.HashMap.Strict     (HashMap)
-import           Data.List.NonEmpty      (NonEmpty)
-import qualified Data.List.NonEmpty      as NonEmpty
-import           Data.Monoid             hiding ((<>))
+import           Data.Aeson                   hiding (Result, Success, Error)
+import           Data.Aeson.Types             (Pair)
+import           Data.Foldable
+import           Data.HashMap.Strict          (HashMap)
+import           Data.List.NonEmpty           (NonEmpty)
+import qualified Data.List.NonEmpty           as NonEmpty
+import           Data.Monoid                  hiding ((<>))
 import           Data.Scientific
 import           Data.Semigroup
-import           Data.Text               (Text)
+import           Data.Text                    (Text)
 import           Data.Text.Buildable
-import           Data.Text.Format        (Format, format)
-import           Data.Text.Format.Params (Params)
-import qualified Data.Text.Lazy          as LText
+import           Data.Text.Format             (Format, format)
+import           Data.Text.Format.Params      (Params)
+import qualified Data.Text.Lazy               as LText
 import           Data.Text.Lazy.Builder
+import           Data.Traversable
+import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc, vsep)
 import           Text.Trifecta.Delta
 
 -- | A function to resolve the target of an @include@ expression.
@@ -75,91 +81,54 @@ data Template = Template
 --         (Parsec.sourceLine p)
 --         (Parsec.sourceColumn p)
 
-data Error
-    = Lexer     !Delta [String]
-    | Parser    !Delta [String]
-    | Evaluator !Delta [String]
-    | Resolver  !Delta [String]
-    | Quoter    [String]
-      deriving (Eq)
-
-instance Show Error where
-    show = \case
-        Lexer     m e -> pos "lexing"     m e
-        Parser    m e -> pos "parsing"    m e
-        Evaluator m e -> pos "evaluation" m e
-        Resolver  m e -> pos "io"  m e
-        Quoter      e -> "ED-E quotation error:\n" ++ msg e
-      where
-        pos k m e = LText.unpack "not implemented." -- $
-            -- format "ED-E {} error in {}:\n{}"
-            --     [k, build m, build (msg e)]
-
-        msg = init . unlines . map (mappend " - ")
-
 -- | The result of running parsing or rendering steps.
 data Result a
-    = Success !a
-    | Error   !Error
-      deriving (Eq, Show)
-
-instance Functor Result where
-    fmap f (Success x) = Success (f x)
-    fmap _ (Error   e) = Error e
-    {-# INLINE fmap #-}
-
-instance Monad Result where
-    return          = Success
-    {-# INLINE return #-}
-    Success a >>= k = k a
-    Error   e >>= _ = Error e
-    {-# INLINE (>>=) #-}
+    = Success a
+    | Failure Doc
+      deriving (Show, Functor, Foldable, Traversable)
 
 instance Applicative Result where
-    pure  = return
+    pure = Success
     {-# INLINE pure #-}
-    (<*>) = ap
+    Success f <*> Success x  = Success (f x)
+    Success _ <*> Failure e  = Failure e
+    Failure e <*> Success _  = Failure e
+    Failure e <*> Failure e' = Failure (vsep [e, e'])
     {-# INLINE (<*>) #-}
 
 instance Alternative Result where
-    empty = fail "empty"
-    {-# INLINE empty #-}
-    (<|>) a@(Success _) _ = a
-    (<|>) _ b             = b
+    Success x <|> Success _  = Success x
+    Success x <|> Failure _  = Success x
+    Failure _ <|> Success x  = Success x
+    Failure e <|> Failure e' = Failure (vsep [e, e'])
     {-# INLINE (<|>) #-}
+    empty = Failure mempty
+    {-# INLINE empty #-}
 
-instance MonadPlus Result where
-    mzero = fail "mzero"
-    {-# INLINE mzero #-}
-    mplus = (<|>)
-    {-# INLINE mplus #-}
-
-instance Monoid a => Monoid (Result a) where
-    mempty  = Success mempty
-    {-# INLINE mempty #-}
-    mappend = mplus
-    {-# INLINE mappend #-}
+instance Show a => Pretty (Result a) where
+    pretty (Success x) = pretty (show x)
+    pretty (Failure e) = pretty e
 
 -- | Convert a 'Result' to an 'Either' with the 'Left' case holding a formatted
 -- error message, and 'Right' being the successful result over which 'Result' is paramterised.
-eitherResult :: Result a -> Either String a
-eitherResult = result (Left . show) Right
+-- eitherResult :: Result a -> Either String a
+-- eitherResult = result (Left . show) Right
 
--- | Perform a case analysis on a 'Result'.
-result :: (Error -> b) -- ^ Function to apply to the 'Error' case.
-       -> (a -> b)     -- ^ Function to apply to the 'Success' case.
-       -> Result a     -- ^ The 'Result' to map over.
-       -> b
-result _ g (Success x) = g x
-result f _ (Error   e) = f e
+-- -- | Perform a case analysis on a 'Result'.
+-- result :: (Error -> b) -- ^ Function to apply to the 'Error' case.
+--        -> (a -> b)     -- ^ Function to apply to the 'Success' case.
+--        -> Result a     -- ^ The 'Result' to map over.
+--        -> b
+-- result _ g (Success x) = g x
+-- result f _ (Error   e) = f e
 
--- | Convenience for returning a successful 'Result'.
-success :: Monad m => a -> m (Result a)
-success = return . Success
+-- -- | Convenience for returning a successful 'Result'.
+-- success :: Monad m => a -> m (Result a)
+-- success = return . Success
 
--- | Convenience for returning an error 'Result'.
-failure :: Monad m => Error -> m (Result a)
-failure = return . Error
+-- -- | Convenience for returning an error 'Result'.
+-- failure :: Monad m => Doc -> m (Result a)
+-- failure = return . Error
 
 data Quoted
     = QLit !Value
@@ -255,8 +224,8 @@ instance HasDelta Exp where
         ELoop d _ _ _ _ -> d
         EIncl d _ _     -> d
 
-throwError :: Params ps => ([String] -> Error) -> Format -> ps -> Result a
-throwError f fmt = Error . f . (:[]) . LText.unpack . format fmt
+-- throwError :: Params ps => ([String] -> Error) -> Format -> ps -> Result a
+-- throwError f fmt = Error . f . (:[]) . LText.unpack . format fmt
 
 -- | Create an 'Object' from a list of name/value 'Pair's.
 -- See 'Aeson''s documentation for more details.
