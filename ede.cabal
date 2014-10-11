@@ -69,14 +69,16 @@ library
       , bytestring
       , directory
       , filepath
+      , lens
       , parsers
       , scientific            >= 0.3.1
       , semigroups
       , text                  >= 1.2
       , text-format
-      , transformers
+      , mtl
       , trifecta
       , unordered-containers
+      , utf8-string
       , vector
 
 -- executable ed-e
@@ -96,19 +98,19 @@ library
 --       , optparse-applicative == 0.10.*
 --       , text
 
-test-suite golden
-    default-language:  Haskell2010
-    type:              exitcode-stdio-1.0
-    hs-source-dirs:    test
-    main-is:           golden.hs
+-- test-suite golden
+--     default-language:  Haskell2010
+--     type:              exitcode-stdio-1.0
+--     hs-source-dirs:    test
+--     main-is:           golden.hs
 
-    ghc-options:       -Wall -threaded
+--     ghc-options:       -Wall -threaded
 
-    build-depends:
-        aeson
-      , base >= 4.6 && < 5
-      , directory
-      , ede
-      , text
-      , tasty
-      , tasty-golden
+--     build-depends:
+--         aeson
+--       , base >= 4.6 && < 5
+--       , directory
+--       , ede
+--       , text
+--       , tasty
+--       , tasty-golden

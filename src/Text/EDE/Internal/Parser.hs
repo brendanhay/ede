@@ -1,5 +1,6 @@
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -14,24 +15,178 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
-import           Control.Arrow           (second)
-import           Data.Char               (isSpace)
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as Map
-import           Data.List.NonEmpty      (NonEmpty(..))
+import           Control.Arrow              (second)
+import           Control.Lens
+import           Control.Monad.State
+import           Data.ByteString            (ByteString)
+import           Data.ByteString.UTF8       as UTF8
+import           Data.Char                  (isSpace)
+import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as Map
+import qualified Data.HashSet               as Set
+import           Data.List.NonEmpty         (NonEmpty(..))
 import           Data.Scientific
 import           Data.Semigroup
-import           Data.Text               (Text)
-import qualified Data.Text.Lazy          as LText
-import qualified Data.Text.Read          as Read
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import qualified Data.Text.Read             as Read
 import           Text.EDE.Internal.AST
+import qualified Text.EDE.Internal.Keywords as Keywords
+import qualified Text.EDE.Internal.Style    as Style
 import           Text.EDE.Internal.Types
-import qualified Text.Parsec             as Parsec
-import           Text.Parsec             hiding (Error, (<|>), many, optional, token, newline, string)
-import           Text.Parsec.Error       (errorMessages, showErrorMessages)
-import           Text.Parsec.Expr
+import           Text.Parser.Expression
+import           Text.Trifecta              hiding (render)
+import           Text.Trifecta.Delta
 
-runParser :: String -> [Token] -> Result (Exp, HashMap Text Meta)
+type Parse m =
+    ( Monad m
+    , TokenParsing m
+    , DeltaParsing m
+--    , MonadState (HashMap Text Delta) m
+    )
+
+--runParser :: String -> ByteString -> Result (Exp, HashMap Text Delta)
+runParser bs =
+    print $ parseByteString template (Directed (UTF8.fromString "parse") 0 0 0 0) bs
+
+  -- where
+  --   res (Success x) = return x
+  --   res (E)
+
+template :: Parse m => m Exp
+template = document <* eof
+
+document :: Parse m => m Exp
+document = eapp <$> expr <*> many expr
+  where
+    expr = render <|> block <|> fragment
+
+render :: Parse m => m Exp
+render = between (symbol "{{") (symbol "}}") term
+
+block :: Parse m => m Exp
+block = choice
+    [ ifelif
+    , cases
+    , loop
+    , include
+    , binding
+    ]
+
+fragment :: Parse m => m Exp
+fragment = ELit <$> position <*> (LText <$> txt)
+  where
+    txt = Text.pack <$> try (some anyChar) <* end
+    end = notFollowedBy (char '{' >> oneOf "{#%")
+
+ifelif :: Parse m => m Exp
+ifelif = eif
+    <$> branch "if"
+    <*> many (branch "elif")
+    <*> optional else'
+    <*  section (keyword "endif")
+  where
+    branch k = section ((,) <$ keyword k <*> term <*> document)
+
+cases :: Parse m => m Exp
+cases = ecase
+    <$> section (keyword "case" *> term)
+    <*> many
+        ((,) <$> section (keyword "when" *> pattern)
+             <*> document)
+    <*> optional else'
+    <*  section (keyword "endcase")
+
+loop :: Parse m => m Exp
+loop = do
+    d <- position
+    uncurry (ELoop d)
+        <$> section
+            ((,) <$> (keyword "for" *> identifier)
+                 <*> (keyword "in"  *> variable))
+        <*> document
+        <*> optional else'
+        <*  section (keyword "endfor")
+
+include :: Parse m => m Exp
+include = do
+    d  <- position
+    k  <- stringLiteral
+--    id %= Map.insert k d
+    EIncl d k <$> optional (keyword "with" *> term)
+
+binding :: Parse m => m Exp
+binding = do
+    d <- position
+    uncurry (ELet d)
+        <$> section
+            ((,) <$> (keyword "let" *> identifier)
+                 <*> (symbol  "="   *> term))
+        <*> document
+        <*  section (keyword "endlet")
+
+else' :: Parse m => m Exp
+else' = try (section (keyword "else")) *> document
+
+section :: Parse m => m a -> m a
+section = between (symbol "{%") (symbol "%}")
+
+term :: Parse m => m Exp
+term = buildExpressionParser table expr
+  where
+    table =
+        [ [prefix "!"]
+        , [binary "*", binary "/"]
+        , [binary "-", binary "+"]
+        , [binary "==", binary "!=", binary ">", binary ">=", binary "<", binary "<="]
+        , [binary "&&"]
+        , [binary "||"]
+--        , [filter']
+        ]
+
+    prefix n = Prefix (efun <$> operator n <*> pure n)
+
+    binary n = Infix (do
+        d <- operator n
+        return $ \l r ->
+            EApp d (efun d n l) r) AssocLeft
+
+    expr = parens term <|> apply EVar variable <|> apply ELit literal
+
+    -- filter' = Infix (do
+    --     m <- operator "|"
+    --     i <- try (lookAhead identifier)
+    --     return $ \l _ ->
+    --         EApp m (EFun m i) l) AssocLeft
+
+
+pattern :: Parse m => m Pat
+pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
+
+literal :: Parse m => m Lit
+literal = LBool <$> boolean <|> LNum <$> number <|> LText <$> stringLiteral
+
+number :: Parse m => m Scientific
+number = either fromIntegral fromFloatDigits <$> integerOrDouble
+
+boolean :: Parse m => m Bool
+boolean = textSymbol "true " *> return True
+      <|> textSymbol "false" *> return False
+
+operator :: Parse m => Text -> m Delta
+operator n = position <* reserveText Style.operator n
+
+keyword :: Parse m => Text -> m Delta
+keyword k = position <* reserveText Style.keyword k
+
+variable :: Parse m => m Var
+variable = Var <$> ((:|) <$> identifier <*> sepBy identifier dot)
+
+identifier :: Parse m => m Id
+identifier = Id <$> ident Style.variable
+
+apply :: Parse m => (Delta -> a -> b) -> m a -> m b
+apply f p = f <$> position <*> p
 
 -- type Parser = Parsec [Token] ParserState
 

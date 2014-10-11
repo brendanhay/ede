@@ -18,39 +18,41 @@ import Data.Foldable           (foldl', foldr')
 import Data.List.NonEmpty      (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
+import Data.Text               (Text)
 import Text.EDE.Internal.Types
+import Text.Trifecta.Delta
 
 var :: Id -> Var
 var = Var . (:| [])
 
-evar :: Var -> Exp
-evar v = EVar (meta v) v
+-- evar :: Var -> Exp
+-- evar v = EVar (meta v) v
 
 eapp :: Exp -> [Exp] -> Exp
 eapp e [] = e
-eapp e es = foldl' (\x -> EApp (meta x) x) e es
+eapp e es = foldl' (\x -> EApp (delta x) x) e es
 
-elet :: Id -> Exp -> Exp -> Exp
-elet i = ELet (meta i) i
+efun :: Delta -> Text -> Exp -> Exp
+efun d = EApp d . EFun d . Id
+
+-- elet :: Id -> Exp -> Exp -> Exp
+-- elet i = ELet (delta i) i
 
 ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
-ecase p ws f = ECase (meta p) p (ws ++ maybe [] ((:[]) . wild) f)
+ecase p ws f = ECase (delta p) p (ws ++ maybe [] ((:[]) . wild) f)
 
 eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
-eif t@(x, _) ts f = foldr' c (fromMaybe (bld (meta x)) f) (t:ts)
+eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
   where
-    c (p, w) e = ECase (meta p) p [true w, false e]
+    c (p, w) e = ECase (delta p) p [true w, false e]
 
-eloop :: Id -> Var -> Exp -> Maybe Exp -> Exp
-eloop i = ELoop (meta i) i
+-- eloop :: Delta -> Id -> Var -> Exp -> Maybe Exp -> Exp
+-- eloop d i = ELoop d i
 
 wild, true, false :: Exp -> Alt
-wild  = alt PWild
-true  = alt (PLit (LBool True))
-false = alt (PLit (LBool False))
+wild  = (PWild,)
+true  = (PLit (LBool True),)
+false = (PLit (LBool False),)
 
-alt :: Pat -> Exp -> Alt
-alt = (,)
-
-bld :: Meta -> Exp
-bld = (`EBld` mempty)
+bld :: Delta -> Exp
+bld = (`ELit` LText mempty)

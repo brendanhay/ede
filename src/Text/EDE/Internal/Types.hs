@@ -35,20 +35,14 @@ import           Data.Text.Format        (Format, format)
 import           Data.Text.Format.Params (Params)
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
-import           Text.Parsec             (ParseError, SourcePos)
-import qualified Text.Parsec             as Parsec
-
-data Syntax
-    = Jinja
-    | Play
-      deriving (Eq, Show)
+import           Text.Trifecta.Delta
 
 -- | A function to resolve the target of an @include@ expression.
-type Resolver m = Text -> Meta -> m (Result Template)
+-- type Resolver m = Text -> Meta -> m (Result Template)
 
-instance Monad m => Semigroup (Resolver m) where
-    (<>) f g = \x y -> liftM2 mplus (f x y) (g x y)
-    {-# INLINE (<>) #-}
+-- instance Monad m => Semigroup (Resolver m) where
+--     (<>) f g = \x y -> liftM2 mplus (f x y) (g x y)
+--     {-# INLINE (<>) #-}
 
 -- | A parsed and compiled template.
 data Template = Template
@@ -57,35 +51,35 @@ data Template = Template
     , tmplIncl :: HashMap Text Exp
     } deriving (Eq)
 
--- | Meta information describing the source position of an expression or error.
-data Meta = Meta !String !Int !Int
-    deriving (Eq, Show)
+-- -- | Meta information describing the source position of an expression or error.
+-- data Meta = Meta !String !Int !Int
+--     deriving (Eq, Show)
 
-instance Buildable Meta where
-    build (Meta n l c) =
-        mconcat ["`", build n, "` (line ", build l, ", column ", build c, ")"]
-    {-# INLINE build #-}
+-- instance Buildable Meta where
+--     build (Meta n l c) =
+--         mconcat ["`", build n, "` (line ", build l, ", column ", build c, ")"]
+--     {-# INLINE build #-}
 
-class Metadata a where
-    meta :: a -> Meta
+-- class Metadata a where
+--     meta :: a -> Meta
 
-instance Metadata Meta where
-    meta = id
+-- instance Metadata Meta where
+--     meta = id
 
-instance Metadata ParseError where
-    meta = meta . Parsec.errorPos
+-- instance Metadata ParseError where
+--     meta = meta . Parsec.errorPos
 
-instance Metadata SourcePos where
-    meta p = Meta
-        (Parsec.sourceName p)
-        (Parsec.sourceLine p)
-        (Parsec.sourceColumn p)
+-- instance Metadata SourcePos where
+--     meta p = Meta
+--         (Parsec.sourceName p)
+--         (Parsec.sourceLine p)
+--         (Parsec.sourceColumn p)
 
 data Error
-    = Lexer     !Meta [String]
-    | Parser    !Meta [String]
-    | Evaluator !Meta [String]
-    | Resolver  !Meta [String]
+    = Lexer     !Delta [String]
+    | Parser    !Delta [String]
+    | Evaluator !Delta [String]
+    | Resolver  !Delta [String]
     | Quoter    [String]
       deriving (Eq)
 
@@ -97,9 +91,9 @@ instance Show Error where
         Resolver  m e -> pos "io"  m e
         Quoter      e -> "ED-E quotation error:\n" ++ msg e
       where
-        pos k m e = LText.unpack $
-            format "ED-E {} error in {}:\n{}"
-                [k, build m, build (msg e)]
+        pos k m e = LText.unpack "not implemented." -- $
+            -- format "ED-E {} error in {}:\n{}"
+            --     [k, build m, build (msg e)]
 
         msg = init . unlines . map (mappend " - ")
 
@@ -179,90 +173,87 @@ instance Eq Quoted where
     QLit a == QLit b = a == b
     _      == _      = False
 
-data Type a where
-    TNil  :: Type ()
-    TText :: Type LText.Text
-    TBool :: Type Bool
-    TNum  :: Type Scientific
-    TBld  :: Type Builder
-    TMap  :: Type Object
-    TList :: Type Array
-    TFun  :: Type Quoted
+-- data Type a where
+--     TNil  :: Type ()
+--     TText :: Type LText.Text
+--     TBool :: Type Bool
+--     TNum  :: Type Scientific
+--     TBld  :: Type Builder
+--     TMap  :: Type Object
+--     TList :: Type Array
+--     TFun  :: Type Quoted
 
-deriving instance Show (Type a)
+-- deriving instance Show (Type a)
 
-typeof :: Value -> String
-typeof = \case
-    Null     -> show TNil
-    Bool   _ -> show TBool
-    Number _ -> show TNum
-    Object _ -> show TMap
-    Array  _ -> show TList
-    String _ -> show TText
+-- typeof :: Value -> String
+-- typeof = \case
+--     Null     -> show TNil
+--     Bool   _ -> show TBool
+--     Number _ -> show TNum
+--     Object _ -> show TMap
+--     Array  _ -> show TList
+--     String _ -> show TText
 
-data TExp = forall a. Eq a => a ::: Type a
+-- data TExp = forall a. Eq a => a ::: Type a
 
-instance Show TExp where
-    show (_ ::: t) = show t
+-- instance Show TExp where
+--     show (_ ::: t) = show t
 
-data Id = Id
-    { idMeta :: !Meta
-    , idName :: !Text
-    } deriving (Eq, Show)
+newtype Id = Id Text
+    deriving (Eq, Show)
 
-instance Metadata Id where
-    meta = idMeta
+-- instance HasDelta Id where
+--     delta = idDelta
 
-instance Buildable Id where
-    build i = mconcat
-        ["`", build (idName i), "` (line ", build l, ", column ", build c, ")"]
-      where
-        Meta _ l c = idMeta i
-    {-# INLINE build #-}
+-- instance Buildable Id where
+--     build i = mconcat
+--         ["`", build (idName i), "` (line ", build l, ", column ", build c, ")"]
+--       where
+--         Delta _ l c = idDelta i
+--     {-# INLINE build #-}
 
-newtype Var = Var { unVar :: NonEmpty Id }
+newtype Var = Var (NonEmpty Id)
     deriving (Eq, Show, Semigroup)
 
-instance Metadata Var where
-    meta = meta . NonEmpty.head . unVar
+-- instance HasDelta Var where
+--     delta (Var is) = delta (NonEmpty.head is)
 
+-- FIXME: implement constructors, remove hardcoded bool keywords, etc.
 data Lit
     = LBool !Bool
     | LNum  !Scientific
-    | LText LText.Text
+    | LText !Text
       deriving (Eq, Show)
 
 data Pat
     = PWild
-    | PVar Var
-    | PLit Lit
+    | PVar !Var
+    | PLit !Lit
       deriving (Eq, Show)
 
 type Alt = (Pat, Exp)
 
 data Exp
-    = ELit  !Meta !Lit
-    | EBld  !Meta !Builder
-    | EVar  !Meta !Var
-    | EFun  !Meta !Id
-    | EApp  !Meta !Exp  !Exp
-    | ELet  !Meta !Id   !Exp  !Exp
-    | ECase !Meta !Exp  [Alt]
-    | ELoop !Meta !Id   !Var  !Exp (Maybe Exp)
-    | EIncl !Meta !Text (Maybe Exp)
+    = ELit  !Delta !Lit
+    | EVar  !Delta !Var
+    | EFun  !Delta !Id
+    | EApp  !Delta !Exp  !Exp
+    | ELet  !Delta !Id   !Exp  !Exp
+    | ECase !Delta !Exp  [Alt]
+    | ELoop !Delta !Id   !Var  !Exp (Maybe Exp)
+    | EIncl !Delta !Text (Maybe Exp)
       deriving (Eq, Show)
 
-instance Metadata Exp where
-    meta = \case
-        ELit  m _       -> m
-        EBld  m _       -> m
-        EVar  m _       -> m
-        EFun  m _       -> m
-        EApp  m _ _     -> m
-        ELet  m _ _ _   -> m
-        ECase m _ _     -> m
-        ELoop m _ _ _ _ -> m
-        EIncl m _ _     -> m
+instance HasDelta Exp where
+    delta = \case
+        ELit  d _       -> d
+        EVar  d _       -> d
+        EFun  d _       -> d
+        EApp  d _ _     -> d
+        ELet  d _ _ _   -> d
+        ECase d _ _     -> d
+        ELoop d _ _ _ _ -> d
+        EIncl d _ _     -> d
 
 throwError :: Params ps => ([String] -> Error) -> Format -> ps -> Result a
 throwError f fmt = Error . f . (:[]) . LText.unpack . format fmt
