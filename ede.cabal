@@ -108,7 +108,9 @@ test-suite golden
 
     build-depends:
         aeson
-      , base >= 4.6 && < 5
+      , base          >= 4.6 && < 5
+      , bifunctors
+      , bytestring
       , directory
       , ede
       , text

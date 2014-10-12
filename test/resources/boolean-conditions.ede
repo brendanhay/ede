@@ -4,10 +4,6 @@
 true
 {% endif %}
 
-{% if True %}
-True
-{% endif %}
-
 {% if yes %}
 {{ yes }}
 {% endif %}
@@ -20,8 +16,8 @@ no
 unknown
 {% endif %}
 
-{% if no || True %}
-{{ no }} || True
+{% if no || true %}
+{{ no }} || true
 {% endif %}
 
 {% if yes == "graugh" %}

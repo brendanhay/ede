@@ -14,38 +14,10 @@
 module Text.EDE.Internal.Syntax where
 
 import           Control.Lens
-import           Data.Default.Class
 import           Data.HashSet            (HashSet)
 import qualified Data.HashSet            as Set
 import           Text.Parser.Token.Style
 import           Text.Trifecta
-
-type Delim = (String, String)
-
-data Options = Options
-    { _delimRender  :: Delim
-    , _delimComment :: Delim
-    , _delimBlock   :: Delim
-    }
-
-makeLenses ''Options
-
-instance Default Options where
-    def = smartySyntax
-
-smartySyntax :: Options
-smartySyntax = Options
-    { _delimRender  = ("{{", "}}")
-    , _delimComment = ("{#", "#}")
-    , _delimBlock   = ("{%", "%}")
-    }
-
-playSyntax :: Options
-playSyntax = Options
-    { _delimRender  = ("<@", "@>")
-    , _delimComment = ("@*", "*@")
-    , _delimBlock   = ("@(", ")@")
-    }
 
 operatorStyle :: TokenParsing m => IdentifierStyle m
 operatorStyle = haskellOps & styleLetter .~ oneOf "-+!&|=><"

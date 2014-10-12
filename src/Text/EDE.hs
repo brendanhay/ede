@@ -69,7 +69,7 @@ module Text.EDE
     , (.=)
 
     -- * Syntax
-    , Options
+    , Syntax
     , delimRender
     , delimComment
     , delimBlock
@@ -117,15 +117,13 @@ import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Lazy               as LText
 import           Data.Text.Lazy.Builder       (toLazyText)
-import qualified Data.Text.Lazy.IO            as LText
 import           System.Directory
 import           System.FilePath
 import           Text.EDE.Filters
 import qualified Text.EDE.Internal.Evaluator  as Eval
 import qualified Text.EDE.Internal.Parser     as Parser
-import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), string, text)
+import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
 -- FIXME: detect include/import loops
@@ -148,7 +146,7 @@ parse = join . parseWith def (includeMap mempty) "Text.EDE.parse"
 parseIO :: FilePath   -- ^ Parent directory for relatively pathed includes.
         -> ByteString -- ^ Strict 'ByteString' template definition.
         -> IO (Result Template)
-parseIO p = parseWith def (includeFile def p) "Text.EDE.parse"
+parseIO p = parseWith def (includeFile p) "Text.EDE.parse"
 
 -- | Load and parse a 'Template' from a file.
 --
@@ -157,7 +155,7 @@ parseIO p = parseWith def (includeFile def p) "Text.EDE.parse"
 -- target (unless absolute paths are used).
 parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
-parseFile p = loadFile p >>= result failure (parseWith def (includeFile def d) n)
+parseFile p = loadFile p >>= result failure (parseWith def (includeFile d) n)
   where
     n = Text.pack p
     d = takeDirectory p
@@ -173,7 +171,7 @@ parseFile p = loadFile p >>= result failure (parseWith def (includeFile def d) n
 --
 -- 'parseFile' for example, is defined as: 'parseWith' 'includeFile'.
 parseWith :: Monad m
-          => Options    -- ^ Delimiters and parsing options.
+          => Syntax    -- ^ Delimiters and parsing options.
           -> Resolver m -- ^ Function to resolve includes.
           -> Text       -- ^ Strict 'Text' name.
           -> ByteString -- ^ Strict 'ByteString' template definition.
@@ -189,7 +187,7 @@ parseWith o f n = result failure resolve . Parser.runParser o n
     -- Presuming self is always in self's includes, see singleton above.
     -- FIXME: utilise the list of deltas for failures
     include (_, _)    (Failure  e) = failure e
-    include (k, d:|_) (Success ss) = f k d >>=
+    include (k, d:|_) (Success ss) = f o k d >>=
         result failure (success . mappend ss . _tmplIncl)
 
 -- | 'HashMap' resolver for @include@ expressions.
@@ -200,24 +198,24 @@ parseWith o f n = result failure resolve . Parser.runParser o n
 includeMap :: Monad m
            => HashMap Text Template -- ^ A 'HashMap' of named 'Template's.
            -> Resolver m            -- ^ Resolver for 'parseWith'.
-includeMap ts k d
+includeMap ts _ k _
     | Just v <- Map.lookup k ts = success v
     | otherwise = failure ("unable to resolve " <> string (Text.unpack k))
+      -- FIXME: utilise deltas in error messages
 
 -- | 'FilePath' resolver for @include@ expressions.
 --
 -- The 'identifier' component of the @include@ expression is treated as a relative
 -- 'FilePath' and the template is loaded and parsed using 'parseFile'.
 -- If the 'identifier' doesn't exist as a valid 'FilePath', an 'Error' is returned.
-includeFile :: Options  -- ^ Delimiters and parsing options.
-            -> FilePath -- ^ Parent directory for relatively pathed includes.
+includeFile :: FilePath -- ^ Parent directory for relatively pathed includes.
             -> Resolver IO
-includeFile o d k _ = loadFile p >>= result failure (parseWith o inc k)
+includeFile p o k _ = loadFile f >>= result failure (parseWith o inc k)
     where
-      inc = includeFile o (takeDirectory p)
+      inc = includeFile (takeDirectory f)
 
-      p | Text.null k = Text.unpack k
-        | otherwise   = d </> Text.unpack k
+      f | Text.null k = Text.unpack k
+        | otherwise   = p </> Text.unpack k
 
 loadFile :: FilePath -> IO (Result ByteString)
 loadFile p = do
@@ -249,8 +247,8 @@ eitherParseFile = fmap eitherResult . parseFile
 
 -- | See: 'parseWith'
 eitherParseWith :: (Functor m, Monad m)
-                => Options
-                -> (Text -> Delta -> m (Result Template))
+                => Syntax
+                -> Resolver m
                 -> Text
                 -> ByteString
                 -> m (Either String Template)

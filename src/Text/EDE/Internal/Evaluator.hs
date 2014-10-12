@@ -225,9 +225,10 @@ qappend d x y =
         _                -> lift (qapp x y)
 
 build :: Delta -> Value -> Context Builder
-build _ Null       = return mempty
-build _ (String t) = return (Build.build t)
-build _ (Bool b)   = return (Build.build b)
+build _ Null         = return mempty
+build _ (String t)   = return (Build.build t)
+build _ (Bool True)  = return "true"
+build _ (Bool False) = return "false"
 build _ (Number n)
     | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
     | otherwise             = return (scientificBuilder n)

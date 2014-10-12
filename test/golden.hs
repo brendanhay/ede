@@ -13,14 +13,14 @@
 module Main (main) where
 
 import           Control.Applicative
-import           Control.Arrow
 import qualified Data.Aeson              as Aeson
+import           Data.Bifunctor
+import qualified Data.ByteString         as BS
+import qualified Data.ByteString.Lazy    as LBS
 import           Data.List               (isSuffixOf)
 import           Data.Maybe
 import qualified Data.Text               as Text
-import qualified Data.Text.Lazy          as LText
 import qualified Data.Text.Lazy.Encoding as LText
-import qualified Data.Text.Lazy.IO       as LText
 import           System.Directory
 import           System.IO.Unsafe
 import           Test.Tasty
@@ -33,6 +33,9 @@ main = defaultMain . testGroup "ED-E" $ unsafePerformIO tests
 resources :: FilePath
 resources = "test/resources/"
 
+include :: Resolver IO
+include = includeFile resources
+
 tests :: IO [TestTree]
 tests = files >>= mapM test
   where
@@ -42,24 +45,23 @@ tests = files >>= mapM test
 
     test :: FilePath -> IO TestTree
     test f = do
-        (txt, n) <- (,)
-            <$> LText.readFile f
+        (bs, n) <- (,)
+            <$> BS.readFile f
             <*> pure (takeWhile (/= '.') f)
 
-        let (js, src) = split txt
+        let (js, src) = split bs
+            name      = Text.pack (n ++ ".ede")
 
         return . goldenVsStringDiff n diff (n ++ ".expected") $ do
-            t <- parseWith (includeFile resources) (Text.pack $ n ++ ".ede") src
-            either error output
-                . eitherResult
-                $ t >>= (`render` input js)
+            r <- parseWith smartySyntax include name src
+            result (error  . show)
+                   (return . LText.encodeUtf8)
+                   (r >>= (`render` js))
 
     diff r n = ["diff", "-u", r, n]
 
-    split = second (LText.drop 4) . LText.breakOn "---"
+    split = bimap input (BS.drop 4) . BS.breakSubstring "---"
 
     input = fromMaybe (error "Failed parsing JSON")
-        . Aeson.decode
-        . LText.encodeUtf8
-
-    output = return . LText.encodeUtf8
+        . Aeson.decode'
+        . LBS.fromStrict

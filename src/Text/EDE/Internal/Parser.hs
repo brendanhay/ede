@@ -49,7 +49,7 @@ import           Text.Trifecta.Delta
 type Includes = HashMap Text (NonEmpty Delta)
 
 data Env = Env
-    { _options  :: !Options
+    { _options  :: !Syntax
     , _includes :: Includes
     }
 
@@ -63,7 +63,7 @@ type Parse m =
     , LookAheadParsing m
     )
 
-runParser :: Options -> Text -> ByteString -> Result (Exp, Includes)
+runParser :: Syntax -> Text -> ByteString -> Result (Exp, Includes)
 runParser o n = res . parseByteString (runStateT (document <* eof) env) pos
   where
     env = Env o mempty
@@ -209,21 +209,17 @@ apply :: Parse m => (Delta -> a -> b) -> m a -> m b
 apply f p = f <$> position <*> p
 
 anyStart :: Parse m => m ()
-anyStart = void . try $ choice
-    [ renderStart
-    , commentStart
-    , blockStart
-    ]
+anyStart = void . try $ renderStart <|> blockStart -- <|> commentStart
 
-renderStart, commentStart, blockStart :: Parse m => m ()
-renderStart  = config (delimRender._1)  >>= void . symbol
-commentStart = config (delimComment._1) >>= void . symbol
-blockStart   = config (delimBlock._1)   >>= void . symbol
+renderStart, blockStart :: Parse m => m ()
+renderStart  = syntax (delimRender._1)  >>= void . symbol
+--commentStart = syntax (delimComment._1) >>= void . symbol
+blockStart   = syntax (delimBlock._1)   >>= void . symbol
 
-renderEnd, commentEnd, blockEnd :: Parse m => m ()
-renderEnd  = config (delimRender._2)  >>= void . string
-commentEnd = config (delimComment._2) >>= void . string
-blockEnd   = config (delimBlock._2)   >>= void . string
+renderEnd, blockEnd :: Parse m => m ()
+renderEnd  = syntax (delimRender._2)  >>= void . string
+--commentEnd = syntax (delimComment._2) >>= void . string
+blockEnd   = syntax (delimBlock._2)   >>= void . string
 
-config :: MonadState Env m => Getter Options a -> m a
-config l = gets (view (options.l))
+syntax :: MonadState Env m => Getter Syntax a -> m a
+syntax l = gets (view (options.l))

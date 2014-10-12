@@ -27,7 +27,7 @@ import           Control.Applicative
 import           Control.Lens
 import           Data.Aeson                   hiding (Result(..))
 import           Data.Aeson.Types             (Pair)
-import           Data.ByteString              (ByteString)
+import           Data.Default.Class
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty)
@@ -100,11 +100,38 @@ success = return . Success
 failure :: Monad m => Doc -> m (Result a)
 failure = return . Failure
 
+type Delim = (String, String)
+
+data Syntax = Syntax
+    { _delimRender  :: Delim
+    , _delimComment :: Delim
+    , _delimBlock   :: Delim
+    }
+
+makeLenses ''Syntax
+
+instance Default Syntax where
+    def = smartySyntax
+
+smartySyntax :: Syntax
+smartySyntax = Syntax
+    { _delimRender  = ("{{", "}}")
+    , _delimComment = ("{#", "#}")
+    , _delimBlock   = ("{%", "%}")
+    }
+
+playSyntax :: Syntax
+playSyntax = Syntax
+    { _delimRender  = ("<@", "@>")
+    , _delimComment = ("@*", "*@")
+    , _delimBlock   = ("@(", ")@")
+    }
+
 -- | A function to resolve the target of an @include@ expression.
-type Resolver m = Text -> Delta -> m (Result Template)
+type Resolver m = Syntax -> Text -> Delta -> m (Result Template)
 
 instance Applicative m => Semigroup (Resolver m) where
-    (f <> g) x y = liftA2 (<|>) (f x y) (g x y)
+    (f <> g) o k d = liftA2 (<|>) (f o k d) (g o k d) -- Haha!
     {-# INLINE (<>) #-}
 
 -- | A parsed and compiled template.
