@@ -216,17 +216,14 @@ anyStart = void . try $ choice
     ]
 
 renderStart, commentStart, blockStart :: Parse m => m ()
-renderStart  = delimiter (delimRender._1)
-commentStart = delimiter (delimComment._1)
-blockStart   = delimiter (delimBlock._1)
+renderStart  = config (delimRender._1)  >>= void . symbol
+commentStart = config (delimComment._1) >>= void . symbol
+blockStart   = config (delimBlock._1)   >>= void . symbol
 
 renderEnd, commentEnd, blockEnd :: Parse m => m ()
-renderEnd  = delimiter (delimRender._2)
--- commentEnd = delimiter (delimComment._2)
-blockEnd   = delimiter (delimBlock._2)
-
-delimiter :: Parse m => Lens' Options String -> m ()
-delimiter l = config l >>= void . symbol
+renderEnd  = config (delimRender._2)  >>= void . string
+commentEnd = config (delimComment._2) >>= void . string
+blockEnd   = config (delimBlock._2)   >>= void . string
 
 config :: MonadState Env m => Getter Options a -> m a
 config l = gets (view (options.l))
