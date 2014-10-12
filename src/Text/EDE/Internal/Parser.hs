@@ -76,7 +76,7 @@ document = eapp <$> position <*> many expr
         ]
 
 render :: Parse m => m Exp
-render = between (try (symbol "{{")) (string "}}") term
+render = between (symbol "{{") (string "}}") term
 
 fragment :: Parse m => m Exp
 fragment = notFollowedBy end >> ELit <$> position <*> txt
@@ -139,10 +139,6 @@ else' = optional (block "else" (pure ()) *> document)
 
 exit :: Parse m => Text -> m ()
 exit k = block k (pure ())
-
--- FIXME: this try makes things work, but at the cost of horrible errors.
--- section' :: Parse m => m a -> m a
--- section' = between (try symbol "{%") (string "%}")
 
 term :: Parse m => m Exp
 term = buildExpressionParser table expr
