@@ -144,18 +144,21 @@ binding = do
 block :: Parse m => String -> m a -> m a
 block k = between (try (start *> keyword k)) end
   where
-    start = do
+    start = lstrip blockStart
+    end   = rtrim  blockEnd
+
+    lstrip p = do
         c <- columnByte <$> position
-        n <- fmap fromIntegral . BS.findIndex keep <$> line
+        n <- fmap fromIntegral . BS.findIndex retain <$> line
         if n < Just c
-           then blockStart
-           else skipMany (oneOf "\t ") *> blockStart
+           then p
+           else skipMany (oneOf "\t ") *> p
 
-    keep 32 = False
-    keep 9  = False
-    keep _  = True
+    rtrim p = p <* try (skipMany (oneOf "\t ") >> newline)
 
-    end = blockEnd <* try (skipMany (oneOf "\t ") >> optional newline)
+    retain 32 = False
+    retain 9  = False
+    retain _  = True
 
 else' :: Parse m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)

@@ -19,12 +19,13 @@
 
 module Text.EDE.Internal.Evaluator where
 
+import Debug.Trace
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Aeson                        hiding (Result(..))
 import           Data.Bifunctor                    (first)
-import           Data.Foldable                     (Foldable, foldlM, foldrM)
+import           Data.Foldable                     (Foldable, foldrM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
 import           Data.List                         (sortBy)
@@ -67,7 +68,7 @@ render :: HashMap Text Exp
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
   where
-    nf (QLit v) = build d v
+    nf (QLit v) = (<> "\n") <$> build d v
     nf _        = lift (Failure err)
 
     err = "unable to evaluate partially applied template to normal form."

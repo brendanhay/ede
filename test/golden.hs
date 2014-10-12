@@ -52,7 +52,7 @@ tests = files >>= mapM test
         let (js, src) = split bs
             name      = Text.pack (n ++ ".ede")
 
-        return . goldenVsStringDiff n diff (n ++ ".expected") $ do
+        return . goldenVsStringDiff n diff (n ++ ".golden") $ do
             r <- parseWith smartySyntax include name src
             result (error  . show)
                    (return . LText.encodeUtf8)
