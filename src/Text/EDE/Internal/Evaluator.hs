@@ -19,13 +19,12 @@
 
 module Text.EDE.Internal.Evaluator where
 
-import Debug.Trace
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Aeson                        hiding (Result(..))
 import           Data.Bifunctor                    (first)
-import           Data.Foldable                     (Foldable, foldrM)
+import           Data.Foldable                     (Foldable, foldlM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
 import           Data.List                         (sortBy)
@@ -68,7 +67,7 @@ render :: HashMap Text Exp
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
   where
-    nf (QLit v) = (<> "\n") <$> build d v
+    nf (QLit v) = build d v
     nf _        = lift (Failure err)
 
     err = "unable to evaluate partially applied template to normal form."
@@ -190,12 +189,12 @@ data Collection where
 
 loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Quoted
 loop _ a b (Col 0 _)  = eval (fromMaybe (ELit (delta a) (LText mempty)) b)
-loop k a _ (Col l xs) = snd <$> foldrM iter (1, quote (String mempty)) xs
+loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
   where
-    iter x (n, p) = do
+    iter (n, p) x = do
         shadowed n
         q <- bind (Map.insert k (context n x)) (eval a)
-        r <- qappend (delta a) q p
+        r <- qappend (delta a) p q
         return (n + 1, r)
 
     shadowed n = do
