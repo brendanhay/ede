@@ -24,6 +24,7 @@ import           Control.Lens
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
 import           Data.ByteString            (ByteString)
+import qualified Data.ByteString            as BS
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import           Data.List.NonEmpty         (NonEmpty(..))
@@ -98,7 +99,7 @@ ifelif = eif
     <$> branch "if"
     <*> many (branch "elif")
     <*> else'
-    <*  end "endif"
+    <*  exit "endif"
   where
     branch k = (,) <$> block k term <*> document
 
@@ -109,7 +110,7 @@ cases = ecase
         ((,) <$> block "when" pattern
              <*> document)
     <*> else'
-    <*  end "endcase"
+    <*  exit "endcase"
 
 loop :: Parse m => m Exp
 loop = do
@@ -120,7 +121,7 @@ loop = do
                  <*> (keyword "in" *> variable))
         <*> document
         <*> else'
-        <*  end "endfor"
+        <*  exit "endfor"
 
 include :: Parse m => m Exp
 include = do
@@ -138,16 +139,29 @@ binding = do
             ((,) <$> identifier
                  <*> (symbol "=" *> term))
         <*> document
-        <*  end "endlet"
+        <*  exit "endlet"
 
 block :: Parse m => String -> m a -> m a
-block k = between (try (blockStart *> keyword k)) blockEnd
+block k = between (try (start *> keyword k)) end
+  where
+    start = do
+        c <- columnByte <$> position
+        n <- fmap fromIntegral . BS.findIndex keep <$> line
+        if n < Just c
+           then blockStart
+           else skipMany (oneOf "\t ") *> blockStart
+
+    keep 32 = False
+    keep 9  = False
+    keep _  = True
+
+    end = blockEnd <* try (skipMany (oneOf "\t ") >> optional newline)
 
 else' :: Parse m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)
 
-end :: Parse m => String -> m ()
-end k = block k (pure ())
+exit :: Parse m => String -> m ()
+exit k = block k (pure ())
 
 term :: Parse m => m Exp
 term = buildExpressionParser table expr

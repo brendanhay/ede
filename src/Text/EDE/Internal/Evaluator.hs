@@ -24,7 +24,7 @@ import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Aeson                        hiding (Result(..))
 import           Data.Bifunctor                    (first)
-import           Data.Foldable                     (Foldable, foldlM)
+import           Data.Foldable                     (Foldable, foldlM, foldrM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
 import           Data.List                         (sortBy)
@@ -189,11 +189,11 @@ data Collection where
 
 loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Quoted
 loop _ a b (Col 0 _)  = eval (fromMaybe (ELit (delta a) (LText mempty)) b)
-loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+loop k a _ (Col l xs) = snd <$> foldrM iter (1, quote (String mempty)) xs
   where
-    iter (n, p) x = do
+    iter x (n, p) = do
         shadowed n
-        q <- bind (Map.insert k $ context n x) (eval a)
+        q <- bind (Map.insert k (context n x)) (eval a)
         r <- qappend (delta a) q p
         return (n + 1, r)
 
