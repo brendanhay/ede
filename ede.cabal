@@ -58,6 +58,7 @@ library
       -- , Text.EDE.Internal.Lexer.Tokens
       , Text.EDE.Internal.Parser
 --      , Text.EDE.Internal.Pretty
+      , Text.EDE.Internal.Syntax
       , Text.EDE.Internal.Types
       -- , Text.EDE.Internal.Quotes
 

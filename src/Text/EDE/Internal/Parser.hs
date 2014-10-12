@@ -36,8 +36,7 @@ import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Read             as Read
 import           Text.EDE.Internal.AST
-import qualified Text.EDE.Internal.Keywords as Keywords
-import qualified Text.EDE.Internal.Style    as Style
+import qualified Text.EDE.Internal.Syntax   as Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
 import           Text.Parser.LookAhead
@@ -66,66 +65,84 @@ runParser n = res . parseByteString (runStateT (document <* eof) mempty) pos
 document :: Parse m => m Exp
 document = eapp <$> position <*> many expr
   where
-    expr = render
+    expr = choice
+        [ render
+        , ifelif
+        , cases
+        , loop
+        , include
+        , binding
+        , fragment
+        ]
 
 render :: Parse m => m Exp
-render = between (symbol "{{") (string "}}") term
+render = between (try (symbol "{{")) (string "}}") term
 
--- fragment :: Parse m => m Exp
--- fragment = notFollowedBy end >> ELit <$> position <*> txt
---   where
---     txt = LText . Text.pack <$> manyTill1 anyChar (lookAhead end <|> eof)
---     end = void (try (char '{') >> oneOf "{#%")
+fragment :: Parse m => m Exp
+fragment = notFollowedBy end >> ELit <$> position <*> txt
+  where
+    txt = LText . Text.pack <$> manyTill1 anyChar (lookAhead end <|> eof)
+    end = void (try (char '{') >> oneOf "{#%")
 
--- ifelif :: Parse m => m Exp
--- ifelif = eif
---     <$> branch "if"
---     <*> many (branch "elif")
---     <*> else'
---     <*  section (keyword "endif")
---   where
---     branch k = (,) <$> try (section (keyword k *> term)) <*> document
+ifelif :: Parse m => m Exp
+ifelif = eif
+    <$> branch "if"
+    <*> many (branch "elif")
+    <*> else'
+    <*  exit "endif"
+  where
+    branch k = (,) <$> block k term <*> document
 
--- cases :: Parse m => m Exp
--- cases = ecase
---     <$> section (keyword "case" *> term)
---     <*> many
---         ((,) <$> section (keyword "when" *> pattern)
---              <*> document)
---     <*> else'
---     <*  section (keyword "endcase")
+cases :: Parse m => m Exp
+cases = ecase
+    <$> block "case" term
+    <*> many
+        ((,) <$> block "when" pattern
+             <*> document)
+    <*> else'
+    <*  exit "endcase"
 
--- loop :: Parse m => m Exp
--- loop = do
---     d <- position
---     uncurry (ELoop d)
---         <$> section
---             ((,) <$> (keyword "for" *> identifier)
---                  <*> (keyword "in"  *> variable))
---         <*> document
---         <*> else'
---         <*  section (keyword "endfor")
+loop :: Parse m => m Exp
+loop = do
+    d <- position
+    uncurry (ELoop d)
+        <$> block "for"
+            ((,) <$> identifier
+                 <*> (keyword "in" *> variable))
+        <*> document
+        <*> else'
+        <*  exit "endfor"
 
--- include :: Parse m => m Exp
--- include = do
---     d  <- position
---     k  <- stringLiteral
---     id %= Map.insertWith (<>) k (Set.singleton d)
---     EIncl d k <$> optional (keyword "with" *> term)
+include :: Parse m => m Exp
+include = do
+    d <- position
+    block "include" $ do
+        k <- stringLiteral
+        id %= Map.insertWith (<>) k (Set.singleton d)
+        EIncl d k <$> optional (keyword "with" *> term)
 
--- binding :: Parse m => m Exp
--- binding = do
---     d <- position
---     uncurry (ELet d)
---         <$> section "let" ((,) <$> identifier *> symbol "=" <*> term)
---         <*> document
---         <*  section "endlet" (pure ())
+binding :: Parse m => m Exp
+binding = do
+    d <- position
+    uncurry (ELet d)
+        <$> block "let"
+            ((,) <$> identifier
+                 <*> (symbol "=" *> term))
+        <*> document
+        <*  exit "endlet"
 
--- else' :: Parse m => m (Maybe Exp)
--- else' = optional (try (section (keyword "else")) *> document)
+block :: Parse m => Text -> m a -> m a
+block k = between (try (symbol "{%" *> keyword k)) (string "%}")
 
--- section :: Parse m => m a -> m a
--- section = between (try (symbol "{%")) (string "%}")
+else' :: Parse m => m (Maybe Exp)
+else' = optional (block "else" (pure ()) *> document)
+
+exit :: Parse m => Text -> m ()
+exit k = block k (pure ())
+
+-- FIXME: this try makes things work, but at the cost of horrible errors.
+-- section' :: Parse m => m a -> m a
+-- section' = between (try symbol "{%") (string "%}")
 
 term :: Parse m => m Exp
 term = buildExpressionParser table expr
@@ -150,7 +167,8 @@ term = buildExpressionParser table expr
     filter' n = Infix (do
         d <- operator n
         i <- try (lookAhead identifier)
-        return $ \l _ -> efun d i l) AssocLeft
+        return $ \l _ ->
+            efun d i l) AssocLeft
 
     expr = parens term <|> apply EVar variable <|> apply ELit literal
 
@@ -168,16 +186,16 @@ boolean = textSymbol "true " *> return True
       <|> textSymbol "false" *> return False
 
 operator :: Parse m => Text -> m Delta
-operator n = position <* reserveText Style.operator n
+operator n = position <* reserveText Syntax.operator n
 
 keyword :: Parse m => Text -> m Delta
-keyword k = position <* reserveText Style.keyword k
+keyword k = position <* try (reserveText Syntax.keyword k)
 
 variable :: Parse m => m Var
 variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 
 identifier :: Parse m => m Id
-identifier = Id <$> ident Style.variable
+identifier = Id <$> ident Syntax.variable
 
 manyTill1 :: (Monad m, Alternative m) => m a -> m end -> m [a]
 manyTill1 p end = liftM2 (:) p (manyTill p end)

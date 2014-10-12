@@ -25,9 +25,6 @@ import Text.Trifecta.Delta
 var :: Id -> Var
 var = Var . (:| [])
 
--- evar :: Var -> Exp
--- evar v = EVar (meta v) v
-
 eapp :: Delta -> [Exp] -> Exp
 eapp d []     = ELit d (LText mempty)
 eapp _ [e]    = e
@@ -35,9 +32,6 @@ eapp d (e:es) = foldl' (EApp d) e es
 
 efun :: Delta -> Id -> Exp -> Exp
 efun d = EApp d . EFun d
-
--- elet :: Id -> Exp -> Exp -> Exp
--- elet i = ELet (delta i) i
 
 ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
 ecase p ws f = ECase (delta p) p (ws ++ maybe [] ((:[]) . wild) f)
@@ -47,9 +41,6 @@ eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
   where
     c (p, w) e = ECase (delta p) p [true w, false e]
 
--- eloop :: Delta -> Id -> Var -> Exp -> Maybe Exp -> Exp
--- eloop d i = ELoop d i
-
 wild, true, false :: Exp -> Alt
 wild  = (PWild,)
 true  = (PLit (LBool True),)
@@ -57,3 +48,4 @@ false = (PLit (LBool False),)
 
 bld :: Delta -> Exp
 bld = (`ELit` LText mempty)
+
