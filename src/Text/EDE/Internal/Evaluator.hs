@@ -19,6 +19,7 @@
 
 module Text.EDE.Internal.Evaluator where
 
+import Debug.Trace
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Reader
@@ -178,11 +179,13 @@ predicate x = do
     r <- runReaderT (eval x) <$> ask
     lift $ case r of
         Success q
-            | QLit(Bool{}) <- q -> Success q
-        Success _               -> Success (quote True)
+            | QLit Bool{} <- q -> Success q
+        Success q
+            | QLit Null   <- q -> Success (quote False)
+        Success _              -> Success (quote True)
         Failure _
-            | EVar{} <- x       -> Success (quote False)
-        Failure e               -> Failure e
+            | EVar{}      <- x -> Success (quote False)
+        Failure e              -> Failure e
 
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
