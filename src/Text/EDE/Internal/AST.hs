@@ -28,12 +28,13 @@ var = Var . (:| [])
 -- evar :: Var -> Exp
 -- evar v = EVar (meta v) v
 
-eapp :: Exp -> [Exp] -> Exp
-eapp e [] = e
-eapp e es = foldl' (\x -> EApp (delta x) x) e es
+eapp :: Delta -> [Exp] -> Exp
+eapp d []     = ELit d (LText mempty)
+eapp _ [e]    = e
+eapp d (e:es) = foldl' (EApp d) e es
 
-efun :: Delta -> Text -> Exp -> Exp
-efun d = EApp d . EFun d . Id
+efun :: Delta -> Id -> Exp -> Exp
+efun d = EApp d . EFun d
 
 -- elet :: Id -> Exp -> Exp -> Exp
 -- elet i = ELet (delta i) i

@@ -44,42 +44,15 @@ import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc, vsep)
 import           Text.Trifecta.Delta
 
 -- | A function to resolve the target of an @include@ expression.
--- type Resolver m = Text -> Meta -> m (Result Template)
+type Resolver m = Text -> Delta -> m (Result Template)
 
--- instance Monad m => Semigroup (Resolver m) where
---     (<>) f g = \x y -> liftM2 mplus (f x y) (g x y)
---     {-# INLINE (<>) #-}
+instance Applicative m => Semigroup (Resolver m) where
+    (<>) f g = \x y -> liftA2 (<|>) (f x y) (g x y)
+    {-# INLINE (<>) #-}
 
 -- | A parsed and compiled template.
-data Template = Template
-    { tmplName :: !Text
-    , tmplExpr :: Exp
-    , tmplIncl :: HashMap Text Exp
-    } deriving (Eq)
-
--- -- | Meta information describing the source position of an expression or error.
--- data Meta = Meta !String !Int !Int
---     deriving (Eq, Show)
-
--- instance Buildable Meta where
---     build (Meta n l c) =
---         mconcat ["`", build n, "` (line ", build l, ", column ", build c, ")"]
---     {-# INLINE build #-}
-
--- class Metadata a where
---     meta :: a -> Meta
-
--- instance Metadata Meta where
---     meta = id
-
--- instance Metadata ParseError where
---     meta = meta . Parsec.errorPos
-
--- instance Metadata SourcePos where
---     meta p = Meta
---         (Parsec.sourceName p)
---         (Parsec.sourceLine p)
---         (Parsec.sourceColumn p)
+data Template = Template !Text !Exp (HashMap Text Exp)
+    deriving (Eq)
 
 -- | The result of running parsing or rendering steps.
 data Result a

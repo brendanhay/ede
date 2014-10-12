@@ -1,14 +1,7 @@
 :set -XOverloadedStrings
 
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Reader
-import           Data.Aeson                 hiding (Result)
-import           Data.Text                  (Text)
-import qualified Data.Text.Lazy             as LText
-import qualified Data.Text.Lazy.Builder     as LText
-import qualified Data.Text.Lazy.IO          as LText
-import qualified Text.Parsec                as P
-
-:l Text.EDE.Internal.Types
-:l Text.EDE.Internal.Evaluator
-:l Text.EDE.Internal.Parser
+import           Data.Aeson             hiding (Result)
+import qualified Data.ByteString        as BS
+import           Data.Text              (Text)
+import qualified Data.Text.Lazy         as LText
+import qualified Data.Text.Lazy.Builder as LText
