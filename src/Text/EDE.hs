@@ -45,7 +45,6 @@ module Text.EDE
 
     -- ** Filters
     , Quoted (..)
-    , Type   (..)
     , defaultFilters
 
     -- ** Either Variants
@@ -57,7 +56,7 @@ module Text.EDE
 
     -- ** Results and Errors
     -- $results
-    , Meta   (..)
+    , Delta  (..)
     , Result (..)
     , eitherResult
     , result
@@ -70,6 +69,14 @@ module Text.EDE
     , (.=)
 
     -- * Syntax
+    , Options
+    , delimRender
+    , delimComment
+    , delimBlock
+
+    , smartySyntax
+    , playSyntax
+
     -- ** Comments
     -- $comments
 
@@ -96,24 +103,30 @@ module Text.EDE
     ) where
 
 import           Control.Monad
-import           Data.Aeson                  ((.=))
-import           Data.Aeson.Types            (Object)
-import           Data.Foldable               (foldrM)
-import           Data.HashMap.Strict         (HashMap)
-import qualified Data.HashMap.Strict         as Map
+import           Data.Aeson                   ((.=))
+import           Data.Aeson.Types             (Object)
+import           Data.ByteString              (ByteString)
+import qualified Data.ByteString              as BS
+import           Data.Default.Class
+import           Data.Foldable                (foldrM)
+import           Data.HashMap.Strict          (HashMap)
+import qualified Data.HashMap.Strict          as Map
+import           Data.List.NonEmpty           (NonEmpty(..))
 import           Data.Monoid
-import           Data.Text                   (Text)
-import qualified Data.Text                   as Text
-import qualified Data.Text.Lazy              as LText
-import           Data.Text.Lazy.Builder      (toLazyText)
-import qualified Data.Text.Lazy.IO           as LText
+import           Data.Text                    (Text)
+import qualified Data.Text                    as Text
+import qualified Data.Text.Lazy               as LText
+import           Data.Text.Lazy.Builder       (toLazyText)
+import qualified Data.Text.Lazy.IO            as LText
 import           System.Directory
 import           System.FilePath
-import           Text.EDE.Filters            as Filters
-import qualified Text.EDE.Internal.Evaluator as Evaluator
-import qualified Text.EDE.Internal.Lexer     as Lexer
-import qualified Text.EDE.Internal.Parser    as Parser
+import           Text.EDE.Filters
+import qualified Text.EDE.Internal.Evaluator  as Eval
+import qualified Text.EDE.Internal.Parser     as Parser
+import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
+import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), string, text)
+import           Text.Trifecta.Delta
 
 -- FIXME: detect include/import loops
 
@@ -124,18 +137,18 @@ import           Text.EDE.Internal.Types
 --
 -- See 'parseFile' or 'parseWith' for mechanisms to deal with @include@
 -- dependencies.
-parse :: LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+parse :: ByteString -- ^ Strict 'ByteString' template definition.
       -> Result Template
-parse = join . parseWith (includeMap mempty) "Text.EDE.parse"
+parse = join . parseWith def (includeMap mempty) "Text.EDE.parse"
 
 -- | Parse 'Text' into a compiled 'Template'.
 --
 -- This function handles all @include@ expressions as 'FilePath's and performs
 -- recursive loading/parsing.
 parseIO :: FilePath   -- ^ Parent directory for relatively pathed includes.
-        -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+        -> ByteString -- ^ Strict 'ByteString' template definition.
         -> IO (Result Template)
-parseIO p = parseWith (includeFile p) "Text.EDE.parse"
+parseIO p = parseWith def (includeFile def p) "Text.EDE.parse"
 
 -- | Load and parse a 'Template' from a file.
 --
@@ -144,11 +157,12 @@ parseIO p = parseWith (includeFile p) "Text.EDE.parse"
 -- target (unless absolute paths are used).
 parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
-parseFile p = loadFile p >>= result failure (parseWith inc $ Text.pack p)
+parseFile p = loadFile p >>= result failure (parseWith def (includeFile def d) n)
   where
-    inc = includeFile $ takeDirectory p
+    n = Text.pack p
+    d = takeDirectory p
 
--- | Parse a 'Template' from a Lazy 'LText.Text' using a custom function for
+-- | Parse a 'Template' from a Strict 'ByteString' using a custom function for
 -- resolving @include@ expressions.
 --
 -- Two custom @include@ resolvers are supplied:
@@ -159,23 +173,24 @@ parseFile p = loadFile p >>= result failure (parseWith inc $ Text.pack p)
 --
 -- 'parseFile' for example, is defined as: 'parseWith' 'includeFile'.
 parseWith :: Monad m
-          => Resolver m -- ^ Function to resolve includes.
-          -> Text       -- ^ Strict 'Data.Text.Text' name.
-          -> LText.Text -- ^ Lazy 'Data.Text.Lazy.Text' template definition.
+          => Options    -- ^ Delimiters and parsing options.
+          -> Resolver m -- ^ Function to resolve includes.
+          -> Text       -- ^ Strict 'Text' name.
+          -> ByteString -- ^ Strict 'ByteString' template definition.
           -> m (Result Template)
-parseWith f n t = result failure resolve $
-    Lexer.runLexer s Play t >>= Parser.runParser s
+parseWith o f n = result failure resolve . Parser.runParser o n
   where
-    s = Text.unpack n
-
     resolve (u, is) = do
-        r <- foldrM include (Success $ Map.singleton n u) $ Map.toList is
-        result failure (success . Template n u) r
+        r <- foldrM include (Success (Map.singleton n u)) (Map.toList is)
+        result failure
+               (success . Template n u)
+               r
 
-     -- Presuming self is always in self's includes, see singleton above.
-    include (_, _) (Error    e) = failure e
-    include (k, m) (Success ss) = f k m >>=
-        result failure (success . mappend ss . tmplIncl)
+    -- Presuming self is always in self's includes, see singleton above.
+    -- FIXME: utilise the list of deltas for failures
+    include (_, _)    (Failure  e) = failure e
+    include (k, d:|_) (Success ss) = f k d >>=
+        result failure (success . mappend ss . _tmplIncl)
 
 -- | 'HashMap' resolver for @include@ expressions.
 --
@@ -185,30 +200,31 @@ parseWith f n t = result failure resolve $
 includeMap :: Monad m
            => HashMap Text Template -- ^ A 'HashMap' of named 'Template's.
            -> Resolver m            -- ^ Resolver for 'parseWith'.
-includeMap ts k m
+includeMap ts k d
     | Just v <- Map.lookup k ts = success v
-    | otherwise = failure (Resolver m ["unable to resolve " ++ Text.unpack k])
+    | otherwise = failure ("unable to resolve " <> string (Text.unpack k))
 
 -- | 'FilePath' resolver for @include@ expressions.
 --
 -- The 'identifier' component of the @include@ expression is treated as a relative
 -- 'FilePath' and the template is loaded and parsed using 'parseFile'.
 -- If the 'identifier' doesn't exist as a valid 'FilePath', an 'Error' is returned.
-includeFile :: FilePath -- ^ Parent directory for relatively pathed includes.
+includeFile :: Options  -- ^ Delimiters and parsing options.
+            -> FilePath -- ^ Parent directory for relatively pathed includes.
             -> Resolver IO
-includeFile d k _ = loadFile p >>= result failure (parseWith inc k)
+includeFile o d k _ = loadFile p >>= result failure (parseWith o inc k)
     where
-      inc = includeFile $ takeDirectory p
+      inc = includeFile o (takeDirectory p)
 
       p | Text.null k = Text.unpack k
         | otherwise   = d </> Text.unpack k
 
-loadFile :: FilePath -> IO (Result LText.Text)
+loadFile :: FilePath -> IO (Result ByteString)
 loadFile p = do
     e <- doesFileExist p
     if not e
-        then failure (Resolver (Meta p 0 0) ["file " ++ p ++ " doesn't exist."])
-        else LText.readFile p >>= success
+        then failure ("file " <> string p <> " doesn't exist.")
+        else BS.readFile p >>= success
 
 -- | Render an 'Object' using the supplied 'Template'.
 render :: Template -- ^ Parsed 'Template' to render.
@@ -221,10 +237,10 @@ renderWith :: HashMap Text Quoted -- ^ Filters to make available in the environm
            -> Template            -- ^ Parsed 'Template' to render.
            -> Object              -- ^ Bindings to make available in the environment.
            -> Result LText.Text
-renderWith fs (Template _ u ts) = fmap toLazyText . Evaluator.render ts fs u
+renderWith fs (Template _ u ts) = fmap toLazyText . Eval.render ts fs u
 
 -- | See: 'parse'
-eitherParse :: LText.Text -> Either String Template
+eitherParse :: ByteString -> Either String Template
 eitherParse = eitherResult . parse
 
 -- | See: 'parseFile'
@@ -233,11 +249,12 @@ eitherParseFile = fmap eitherResult . parseFile
 
 -- | See: 'parseWith'
 eitherParseWith :: (Functor m, Monad m)
-                => (Text -> Meta -> m (Result Template))
+                => Options
+                -> (Text -> Delta -> m (Result Template))
                 -> Text
-                -> LText.Text
+                -> ByteString
                 -> m (Either String Template)
-eitherParseWith f n = fmap eitherResult . parseWith f n
+eitherParseWith o f n = fmap eitherResult . parseWith o f n
 
 -- | See: 'render'
 eitherRender :: Template
@@ -259,7 +276,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- First the 'Template' is defined:
 --
--- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Data.Text.Lazy.Text
+-- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Data.ByteString.ByteString
 --
 -- Then an 'Object' is defined containing the environment which will be
 -- available to the 'Template' during rendering:

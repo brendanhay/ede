@@ -18,26 +18,18 @@ module Text.EDE.Internal.Quotes where
 
 import           Control.Applicative
 import           Control.Monad
-import           Data.Aeson                        hiding (Result, Success, Error)
-import           Data.Monoid
+import           Data.Aeson              hiding (Result, Success, Error)
 import           Data.Scientific
-import           Data.Text                         (Text)
-import qualified Data.Text.Buildable               as Build
-import qualified Data.Text.Lazy                    as LText
+import           Data.Text               (Text)
+import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
-import           Data.Text.Lazy.Builder.Scientific
 import           Text.EDE.Internal.Types
-import Debug.Trace
-
-tfun :: String
-tfun = "TFun"
 
 qapp :: Quoted -> Quoted -> Result Quoted
 qapp a b = case (a, b) of
     (QLam f, x) -> f x
-    (QLit x, _) ->
-        throwError Quoter "unable to apply literal {} -> {}\n{}"
-            [typeof x, tfun, show x]
+    (QLit x, _) -> throwError "unable to apply literal {} -> {}\n{}"
+        [typeof x, tfun, show x]
 
 bpoly :: Quote a => (Value -> Value -> a) -> Quoted
 bpoly = quote
@@ -51,14 +43,13 @@ bnum = quote
 useq :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Quoted
 useq f g h = QLam $ \x ->
    case x of
-       QLit (String t) -> return . quote $ f t
-       QLit (Object o) -> return . quote $ g o
-       QLit (Array  v) -> return . quote $ h v
+       QLit (String t) -> pure . quote $ f t
+       QLit (Object o) -> pure . quote $ g o
+       QLit (Array  v) -> pure . quote $ h v
        QLit y          -> err (typeof y)
        _               -> err tfun
   where
-    err t = throwError Quoter "expected a {}, {}, or {}, but got {}"
-        [show TText, show TMap, show TList, t]
+    err t = throwError "expected a String, Object, or Array, but got {}" [t]
 
 class Quote a where
     quote :: a -> Quoted
@@ -70,7 +61,7 @@ instance Quote Lit where
     quote = \case
         LBool b -> QLit (Bool b)
         LNum  n -> QLit (Number n)
-        LText t -> QLit (String (LText.toStrict t))
+        LText t -> QLit (String t)
 
 instance Quote Value where
     quote = QLit
@@ -98,37 +89,37 @@ class Unquote a where
 
 instance Unquote Value where
     unquote = \case
-        QLit v -> return v
-        _      -> throwError Quoter "unable to unquote {} -> literal" [tfun]
+        QLit v -> pure v
+        _      -> throwError "unable to unquote {} -> Literal" [tfun]
 
 instance Unquote Text where
     unquote = unquote >=> \case
-        String t -> return t
-        v        -> unexpected (typeof v) TText
+        String t -> pure t
+        v        -> unexpected (typeof v) "String"
 
 instance Unquote LText.Text where
     unquote = fmap LText.fromStrict . unquote
 
 instance Unquote Bool where
     unquote = unquote >=> \case
-        Bool b -> return b
-        v      -> unexpected (typeof v) TBool
+        Bool b -> pure b
+        v      -> unexpected (typeof v) "Bool"
 
 instance Unquote Scientific where
     unquote = \case
-        QLit (Number n) -> return n
-        QLit v          -> unexpected (typeof v)  TText
-        _               -> unexpected tfun TText
+        QLit (Number n) -> pure n
+        QLit v          -> unexpected (typeof v) "String"
+        _               -> unexpected tfun "String"
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
     quote f = QLam (fmap (quote . f) . unquote)
 
 instance (Unquote a, Unquote b, Quote c) => Quote (a -> b -> c) where
     quote f = QLam $ \x ->
-        return . QLam $ \y ->
+        pure . QLam $ \y ->
             case y of
-                QLam g -> join (qapp <$> pure (quote f) <*> g x)
+                QLam g -> join (qapp (quote f) <$> g x)
                 _      -> quote <$> (f <$> unquote x <*> unquote y)
 
-unexpected :: String -> Type a -> Result b
-unexpected x y = throwError Quoter "unable to unquote {} -> {}" [x, show y]
+unexpected :: String -> String -> Result b
+unexpected x y = throwError "unable to unquote {} -> {}" [x, y]

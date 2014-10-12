@@ -25,23 +25,19 @@ module Text.EDE.Internal.Types where
 
 import           Control.Applicative
 import           Control.Lens
-import           Control.Monad
-import           Data.Aeson                   hiding (Result, Success, Error)
+import           Data.Aeson                   hiding (Result(..))
 import           Data.Aeson.Types             (Pair)
+import           Data.ByteString              (ByteString)
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty)
-import qualified Data.List.NonEmpty           as NonEmpty
 import           Data.Monoid                  hiding ((<>))
 import           Data.Scientific
 import           Data.Semigroup
 import           Data.Text                    (Text)
-import           Data.Text.Buildable
 import           Data.Text.Format             (Format, format)
 import           Data.Text.Format.Params      (Params)
 import qualified Data.Text.Lazy               as LText
-import           Data.Text.Lazy.Builder
-import           Data.Traversable
 import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc, vsep)
 import           Text.Trifecta.Delta
 
@@ -53,8 +49,15 @@ data Result a
 
 makePrisms ''Result
 
+instance Monad Result where
+    return          = Success
+    {-# INLINE return #-}
+    Success x >>= k = k x
+    Failure e >>= _ = Failure e
+    {-# INLINE (>>=) #-}
+
 instance Applicative Result where
-    pure = Success
+    pure = return
     {-# INLINE pure #-}
     Success f <*> Success x  = Success (f x)
     Success _ <*> Failure e  = Failure e
@@ -75,26 +78,27 @@ instance Show a => Pretty (Result a) where
     pretty (Success x) = pretty (show x)
     pretty (Failure e) = pretty e
 
--- | Convert a 'Result' to an 'Either' with the 'Left' case holding a formatted
--- error message, and 'Right' being the successful result over which 'Result' is paramterised.
--- eitherResult :: Result a -> Either String a
--- eitherResult = result (Left . show) Right
+-- | Convert a 'Result' to an 'Either' with the 'Left' case holding a
+-- formatted error message, and 'Right' being the successful result over
+-- which 'Result' is paramterised.
+eitherResult :: Result a -> Either String a
+eitherResult = result (Left . show) Right
 
--- -- | Perform a case analysis on a 'Result'.
--- result :: (Error -> b) -- ^ Function to apply to the 'Error' case.
---        -> (a -> b)     -- ^ Function to apply to the 'Success' case.
---        -> Result a     -- ^ The 'Result' to map over.
---        -> b
--- result _ g (Success x) = g x
--- result f _ (Error   e) = f e
+-- | Perform a case analysis on a 'Result'.
+result :: (Doc -> b) -- ^ Function to apply to the 'Failure' case.
+       -> (a -> b)   -- ^ Function to apply to the 'Success' case.
+       -> Result a   -- ^ The 'Result' to map over.
+       -> b
+result _ g (Success x) = g x
+result f _ (Failure e) = f e
 
--- -- | Convenience for returning a successful 'Result'.
--- success :: Monad m => a -> m (Result a)
--- success = return . Success
+-- | Convenience for returning a successful 'Result'.
+success :: Monad m => a -> m (Result a)
+success = return . Success
 
--- -- | Convenience for returning an error 'Result'.
--- failure :: Monad m => Doc -> m (Result a)
--- failure = return . Error
+-- | Convenience for returning an error 'Result'.
+failure :: Monad m => Doc -> m (Result a)
+failure = return . Failure
 
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Text -> Delta -> m (Result Template)
@@ -104,8 +108,11 @@ instance Applicative m => Semigroup (Resolver m) where
     {-# INLINE (<>) #-}
 
 -- | A parsed and compiled template.
-data Template = Template !Text !Exp (HashMap Text Exp)
-    deriving (Eq)
+data Template = Template
+    { _tmplName :: !Text
+    , _tmplExp  :: !Exp
+    , _tmplIncl :: HashMap Text Exp
+    } deriving (Eq)
 
 data Quoted
     = QLit !Value
@@ -119,50 +126,22 @@ instance Eq Quoted where
     QLit a == QLit b = a == b
     _      == _      = False
 
--- data Type a where
---     TNil  :: Type ()
---     TText :: Type LText.Text
---     TBool :: Type Bool
---     TNum  :: Type Scientific
---     TBld  :: Type Builder
---     TMap  :: Type Object
---     TList :: Type Array
---     TFun  :: Type Quoted
+typeof :: Value -> String
+typeof = \case
+    Null     -> "Null"
+    Bool   _ -> "Bool"
+    Number _ -> "Number"
+    Object _ -> "Object"
+    Array  _ -> "Array"
+    String _ -> "String"
 
--- deriving instance Show (Type a)
+tfun :: String
+tfun = "Function"
 
--- typeof :: Value -> String
--- typeof = \case
---     Null     -> show TNil
---     Bool   _ -> show TBool
---     Number _ -> show TNum
---     Object _ -> show TMap
---     Array  _ -> show TList
---     String _ -> show TText
-
--- data TExp = forall a. Eq a => a ::: Type a
-
--- instance Show TExp where
---     show (_ ::: t) = show t
-
-newtype Id = Id Text
-    deriving (Eq, Show)
-
--- instance HasDelta Id where
---     delta = idDelta
-
--- instance Buildable Id where
---     build i = mconcat
---         ["`", build (idName i), "` (line ", build l, ", column ", build c, ")"]
---       where
---         Delta _ l c = idDelta i
---     {-# INLINE build #-}
+type Id = Text
 
 newtype Var = Var (NonEmpty Id)
     deriving (Eq, Show, Semigroup)
-
--- instance HasDelta Var where
---     delta (Var is) = delta (NonEmpty.head is)
 
 -- FIXME: implement constructors, remove hardcoded bool keywords, etc.
 data Lit
@@ -201,8 +180,8 @@ instance HasDelta Exp where
         ELoop d _ _ _ _ -> d
         EIncl d _ _     -> d
 
--- throwError :: Params ps => ([String] -> Error) -> Format -> ps -> Result a
--- throwError f fmt = Error . f . (:[]) . LText.unpack . format fmt
+throwError :: Params ps => Format -> ps -> Result a
+throwError fmt = Failure . pretty . LText.unpack . format fmt
 
 -- | Create an 'Object' from a list of name/value 'Pair's.
 -- See 'Aeson''s documentation for more details.

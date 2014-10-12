@@ -21,9 +21,8 @@ module Text.EDE.Internal.Evaluator where
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Reader
-import           Data.Aeson                        hiding (Result, Success, Error)
+import           Control.Monad.Reader
+import           Data.Aeson                        hiding (Result(..))
 import           Data.Bifunctor                    (first)
 import           Data.Foldable                     (Foldable, foldlM)
 import           Data.HashMap.Strict               (HashMap)
@@ -45,6 +44,8 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.Quotes
 import           Text.EDE.Internal.Types
+import           Text.PrettyPrint.ANSI.Leijen      (Pretty(..))
+import           Text.Trifecta.Delta
 
 -- FIXME: look at adding a whnf step to reduce everything before storing as a template
 -- (optimisation passes, case reducation etc.)
@@ -66,42 +67,41 @@ render :: HashMap Text Exp
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
   where
-    nf (QLit v) = build m v
-    nf _        = lift (Error (Evaluator m [err]))
+    nf (QLit v) = build d v
+    nf _        = lift (Failure err)
 
     err = "unable to evaluate partially applied template to normal form."
 
-    m = meta e
+    d = delta e
 
 eval :: Exp -> Context Quoted
 eval (ELit _ l) = return (quote l)
-eval (EBld _ b) = return (quote b)
 eval (EVar _ v) = quote <$> variable v
-eval (EFun m i) = do
-    q <- Map.lookup (idName i) <$> asks _quoted
-    maybe (throw m "binding {} doesn't exist." [i])
+eval (EFun d i) = do
+    q <- Map.lookup i <$> asks _quoted
+    maybe (throwError' d "binding {} doesn't exist." [i])
           return
           q
 
-eval (EApp m a b) = do
+eval (EApp d a b) = do
     x <- eval a
     y <- eval b
-    qappend m x y
+    qappend d x y
 
-eval (ELet _ (Id _ k) rhs bdy) = do
+eval (ELet _ k rhs bdy) = do
     q <- eval rhs
     v <- lift (unquote q)
     bind (Map.insert k v) (eval bdy)
 
 -- FIXME: We have to recompute c everytime due to the predicate ..
-eval (ECase m p ws) = go ws
+eval (ECase d p ws) = go ws
   where
     go []          = return (quote (LText mempty))
     go ((a, e):as) =
         case a of
             PWild  -> eval e
-            PVar v -> eval (EVar m v) >>= cond e as
-            PLit l -> eval (ELit m l) >>= cond e as
+            PVar v -> eval (EVar d v) >>= cond e as
+            PLit l -> eval (ELit d l) >>= cond e as
 
     cond e as y@(QLit Bool{}) = do
         x <- predicate p
@@ -111,12 +111,12 @@ eval (ECase m p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
-eval (ELoop m (Id _ k) v bdy ma) = variable v >>= go >>= loop k bdy ma
+eval (ELoop d k v bdy ma) = variable v >>= go >>= loop k bdy ma
   where
     go (Object o) = return (Col (Map.size o) (hmap o))
     go (Array  a) = return (Col (Vector.length a) (vec a))
     go x          =
-        throw m "invalid loop target {}, expected {} or {}"
+        throwError' d "invalid loop target {}, expected {} or {}"
             [typeof x, typeof (Object mempty), typeof (Array mempty)]
 
     hmap :: HashMap Text Value -> [(Maybe Text, Value)]
@@ -125,10 +125,10 @@ eval (ELoop m (Id _ k) v bdy ma) = variable v >>= go >>= loop k bdy ma
     vec :: Vector Value -> Vector (Maybe Text, Value)
     vec = Vector.map (Nothing,)
 
-eval (EIncl m k mu) = do
+eval (EIncl d k mu) = do
     ts <- asks _templates
     t  <- maybe
-        (throw m "template {} is not in scope: {}"
+        (throwError' d "template {} is not in scope: {}"
             [k, Text.intercalate "," $ Map.keys ts])
         return
         (Map.lookup k ts)
@@ -144,7 +144,7 @@ eval (EIncl m k mu) = do
         x <- case u of
             ELit _ l -> return (enc l)
             EVar _ v -> variable v
-            _        -> throw m "unexpected template scope {}" [meta u]
+            _        -> throwError' d "unexpected template scope {}" [show (delta u)]
         return . const $ fromPairs ["scope" .= x]
 
     enc (LBool b) = toJSON b
@@ -160,17 +160,17 @@ variable (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
     go []     _ v = return v
     go (k:ks) r v = do
         m <- nest v
-        maybe (throw (meta k) "binding {} doesn't exist." [fmt (k:r)])
+        maybe (throwError' undefined "binding {} doesn't exist." [fmt (k:r)])
               (go ks (k:r))
-              (Map.lookup (idName k) m)
+              (Map.lookup k m)
       where
         nest :: Value -> Context Object
         nest (Object o) = return o
         nest x          =
-            throw (meta k) "variable {} :: {} doesn't supported nested accessors."
+            throwError' undefined "variable {} :: {} doesn't supported nested accessors."
                 [fmt (k:r), typeof x]
 
-        fmt = Text.unpack . Text.intercalate "." . map idName
+        fmt = Text.unpack . Text.intercalate "."
 
 -- | A variable can be tested for truthiness, but a non-whnf expr cannot.
 predicate :: Exp -> Context Quoted
@@ -180,27 +180,27 @@ predicate x = do
         Success q
             | QLit(Bool{}) <- q -> Success q
         Success _               -> Success (quote True)
-        Error   _
+        Failure _
             | EVar{} <- x       -> Success (quote False)
-        Error   e               -> Error   e
+        Failure e               -> Failure e
 
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
 
 loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Quoted
-loop _ a b (Col 0 _)  = eval (fromMaybe (EBld (meta a) mempty) b)
+loop _ a b (Col 0 _)  = eval (fromMaybe (ELit (delta a) (LText mempty)) b)
 loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
   where
     iter (n, p) x = do
         shadowed n
         q <- bind (Map.insert k $ context n x) (eval a)
-        r <- qappend (meta a) q p
+        r <- qappend (delta a) q p
         return (n + 1, r)
 
     shadowed n = do
         m <- asks _values
         maybe (return ())
-              (\x -> throw (meta a) "binding {} shadows existing variable {} :: {}, {}"
+              (\x -> throwError' (delta a) "binding {} shadows existing variable {} :: {}, {}"
                   [Text.unpack k, show x, typeof x, show n])
               (Map.lookup k m)
 
@@ -218,21 +218,21 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
         , "even"       .= (n `mod` 2 == 0)
         ]
 
-qappend :: Meta -> Quoted -> Quoted -> Context Quoted
-qappend m x y =
+qappend :: Delta -> Quoted -> Quoted -> Context Quoted
+qappend d x y =
     case (x, y) of
-        (QLit l, QLit r) -> quote <$> liftM2 (<>) (build m l) (build m r)
+        (QLit l, QLit r) -> quote <$> liftM2 (<>) (build d l) (build d r)
         _                -> lift (qapp x y)
 
-build :: Meta -> Value -> Context Builder
+build :: Delta -> Value -> Context Builder
 build _ Null       = return mempty
 build _ (String t) = return (Build.build t)
 build _ (Bool b)   = return (Build.build b)
 build _ (Number n)
     | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
     | otherwise             = return (scientificBuilder n)
-build m x =
-    throw m "unable to render literal {}\n{}" [typeof x, show x]
+build d x =
+    throwError' d "unable to render literal {}\n{}" [typeof x, show x]
 
-throw :: Params ps => Meta -> Format -> ps -> Context a
-throw m f = lift . throwError (Evaluator m) f
+throwError' :: Params ps => Delta -> Format -> ps -> Context a
+throwError' _ f = lift . throwError f

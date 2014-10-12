@@ -18,7 +18,6 @@ import Data.Foldable           (foldl', foldr')
 import Data.List.NonEmpty      (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
-import Data.Text               (Text)
 import Text.EDE.Internal.Types
 import Text.Trifecta.Delta
 

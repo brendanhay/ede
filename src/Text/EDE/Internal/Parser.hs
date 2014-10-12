@@ -23,16 +23,16 @@ import           Control.Applicative
 import           Control.Lens
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
-import           Data.ByteString.UTF8       as UTF8
+import           Data.ByteString            (ByteString)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
-import           Data.HashSet               (HashSet)
-import qualified Data.HashSet               as Set
+import           Data.List.NonEmpty         (NonEmpty(..))
 import qualified Data.List.NonEmpty         as NonEmpty
 import           Data.Scientific
 import           Data.Semigroup
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
+import qualified Data.Text.Encoding         as Text
 import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
@@ -46,7 +46,7 @@ import           Text.Trifecta.Delta
 -- whitespace
 -- comments
 
-type Includes = HashMap Text (HashSet Delta)
+type Includes = HashMap Text (NonEmpty Delta)
 
 data Env = Env
     { _options  :: !Options
@@ -63,11 +63,11 @@ type Parse m =
     , LookAheadParsing m
     )
 
-runParser :: Options -> String -> ByteString -> Result (Exp, Includes)
+runParser :: Options -> Text -> ByteString -> Result (Exp, Includes)
 runParser o n = res . parseByteString (runStateT (document <* eof) env) pos
   where
     env = Env o mempty
-    pos = Directed (UTF8.fromString n) 0 0 0 0
+    pos = Directed (Text.encodeUtf8 n) 0 0 0 0
 
     res (Tri.Success x) = Success (_includes `second` x)
     res (Tri.Failure e) = Failure e
@@ -98,7 +98,7 @@ ifelif = eif
     <$> branch "if"
     <*> many (branch "elif")
     <*> else'
-    <*  exit "endif"
+    <*  end "endif"
   where
     branch k = (,) <$> block k term <*> document
 
@@ -109,7 +109,7 @@ cases = ecase
         ((,) <$> block "when" pattern
              <*> document)
     <*> else'
-    <*  exit "endcase"
+    <*  end "endcase"
 
 loop :: Parse m => m Exp
 loop = do
@@ -120,14 +120,14 @@ loop = do
                  <*> (keyword "in" *> variable))
         <*> document
         <*> else'
-        <*  exit "endfor"
+        <*  end "endfor"
 
 include :: Parse m => m Exp
 include = do
     d <- position
     block "include" $ do
         k <- stringLiteral
-        includes %= Map.insertWith (<>) k (Set.singleton d)
+        includes %= Map.insertWith (<>) k (d:|[])
         EIncl d k <$> optional (keyword "with" *> term)
 
 binding :: Parse m => m Exp
@@ -138,7 +138,7 @@ binding = do
             ((,) <$> identifier
                  <*> (symbol "=" *> term))
         <*> document
-        <*  exit "endlet"
+        <*  end "endlet"
 
 block :: Parse m => String -> m a -> m a
 block k = between (try (blockStart *> keyword k)) blockEnd
@@ -146,8 +146,8 @@ block k = between (try (blockStart *> keyword k)) blockEnd
 else' :: Parse m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)
 
-exit :: Parse m => String -> m ()
-exit k = block k (pure ())
+end :: Parse m => String -> m ()
+end k = block k (pure ())
 
 term :: Parse m => m Exp
 term = buildExpressionParser table expr
@@ -162,12 +162,12 @@ term = buildExpressionParser table expr
         , [filter' "|"]
         ]
 
-    prefix n = Prefix (efun <$> operator n <*> pure (Id n))
+    prefix n = Prefix (efun <$> operator n <*> pure n)
 
     infix' n = Infix (do
         d <- operator n
         return $ \l r ->
-            EApp d (efun d (Id n) l) r) AssocLeft
+            EApp d (efun d n l) r) AssocLeft
 
     filter' n = Infix (do
         d <- operator n
@@ -200,10 +200,10 @@ variable :: Parse m => m Var
 variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 
 identifier :: Parse m => m Id
-identifier = Id <$> ident variableStyle
+identifier = ident variableStyle
 
-manyTill1 :: (Monad m, Alternative m) => m a -> m end -> m [a]
-manyTill1 p end = liftM2 (:) p (manyTill p end)
+manyTill1 :: (Monad m, Alternative m) => m a -> m b -> m [a]
+manyTill1 p e = liftM2 (:) p (manyTill p e)
 
 apply :: Parse m => (Delta -> a -> b) -> m a -> m b
 apply f p = f <$> position <*> p

@@ -14,6 +14,7 @@
 module Text.EDE.Internal.Syntax where
 
 import           Control.Lens
+import           Data.Default.Class
 import           Data.HashSet            (HashSet)
 import qualified Data.HashSet            as Set
 import           Text.Parser.Token.Style
@@ -29,11 +30,11 @@ data Options = Options
 
 makeLenses ''Options
 
-defaultSyntax :: Options
-defaultSyntax = jinjaSyntax
+instance Default Options where
+    def = smartySyntax
 
-jinjaSyntax :: Options
-jinjaSyntax = Options
+smartySyntax :: Options
+smartySyntax = Options
     { _delimRender  = ("{{", "}}")
     , _delimComment = ("{#", "#}")
     , _delimBlock   = ("{%", "%}")

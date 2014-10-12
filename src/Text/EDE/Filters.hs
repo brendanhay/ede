@@ -39,20 +39,13 @@ module Text.EDE.Filters where
 -- --    , Type (..)
 --     ) where
 
-import           Control.Applicative      hiding (empty)
-import           Control.Monad
 import           Data.Aeson               (Value, encode)
 import           Data.Char                hiding (ord)
 import           Data.HashMap.Strict      (HashMap)
 import qualified Data.HashMap.Strict      as Map
-import           Data.Scientific
 import           Data.Text                (Text)
-import qualified Data.Text                as Text
 import qualified Data.Text.Lazy           as LText
 import qualified Data.Text.Lazy.Encoding  as LText
-import           Data.Vector              (Vector)
-import qualified Data.Vector              as Vector
-import           Debug.Trace
 import           Text.EDE.Internal.Quotes
 import           Text.EDE.Internal.Types
 
