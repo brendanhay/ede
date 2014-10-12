@@ -20,11 +20,11 @@
 module Text.EDE.Internal.Evaluator where
 
 import           Control.Applicative
-import           Control.Arrow                     (first)
 import           Control.Monad
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
 import           Data.Aeson                        hiding (Result, Success, Error)
+import           Data.Bifunctor                    (first)
 import           Data.Foldable                     (Foldable, foldlM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map

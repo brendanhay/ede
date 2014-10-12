@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 -- Module      : Text.EDE.Internal.Syntax
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -15,21 +16,40 @@ module Text.EDE.Internal.Syntax where
 import           Control.Lens
 import           Data.HashSet            (HashSet)
 import qualified Data.HashSet            as Set
-import           Data.Monoid
 import           Text.Parser.Token.Style
 import           Text.Trifecta
 
-operator :: TokenParsing m => IdentifierStyle m
-operator = haskellOps & styleLetter .~ oneOf "-+!&|=><"
+data Options = Options
+    { _delimRender         :: (String, String)
+    , _delimComment        :: (String, String)
+    , _delimBlock          :: (String, String)
+    -- , _lstripBlocks        :: !Bool
+    -- , _trimBlocks          :: !Bool
+    -- , _keepTrailingNewline :: !Bool
+    } deriving (Eq, Show)
 
-keyword :: TokenParsing m => IdentifierStyle m
-keyword = haskellIdents & styleReserved .~ reserved & styleName .~ "keyword"
+makeLenses ''Options
 
-variable :: TokenParsing m => IdentifierStyle m
-variable = keyword & styleName .~ "variable"
+jinjaSyntax :: Options
+jinjaSyntax = Options
+    { _delimRender  = ("{{", "}}")
+    , _delimComment = ("{#", "#}")
+    , _delimBlock   = ("{%", "%}")
+    }
 
-reserved :: HashSet String
-reserved = Set.fromList
+operatorStyle :: TokenParsing m => IdentifierStyle m
+operatorStyle = haskellOps & styleLetter .~ oneOf "-+!&|=><"
+
+variableStyle :: TokenParsing m => IdentifierStyle m
+variableStyle = keywordStyle & styleName .~ "variable"
+
+keywordStyle :: TokenParsing m => IdentifierStyle m
+keywordStyle = haskellIdents
+     & styleReserved .~ keywordSet
+     & styleName     .~ "keyword"
+
+keywordSet :: HashSet String
+keywordSet = Set.fromList
     [ "if"
     , "elif"
     , "else"

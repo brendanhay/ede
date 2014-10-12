@@ -9,6 +9,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -23,6 +24,7 @@
 module Text.EDE.Internal.Types where
 
 import           Control.Applicative
+import           Control.Lens
 import           Control.Monad
 import           Data.Aeson                   hiding (Result, Success, Error)
 import           Data.Aeson.Types             (Pair)
@@ -43,22 +45,13 @@ import           Data.Traversable
 import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc, vsep)
 import           Text.Trifecta.Delta
 
--- | A function to resolve the target of an @include@ expression.
-type Resolver m = Text -> Delta -> m (Result Template)
-
-instance Applicative m => Semigroup (Resolver m) where
-    (<>) f g = \x y -> liftA2 (<|>) (f x y) (g x y)
-    {-# INLINE (<>) #-}
-
--- | A parsed and compiled template.
-data Template = Template !Text !Exp (HashMap Text Exp)
-    deriving (Eq)
-
 -- | The result of running parsing or rendering steps.
 data Result a
     = Success a
     | Failure Doc
       deriving (Show, Functor, Foldable, Traversable)
+
+makePrisms ''Result
 
 instance Applicative Result where
     pure = Success
@@ -102,6 +95,17 @@ instance Show a => Pretty (Result a) where
 -- -- | Convenience for returning an error 'Result'.
 -- failure :: Monad m => Doc -> m (Result a)
 -- failure = return . Error
+
+-- | A function to resolve the target of an @include@ expression.
+type Resolver m = Text -> Delta -> m (Result Template)
+
+instance Applicative m => Semigroup (Resolver m) where
+    (f <> g) x y = liftA2 (<|>) (f x y) (g x y)
+    {-# INLINE (<>) #-}
+
+-- | A parsed and compiled template.
+data Template = Template !Text !Exp (HashMap Text Exp)
+    deriving (Eq)
 
 data Quoted
     = QLit !Value

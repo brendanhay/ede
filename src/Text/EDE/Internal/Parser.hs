@@ -1,6 +1,8 @@
 {-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE RankNTypes        #-}
 
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -18,25 +20,21 @@ module Text.EDE.Internal.Parser
     ) where
 
 import           Control.Applicative
-import           Control.Arrow              (second)
 import           Control.Lens
 import           Control.Monad.State.Strict
-import           Data.ByteString            (ByteString)
+import           Data.Bifunctor
 import           Data.ByteString.UTF8       as UTF8
-import           Data.Char                  (isSpace)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import           Data.HashSet               (HashSet)
 import qualified Data.HashSet               as Set
-import           Data.List.NonEmpty         (NonEmpty(..))
 import qualified Data.List.NonEmpty         as NonEmpty
 import           Data.Scientific
 import           Data.Semigroup
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
-import qualified Data.Text.Read             as Read
 import           Text.EDE.Internal.AST
-import qualified Text.EDE.Internal.Syntax   as Syntax
+import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
 import           Text.Parser.LookAhead
@@ -44,22 +42,34 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Result(..), render)
 import           Text.Trifecta.Delta
 
+-- FIXME: add 'raw' tag
+-- whitespace
+-- comments
+
 type Includes = HashMap Text (HashSet Delta)
+
+data Env = Env
+    { _options  :: !Options
+    , _includes :: Includes
+    }
+
+makeLenses ''Env
 
 type Parse m =
     ( Monad m
-    , MonadState Includes m
+    , MonadState Env m
     , TokenParsing m
     , DeltaParsing m
     , LookAheadParsing m
     )
 
-runParser :: String -> ByteString -> Result (Exp, Includes)
-runParser n = res . parseByteString (runStateT (document <* eof) mempty) pos
+runParser :: Options -> String -> ByteString -> Result (Exp, Includes)
+runParser o n = res . parseByteString (runStateT (document <* eof) env) pos
   where
+    env = Env o mempty
     pos = Directed (UTF8.fromString n) 0 0 0 0
 
-    res (Tri.Success x) = Success x
+    res (Tri.Success x) = Success (_includes `second` x)
     res (Tri.Failure e) = Failure e
 
 document :: Parse m => m Exp
@@ -76,13 +86,12 @@ document = eapp <$> position <*> many expr
         ]
 
 render :: Parse m => m Exp
-render = between (symbol "{{") (string "}}") term
+render = between renderStart renderEnd term
 
 fragment :: Parse m => m Exp
-fragment = notFollowedBy end >> ELit <$> position <*> txt
-  where
-    txt = LText . Text.pack <$> manyTill1 anyChar (lookAhead end <|> eof)
-    end = void (try (char '{') >> oneOf "{#%")
+fragment = notFollowedBy anyStart >> ELit
+    <$> position
+    <*> (LText . Text.pack <$> manyTill1 anyChar (lookAhead anyStart <|> eof))
 
 ifelif :: Parse m => m Exp
 ifelif = eif
@@ -118,7 +127,7 @@ include = do
     d <- position
     block "include" $ do
         k <- stringLiteral
-        id %= Map.insertWith (<>) k (Set.singleton d)
+        includes %= Map.insertWith (<>) k (Set.singleton d)
         EIncl d k <$> optional (keyword "with" *> term)
 
 binding :: Parse m => m Exp
@@ -131,13 +140,13 @@ binding = do
         <*> document
         <*  exit "endlet"
 
-block :: Parse m => Text -> m a -> m a
-block k = between (try (symbol "{%" *> keyword k)) (string "%}")
+block :: Parse m => String -> m a -> m a
+block k = between (try (blockStart *> keyword k)) blockEnd
 
 else' :: Parse m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)
 
-exit :: Parse m => Text -> m ()
+exit :: Parse m => String -> m ()
 exit k = block k (pure ())
 
 term :: Parse m => m Exp
@@ -178,23 +187,46 @@ number :: Parse m => m Scientific
 number = either fromIntegral fromFloatDigits <$> integerOrDouble
 
 boolean :: Parse m => m Bool
-boolean = textSymbol "true " *> return True
-      <|> textSymbol "false" *> return False
+boolean = symbol "true " *> return True
+      <|> symbol "false" *> return False
 
 operator :: Parse m => Text -> m Delta
-operator n = position <* reserveText Syntax.operator n
+operator n = position <* reserveText operatorStyle n
 
-keyword :: Parse m => Text -> m Delta
-keyword k = position <* try (reserveText Syntax.keyword k)
+keyword :: Parse m => String -> m Delta
+keyword k = position <* try (reserve keywordStyle k)
 
 variable :: Parse m => m Var
 variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 
 identifier :: Parse m => m Id
-identifier = Id <$> ident Syntax.variable
+identifier = Id <$> ident variableStyle
 
 manyTill1 :: (Monad m, Alternative m) => m a -> m end -> m [a]
 manyTill1 p end = liftM2 (:) p (manyTill p end)
 
 apply :: Parse m => (Delta -> a -> b) -> m a -> m b
 apply f p = f <$> position <*> p
+
+anyStart :: Parse m => m ()
+anyStart = void . try $ choice
+    [ renderStart
+    , commentStart
+    , blockStart
+    ]
+
+renderStart, commentStart, blockStart :: Parse m => m ()
+renderStart  = delimiter (delimRender._1)
+commentStart = delimiter (delimComment._1)
+blockStart   = delimiter (delimBlock._1)
+
+renderEnd, commentEnd, blockEnd :: Parse m => m ()
+renderEnd  = delimiter (delimRender._2)
+-- commentEnd = delimiter (delimComment._2)
+blockEnd   = delimiter (delimBlock._2)
+
+delimiter :: Parse m => Lens' Options String -> m ()
+delimiter l = config l >>= void . symbol
+
+config :: MonadState Env m => Getter Options a -> m a
+config l = gets (view (options.l))
