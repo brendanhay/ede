@@ -60,12 +60,6 @@ module Text.EDE
     , success
     , failure
 
-    -- * Syntax
-    , Syntax
-    , delimRender
-    , delimComment
-    , delimBlock
-
     , defaultSyntax
     , alternateSyntax
 
@@ -77,6 +71,12 @@ module Text.EDE
 
     -- * Version
     , version
+
+    -- * Syntax
+    , Syntax
+    , delimRender
+    , delimComment
+    , delimBlock
 
     -- ** Comments
     -- $comments
