@@ -194,6 +194,8 @@ fractional = Map.fromList
 -- * @underscore@ @:: Text -> Text@
 --
 -- * @hyphenate@  @:: Text -> Text@
+--
+-- /See:/ "Text.EDE.Text"
 
 textual :: HashMap Text Binding
 textual = Map.fromList
