@@ -40,10 +40,6 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Result(..), render, spaces)
 import           Text.Trifecta.Delta
 
--- FIXME: add 'raw' tag
--- whitespace
--- comments
-
 data Env = Env
     { _syntax  :: !Syntax
     , _includes :: HashMap Text (NonEmpty Delta)
@@ -86,12 +82,6 @@ fragment = ELit <$> position <*> pack (notFollowedBy cond >> try line0 <|> line1
     cond = () <$ lookAhead (renderStart <|> try blockStart)
 
     pack = fmap (LText . Text.pack)
-
--- -- FIXME: empty text
--- comment :: Parse m => m Exp
--- comment = ELit <$> position <*> pure (LText mempty) <* p
---   where
---     p = between (try (commentStart)) (rstrip commentEnd <|> commentEnd) (skipMany anyChar)
 
 statement :: Parse m => m Exp
 statement = trace "statement" $ choice
@@ -231,10 +221,6 @@ manyEndBy1 p end = go
 renderStart, renderEnd :: Parse m => m String
 renderStart = delimiter (delimRender._1) >>= symbol
 renderEnd   = delimiter (delimRender._2) >>= string
-
--- commentStart, commentEnd :: Parse m => m String
--- commentStart = insensitive (delimComment._1)
--- commentEnd   = delimiter   (delimComment._2) >>= string
 
 blockStart, blockEnd :: Parse m => m String
 blockStart = insensitive (delimBlock._1)

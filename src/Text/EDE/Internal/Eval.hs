@@ -62,12 +62,9 @@ render :: HashMap Text Exp
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
   where
-    nf (BVal v) = build d v
-    nf _        = lift (Failure err)
-
-    err = "unable to evaluate partially applied template to normal form."
-
-    d = delta e
+    nf (BVal v) = build (delta e) v
+    nf _        = lift $ Failure
+        "unable to evaluate partially applied template to normal form."
 
 eval :: Exp -> Context Binding
 eval (ELit _ l) = return (quote l)
@@ -106,7 +103,7 @@ eval (ECase d p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
-eval (ELoop d k v bdy ma) = variable v >>= go >>= loop k bdy ma
+eval (ELoop d i v bdy ma) = variable v >>= go >>= loop i bdy ma
   where
     go (Object o) = return (Col (Map.size o) (hmap o))
     go (Array  a) = return (Col (Vector.length a) (vec a))
@@ -120,13 +117,13 @@ eval (ELoop d k v bdy ma) = variable v >>= go >>= loop k bdy ma
     vec :: Vector Value -> Vector (Maybe Text, Value)
     vec = Vector.map (Nothing,)
 
-eval (EIncl d k mu) = do
+eval (EIncl d i mu) = do
     ts <- asks _templates
     t  <- maybe
         (throwError' d "template {} is not in scope: {}"
-            [k, Text.intercalate "," $ Map.keys ts])
+            [i, Text.intercalate "," $ Map.keys ts])
         return
-        (Map.lookup k ts)
+        (Map.lookup i ts)
     s  <- maybe (return global) local' mu
     bind s (eval t)
   where
@@ -188,11 +185,11 @@ data Collection where
 
 loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Binding
 loop _ a b (Col 0 _)  = eval (fromMaybe (ELit (delta a) (LText mempty)) b)
-loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+loop i a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
   where
     iter (n, p) x = do
         shadowed n
-        q <- bind (Map.insert k (context n x)) (eval a)
+        q <- bind (Map.insert i (context n x)) (eval a)
         r <- qapplyend (delta a) p q
         return (n + 1, r)
 
@@ -200,12 +197,11 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
         m <- asks _values
         maybe (return ())
               (\x -> throwError' (delta a) "binding {} shadows existing variable {} :: {}, {}"
-                  [Text.unpack k, show x, typeOf x, show n])
-              (Map.lookup k m)
+                  [Text.unpack i, show x, typeOf x, show n])
+              (Map.lookup i m)
 
-    context n (mk, v) = object
-        [ "key"        .= mk -- FIXME: ensure null keys don't exist
-        , "value"      .= v
+    context n (k, v) = object $
+        [ "value"      .= v
         , "length"     .= l
         , "index"      .= n
         , "index0"     .= (n - 1)
@@ -215,7 +211,10 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
         , "last"       .= (n == l)
         , "odd"        .= (n `mod` 2 == 1)
         , "even"       .= (n `mod` 2 == 0)
-        ]
+        ] ++ key k
+
+    key (Just k) = ["key" .= k]
+    key Nothing  = []
 
 qapplyend :: Delta -> Binding -> Binding -> Context Binding
 qapplyend d x y =
@@ -234,5 +233,6 @@ build _ (Number n)
 build d x =
     throwError' d "unable to render literal {}\n{}" [typeOf x, show x]
 
+-- FIXME: Add delta information to the thrown error document.
 throwError' :: Params ps => Delta -> Format -> ps -> Context a
 throwError' _ f = lift . throwError f

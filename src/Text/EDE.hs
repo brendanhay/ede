@@ -79,12 +79,6 @@ module Text.EDE
     , defaultSyntax
     , alternateSyntax
 
-    -- ** Comments
-    -- $comments
-
-    -- ** Raw
-    -- $raw
-
     -- ** Variables
     -- $variables
 
@@ -102,6 +96,12 @@ module Text.EDE
 
     -- ** Filters
     -- $filters
+
+    -- ** Raw
+    -- $raw
+
+    -- ** Comments
+    -- $comments
     ) where
 
 import           Control.Monad
@@ -370,30 +370,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- >>> render (fromPairs [ "foo" .= "value", "bar" .= 1 ]) :: Template -> Result Text
 
--- $comments #syntax#
---
--- Comments are ignored by the parser and omitted from the rendered output.
---
--- > {# singleline comment #}
---
--- > {#
--- >    multiline
--- >    comment
--- > #}
---
-
--- $raw
---
--- You can disable template processing for blocks of text using the @raw@ section:
---
--- > {% raw %}
--- > Some {{{ handlebars }}} or {{ mustache }} or {{ jinja2 }} output tags etc.
--- > {% endraw %}
---
--- This can be used to avoid parsing expressions which would otherwise be considered
--- valid @ED-E@ syntax.
-
--- $variables
+-- $variables #syntax
 --
 -- Variables are substituted directly for their 'Buildable' representation.
 -- An error is raised if the varaible being substituted is not a literal type
@@ -565,3 +542,11 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- with filters being applied left associatively.
 --
 -- /See:/ "Text.EDE.Filters"
+
+-- $raw
+--
+-- /Important:/ For the current version of ED-E raw blocks are not supported.
+
+-- $comments
+--
+-- /Important:/ For the current version of ED-E comments are not supported.
