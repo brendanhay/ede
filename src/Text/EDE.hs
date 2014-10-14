@@ -412,14 +412,19 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- A conditional is introduced and completed with the section syntax:
 --
--- > {% if var %}
+-- > {% if <expr1> %}
+-- >    ... consequent expressions
+-- > {% elif <expr2> %}
+-- >    ... consequent expressions
+-- > {% elif <expr3> %}
 -- >    ... consequent expressions
 -- > {% else %}
 -- >    ... alternate expressions
 -- > {% endif %}
 --
--- The value of @{{ var }}@ determines the branch that is rendered by the template with
--- the else branch being optional.
+-- The boolean result of the @expr@ determines the branch that is rendered by
+-- the template with multiple (or none) elif branches supported, and the
+-- else branch being optional.
 --
 -- In the case of a literal it conforms directly to the supported boolean or relation logical
 -- operators from Haskell.
@@ -437,7 +442,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * @Equal@: '=='
 --
--- * @Not Equal@: '/='
+-- * @Not Equal@: @!=@ (/See:/ '/=')
 --
 -- * @Greater@: '>'
 --
@@ -447,7 +452,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * @Less Or Equal@: '<='
 --
--- * @Negation@: '!'
+-- * @Negation@: @!@ (/See:/ 'not')
+--
+-- /See:/ "Text.EDE.Filters"
 
 -- $case
 --
@@ -557,4 +564,4 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- The input is on the LHS and chained filters (delimited by '|') are on the RHS,
 -- with filters being applied left associatively.
 --
--- /See:/ "Text.EDE.Filters".
+-- /See:/ "Text.EDE.Filters"
