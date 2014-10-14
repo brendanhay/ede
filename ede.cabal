@@ -57,6 +57,7 @@ library
       , Text.EDE.Internal.Parser
       , Text.EDE.Internal.Syntax
       , Text.EDE.Internal.Types
+
       , Paths_ede
 
     ghc-options:       -Wall
