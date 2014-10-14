@@ -51,6 +51,8 @@ import           Text.EDE.Internal.Types
 
 default (Integer)
 
+-- Opaque? def? insert (use Quote constraint)/member?
+
 defaultFilters :: HashMap Text Quoted
 defaultFilters = Map.fromList prelude
   where

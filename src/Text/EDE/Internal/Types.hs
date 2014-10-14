@@ -172,9 +172,9 @@ newtype Var = Var (NonEmpty Id)
 
 -- FIXME: implement constructors, remove hardcoded bool keywords, etc.
 data Lit
-    = LBool !Bool
-    | LNum  !Scientific
-    | LText !Text
+    = LBool   !Bool
+    | LNum    !Scientific
+    | LText   !Text
       deriving (Eq, Show)
 
 data Pat

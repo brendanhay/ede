@@ -19,6 +19,9 @@ import qualified Data.HashSet            as Set
 import           Text.Parser.Token.Style
 import           Text.Trifecta
 
+-- commentStyle :: String -> String -> CommentStyle
+-- commentStyle s e = emptyCommentStyle & commentStart .~ s & commentEnd .~ e
+
 operatorStyle :: TokenParsing m => IdentifierStyle m
 operatorStyle = haskellOps & styleLetter .~ oneOf "-+!&|=><"
 
@@ -26,9 +29,7 @@ variableStyle :: TokenParsing m => IdentifierStyle m
 variableStyle = keywordStyle & styleName .~ "variable"
 
 keywordStyle :: TokenParsing m => IdentifierStyle m
-keywordStyle = haskellIdents
-     & styleReserved .~ keywordSet
-     & styleName     .~ "keyword"
+keywordStyle = haskellIdents & styleReserved .~ keywordSet & styleName .~ "keyword"
 
 keywordSet :: HashSet String
 keywordSet = Set.fromList

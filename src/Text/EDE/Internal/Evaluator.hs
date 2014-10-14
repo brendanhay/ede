@@ -1,11 +1,6 @@
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE GADTs                     #-}
-{-# LANGUAGE LambdaCase                #-}
-{-# LANGUAGE OverloadedStrings         #-}
-{-# LANGUAGE StandaloneDeriving        #-}
-{-# LANGUAGE TupleSections             #-}
-{-# LANGUAGE ViewPatterns              #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.Evaluator
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -19,7 +14,6 @@
 
 module Text.EDE.Internal.Evaluator where
 
-import Debug.Trace
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Reader
@@ -145,7 +139,9 @@ eval (EIncl d k mu) = do
         x <- case u of
             ELit _ l -> return (enc l)
             EVar _ v -> variable v
-            _        -> throwError' d "unexpected template scope {}" [show (delta u)]
+            _        ->
+                throwError' d "unexpected template scope {}"
+                    [show (delta u)]
         return . const $ fromPairs ["scope" .= x]
 
     enc (LBool b) = toJSON b

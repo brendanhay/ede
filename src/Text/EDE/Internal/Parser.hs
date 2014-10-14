@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -20,13 +21,14 @@ module Text.EDE.Internal.Parser
     ) where
 
 import           Control.Applicative
-import           Control.Lens
+import           Control.Lens               hiding (both, noneOf)
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString            as BS
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
+import           Data.List                  (nub)
 import           Data.List.NonEmpty         (NonEmpty(..))
 import qualified Data.List.NonEmpty         as NonEmpty
 import           Data.Scientific
@@ -34,13 +36,14 @@ import           Data.Semigroup
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
+import           Debug.Trace
 import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
 import           Text.Parser.LookAhead
 import qualified Text.Trifecta              as Tri
-import           Text.Trifecta              hiding (Result(..), render)
+import           Text.Trifecta              hiding (Result(..), render, spaces)
 import           Text.Trifecta.Delta
 
 -- FIXME: add 'raw' tag
@@ -50,7 +53,7 @@ import           Text.Trifecta.Delta
 type Includes = HashMap Text (NonEmpty Delta)
 
 data Env = Env
-    { _options  :: !Syntax
+    { _syntax  :: !Syntax
     , _includes :: Includes
     }
 
@@ -74,25 +77,34 @@ runParser o n = res . parseByteString (runStateT (document <* eof) env) pos
     res (Tri.Failure e) = Failure e
 
 document :: Parse m => m Exp
-document = eapp <$> position <*> many expr
-  where
-    expr = choice
-        [ render
-        , ifelif
-        , cases
-        , loop
-        , include
-        , binding
-        , fragment
-        ]
+document = eapp <$> position <*> many (statement <|> render <|> fragment)
 
 render :: Parse m => m Exp
 render = between renderStart renderEnd term
 
 fragment :: Parse m => m Exp
-fragment = notFollowedBy anyStart >> ELit
-    <$> position
-    <*> (LText . Text.pack <$> manyTill1 anyChar (lookAhead anyStart <|> eof))
+fragment = ELit <$> position <*> pack (notFollowedBy cond >> try l0 <|> l1)
+  where
+    l0 = manyTill1 (noneOf "\n") (cond <|> eof)
+    l1 = manyEndBy1 anyChar newline
+
+    cond = () <$ lookAhead (renderStart <|> try blockStart)
+
+    pack = fmap (LText . Text.pack)
+
+statement :: Parse m => m Exp
+statement = trace "statement" $ choice
+    [ ifelif
+    , cases
+    , loop
+    , include
+    , binding
+    ]
+
+block :: Parse m => String -> m a -> m a
+block k = between (try (blockStart *> keyword k)) (try rstrip <|> blockEnd)
+  where
+    rstrip = blockEnd <* skipMany (oneOf "\t ") <* newline
 
 ifelif :: Parse m => m Exp
 ifelif = eif
@@ -140,25 +152,6 @@ binding = do
                  <*> (symbol "=" *> term))
         <*> document
         <*  exit "endlet"
-
-block :: Parse m => String -> m a -> m a
-block k = between (try (start *> keyword k)) end
-  where
-    start = lstrip blockStart
-    end   = rtrim  blockEnd
-
-    lstrip p = do
-        c <- columnByte <$> position
-        n <- fmap fromIntegral . BS.findIndex retain <$> line
-        if n < Just c
-           then p
-           else skipMany (oneOf "\t ") *> p
-
-    rtrim p = p <* try (skipMany (oneOf "\t ") >> newline)
-
-    retain 32 = False
-    retain 9  = False
-    retain _  = True
 
 else' :: Parse m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)
@@ -219,24 +212,42 @@ variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 identifier :: Parse m => m Id
 identifier = ident variableStyle
 
-manyTill1 :: (Monad m, Alternative m) => m a -> m b -> m [a]
-manyTill1 p e = liftM2 (:) p (manyTill p e)
+comments :: Parse m => m ()
+comments = do
+    (start, end) <- syntax' delimComment
+    skipSome (try (string start) *> go (nub (start ++ end)) end)
+  where
+    go both end = ()
+        <$  try (string end)
+        <|> comments               *> go both end
+        <|> skipSome (noneOf both) *> go both end
+        <|> oneOf both             *> go both end
+        <?> "end of comment"
 
 apply :: Parse m => (Delta -> a -> b) -> m a -> m b
 apply f p = f <$> position <*> p
 
-anyStart :: Parse m => m ()
-anyStart = void . try $ renderStart <|> blockStart -- <|> commentStart
+manyTill1 :: Alternative m => m a -> m b -> m [a]
+manyTill1 p end = (:) <$> p <*> manyTill p end
 
-renderStart, blockStart :: Parse m => m ()
-renderStart  = syntax (delimRender._1)  >>= void . symbol
---commentStart = syntax (delimComment._1) >>= void . symbol
-blockStart   = syntax (delimBlock._1)   >>= void . symbol
+manyEndBy1 :: Alternative m => m a -> m a -> m [a]
+manyEndBy1 p end = go
+  where
+    go = (:[]) <$> end <|> (:) <$> p <*> go
 
-renderEnd, blockEnd :: Parse m => m ()
-renderEnd  = syntax (delimRender._2)  >>= void . string
---commentEnd = syntax (delimComment._2) >>= void . string
-blockEnd   = syntax (delimBlock._2)   >>= void . string
+renderStart, commentStart, blockStart :: Parse m => m String
+renderStart  = syntax' (delimRender  . _1) >>= symbol
+commentStart = syntax' (delimComment . _1) >>= string
+blockStart   = do
+    d <- syntax' (delimBlock   . _1)
+    c <- column <$> position
+    if c == 0
+        then skipMany (oneOf "\t ") *> symbol d
+        else symbol d
 
-syntax :: MonadState Env m => Getter Syntax a -> m a
-syntax l = gets (view (options.l))
+renderEnd, blockEnd :: Parse m => m String
+renderEnd = syntax' (delimRender . _2) >>= string
+blockEnd  = syntax' (delimBlock  . _2) >>= string
+
+syntax' :: MonadState Env m => Getter Syntax a -> m a
+syntax' l = gets (view (syntax.l))
