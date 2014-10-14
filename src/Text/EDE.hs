@@ -551,4 +551,4 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- The input is on the LHS and chained filters (delimited by '|') are on the RHS,
 -- with filters being applied left associatively.
 --
--- See "Text.EDE.Filters" for available filters.
+-- /See:/ "Text.EDE.Filters".
