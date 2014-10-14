@@ -22,7 +22,7 @@ import           Text.Trifecta
 
 -- | The default ED-E syntax.
 --
--- Delimieters:
+-- Delimiters:
 --
 -- * Inline: @{{ ... }}@
 --
@@ -37,9 +37,9 @@ defaultSyntax = Syntax
     , _delimBlock   = ("{%", "%}")
     }
 
--- | An alternate syntax (based on Play/Scala templates) which is designed to
--- be used when the default is potentially ambiguous due to another
--- smarty based template syntax.
+-- | An alternate syntax (based on Play/Scala templates) designed to
+-- be used when the default is potentially ambiguous due to another encountered
+-- smarty based syntax.
 --
 -- Delimiters:
 --
