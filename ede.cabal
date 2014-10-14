@@ -28,7 +28,7 @@ description:
     * Markup agnostic. ED-E is used to write out everything from configuration files for
     system services to HTML and formatted emails.
     .
-    * Easy to debug. All parsing, type checking, and rendering steps report helpful
+    * Easy to debug. All parsing, type assurances, and rendering steps report helpful
     error messages with line/column metadata. Variable shadowing, unprintable expressions,
     implicit type coercion, and unbound variable access are all considered errors.
     .
@@ -49,27 +49,35 @@ library
     exposed-modules:
         Text.EDE
       , Text.EDE.Filters
-      , Paths_ede
+      , Text.EDE.Text
 
     other-modules:
-        Text.EDE.Internal.Compiler
-      , Text.EDE.Internal.Lexer
+        Text.EDE.Internal.Eval
+      , Text.EDE.Internal.HOAS
       , Text.EDE.Internal.Parser
+      , Text.EDE.Internal.Syntax
       , Text.EDE.Internal.Types
+
+      , Paths_ede
 
     ghc-options:       -Wall
 
     build-depends:
-        aeson           >= 0.7
-      , base            >= 4.6 && < 5
+        aeson                 >= 0.7
+      , ansi-wl-pprint
+      , base                  >= 4.6   && < 5
+      , bifunctors
+      , bytestring            >= 0.9
       , directory
       , filepath
-      , parsec
-      , scientific      >= 0.3.1
+      , lens                  >= 4.0
+      , parsers
+      , scientific            >= 0.3.1
       , semigroups
-      , text            >= 1.0
+      , text                  >= 1.2
       , text-format
-      , transformers
+      , mtl                   >= 2.2
+      , trifecta
       , unordered-containers
       , vector
 
@@ -100,7 +108,9 @@ test-suite golden
 
     build-depends:
         aeson
-      , base >= 4.6 && < 5
+      , base          >= 4.6 && < 5
+      , bifunctors
+      , bytestring
       , directory
       , ede
       , text

@@ -1,65 +1,52 @@
 SHELL         := /usr/bin/env bash
+CABAL_SANDBOX ?= $(CURDIR)/.cabal-sandbox
+FLAGS         := --enable-tests --enable-benchmarks
 NAME          := ede
 VERSION       := $(shell sed -n 's/^version: *\(.*\)$$/\1/p' $(NAME).cabal)
 BUILD_NUMBER  ?= 0
-CABAL_SANDBOX ?= $(CURDIR)/.cabal-sandbox
-
-CONFIGURED    := dist/setup-config
 DEB           := dist/$(NAME)_$(VERSION)+$(BUILD_NUMBER)_amd64.deb
-BIN           := dist/build/$(NAME)/$(NAME)
-IMG           := dist/image/$(NAME)
+BIN           := dist/release/$(NAME)
 
-FLAGS         := --disable-documentation --disable-library-coverage
+.PHONY: test doc
 
-
-.PHONY: test bench lint doc dist deps
-
-all: build
-
-build: $(CONFIGURED)
+build: dist/setup-config
 	cabal build $(addprefix -,$(findstring j,$(MAKEFLAGS)))
 
+all:
+	make clean; make install && make build
+
+dist/setup-config: install
+	cabal configure $(FLAGS) --bindir=bin --libdir=lib
+
 install: cabal.sandbox.config
-	cabal install $(FLAGS)
-
-dist: $(DEB)
-	cabal sdist
-
-clean:
-	-rm -rf dist cabal.sandbox.config .cabal-sandbox
-	cabal clean
-
-test: $(CONFIGURED)
-	cabal test
-
-bench: $(CONFIGURED)
-	cabal bench
-
-lint:
-	hlint src
-
-doc:
-	cabal haddock
+	cabal install -j $(FLAGS) \
+ --only-dependencies \
+ --disable-documentation \
+ --disable-library-coverage
 
 cabal.sandbox.config:
 	cabal sandbox init --sandbox=$(CABAL_SANDBOX)
 
-deps: cabal.sandbox.config
-	cabal install -j --only-dependencies --enable-tests --enable-benchmarks
+clean:
+	-rm -rf bin lib dist cabal.sandbox.config .cabal-sandbox
+	cabal clean
 
-$(CONFIGURED): deps cabal.sandbox.config $(NAME).cabal
-	cabal configure --bindir=bin --libdir=lib --enable-tests --enable-benchmarks
+test:
+	cabal test
 
-$(BIN): $(CONFIGURED) test
-	cabal build -j
+doc:
+	cabal haddock
 
-$(IMG): $(BIN)
-	cabal copy --destdir=dist/image
+dist: $(DEB)
+	cabal sdist
 
-%.deb: $(IMG)
+$(BIN): build
+	cabal copy --destdir=dist/release && upx $@
+
+%.deb: $(BIN)
 	makedeb --name=$(NAME) \
-          --version=$(VERSION) \
-          --debian-dir=deb \
-          --build=$(BUILD_NUMBER) \
-          --architecture=amd64 \
-          --output-dir=dist
+ --version=$(VERSION) \
+ --debian-dir=deb \
+ --build=$(BUILD_NUMBER) \
+ --architecture=amd64 \
+ --output-dir=dist

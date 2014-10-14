@@ -25,11 +25,11 @@ ack.
 {% if one == ten %}
 No..
 {% else %}
-{{ one }} /= {{ ten }}
+{{ one }} != {{ ten }}
 {% endif %}
 
-{% if ten /= one %}
-{{ ten }} /= {{ one }}
+{% if ten != one %}
+{{ ten }} != {{ one }}
 {% endif %}
 
 {% if ten > one %}

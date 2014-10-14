@@ -1,6 +1,0 @@
-lorem ipsum
-LOREM IPSUM
-true
-TRUE
-
-text | lower == "lorem ipsum"

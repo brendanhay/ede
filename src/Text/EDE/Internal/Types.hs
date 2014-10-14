@@ -1,7 +1,11 @@
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -16,200 +20,187 @@
 module Text.EDE.Internal.Types where
 
 import           Control.Applicative
-import           Control.Monad
-import           Data.Aeson              hiding (Result, Success, Error)
-import           Data.Aeson.Types        (Pair)
-import           Data.HashMap.Strict     (HashMap)
-import           Data.List               (intercalate)
-import           Data.Monoid             hiding ((<>))
+import           Control.Lens
+import           Data.Aeson                   hiding (Result(..))
+import           Data.Aeson.Types             (Pair)
+import           Data.Foldable
+import           Data.HashMap.Strict          (HashMap)
+import           Data.List.NonEmpty           (NonEmpty(..))
+import           Data.Monoid                  hiding ((<>))
+import           Data.Maybe
 import           Data.Scientific
 import           Data.Semigroup
-import           Data.Text               (Text)
-import           Data.Text.Buildable
-import           Data.Text.Format        (Format, format)
-import           Data.Text.Format.Params (Params)
-import qualified Data.Text.Lazy          as LText
-import           Data.Text.Lazy.Builder
-
--- | A function to resolve the target of an @include@ expression.
-type Resolver m = Text -> Meta -> m (Result Template)
-
-instance Monad m => Semigroup (Resolver m) where
-    (<>) f g = \x y -> liftM2 mplus (f x y) (g x y)
-    {-# INLINE (<>) #-}
-
--- | A parsed and compiled template.
-data Template = Template
-    { tmplName :: !Text
-    , tmplExpr :: UExp
-    , tmplIncl :: HashMap Text UExp
-    } deriving (Eq)
-
--- | Meta information describing the source position of an expression or error.
-data Meta = Meta
-    { metaSource :: !String
-    , metaRow    :: !Int
-    , metaColumn :: !Int
-    } deriving (Eq, Ord)
-
-instance Show Meta where
-    show Meta{..} = metaSource ++ ":" ++ show metaRow ++ "," ++ show metaColumn
+import           Data.Text                    (Text)
+import           Data.Text.Format             (Format, format)
+import           Data.Text.Format.Params      (Params)
+import qualified Data.Text.Lazy               as LText
+import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc, vsep)
+import           Text.Trifecta.Delta
 
 -- | The result of running parsing or rendering steps.
 data Result a
-    = Error !Meta [String]
-    | Success a
-      deriving (Eq, Ord, Show)
+    = Success a
+    | Failure Doc
+      deriving (Show, Functor, Foldable, Traversable)
 
-instance Functor Result where
-    fmap _ (Error m e) = Error m e
-    fmap f (Success x) = Success $ f x
-    {-# INLINE fmap #-}
+makePrisms ''Result
 
 instance Monad Result where
     return          = Success
     {-# INLINE return #-}
-    Error m e >>= _ = Error m e
-    Success a >>= k = k a
+    Success x >>= k = k x
+    Failure e >>= _ = Failure e
     {-# INLINE (>>=) #-}
 
 instance Applicative Result where
-    pure  = return
+    pure = return
     {-# INLINE pure #-}
-    (<*>) = ap
+    Success f <*> Success x  = Success (f x)
+    Success _ <*> Failure e  = Failure e
+    Failure e <*> Success _  = Failure e
+    Failure e <*> Failure e' = Failure (vsep [e, e'])
     {-# INLINE (<*>) #-}
 
 instance Alternative Result where
-    empty = fail "empty"
-    {-# INLINE empty #-}
-    (<|>) a@(Success _) _ = a
-    (<|>) _ b             = b
+    Success x <|> Success _  = Success x
+    Success x <|> Failure _  = Success x
+    Failure _ <|> Success x  = Success x
+    Failure e <|> Failure e' = Failure (vsep [e, e'])
     {-# INLINE (<|>) #-}
+    empty = Failure mempty
+    {-# INLINE empty #-}
 
-instance MonadPlus Result where
-    mzero = fail "mzero"
-    {-# INLINE mzero #-}
-    mplus = (<|>)
-    {-# INLINE mplus #-}
+instance Show a => Pretty (Result a) where
+    pretty (Success x) = pretty (show x)
+    pretty (Failure e) = pretty e
 
-instance Monoid a => Monoid (Result a) where
-    mempty  = Success mempty
-    {-# INLINE mempty #-}
-    mappend = mplus
-    {-# INLINE mappend #-}
-
--- | Convert a 'Result' to an 'Either' with the 'Left' case holding a formatted
--- error message, and 'Right' being the successful result over which 'Result' is paramterised.
+-- | Convert a 'Result' to an 'Either' with the 'Left' case holding a
+-- formatted error message, and 'Right' being the successful result over
+-- which 'Result' is paramterised.
 eitherResult :: Result a -> Either String a
-eitherResult = result f Right
-  where
-    f Meta{..} e = Left . concat $
-        [ "ED-E error position: "
-        , concat [metaSource, ":(", show metaRow, ",", show metaColumn, ")"]
-        , ", messages: " ++ intercalate ", " e
-        ]
+eitherResult = result (Left . show) Right
 
 -- | Perform a case analysis on a 'Result'.
-result :: (Meta -> [String] -> b) -- ^ Function to apply to the 'Error' parameters.
-       -> (a -> b)                -- ^ Function to apply to the 'Success' case.
-       -> Result a                -- ^ The 'Result' to map over.
+result :: (Doc -> b) -- ^ Function to apply to the 'Failure' case.
+       -> (a -> b)   -- ^ Function to apply to the 'Success' case.
+       -> Result a   -- ^ The 'Result' to map over.
        -> b
-result f _ (Error m e) = f m e
 result _ g (Success x) = g x
+result f _ (Failure e) = f e
 
 -- | Convenience for returning a successful 'Result'.
 success :: Monad m => a -> m (Result a)
 success = return . Success
 
 -- | Convenience for returning an error 'Result'.
-failure :: Monad m => Meta -> [String] -> m (Result a)
-failure m = return . Error m
+failure :: Monad m => Doc -> m (Result a)
+failure = return . Failure
 
-newtype Id = Id Text
-    deriving (Eq, Ord, Show)
+throwError :: Params ps => Format -> ps -> Result a
+throwError fmt = Failure . pretty . LText.unpack . format fmt
 
-instance Buildable Id where
-    build (Id i) = build i
-    {-# INLINE build #-}
+type Delim = (String, String)
 
-data Fun where
-    Fun :: (Eq a, Eq b) => TType a -> TType b -> (a -> b) -> Fun
+data Syntax = Syntax
+    { _delimRender  :: Delim
+    , _delimComment :: Delim
+    , _delimBlock   :: Delim
+    }
 
-instance Eq Fun where
-    _ == _ = False
+makeLenses ''Syntax
 
-data TType a where
-    TNil  :: TType ()
-    TText :: TType Text
-    TBool :: TType Bool
-    TNum  :: TType Scientific
-    TBld  :: TType Builder
-    TMap  :: TType Object
-    TList :: TType Array
-    TFun  :: TType Fun
-    TVar  :: TType a
+-- | A function to resolve the target of an @include@ expression.
+type Resolver m = Syntax -> Text -> Delta -> m (Result Template)
 
-deriving instance Show (TType a)
+instance Applicative m => Semigroup (Resolver m) where
+    (f <> g) o k d = liftA2 (<|>) (f o k d) (g o k d) -- Haha!
+    {-# INLINE (<>) #-}
 
-data UExp
-    = UNil
-    | UText !Meta !Text
-    | UBool !Meta !Bool
-    | UNum  !Meta !Scientific
-    | UBld  !Meta !Builder
-    | UVar  !Meta !Id
-    | UFun  !Meta !Id
-    | UApp  !Meta !UExp !UExp
-    | UNeg  !Meta !UExp
-    | UBin  !Meta !BinOp !UExp !UExp
-    | URel  !Meta !RelOp !UExp !UExp
-    | UCond !Meta !UExp !UExp !UExp
-    | UCase !Meta !UExp [(UExp, UExp)] !UExp
-    | ULoop !Meta !Id !UExp !UExp !UExp
-    | UIncl !Meta !Text (Maybe UExp)
-      deriving (Eq, Ord, Show)
+-- | A parsed and compiled template.
+data Template = Template
+    { _tmplName :: !Text
+    , _tmplExp  :: !Exp
+    , _tmplIncl :: HashMap Text Exp
+    } deriving (Eq)
 
--- FIXME:
--- {% assign ... %}
--- {% capture ... %}
+type Id = Text
 
-data BinOp = And | Or
-    deriving (Eq, Ord, Show)
+newtype Var = Var (NonEmpty Id)
+    deriving (Eq, Show)
 
-data RelOp
-    = Equal
-    | NotEqual
-    | Greater
-    | GreaterEqual
-    | Less
-    | LessEqual
-      deriving (Eq, Ord, Show)
+-- FIXME: implement constructors, remove hardcoded bool keywords, etc.
+data Lit
+    = LBool !Bool
+    | LNum  !Scientific
+    | LText !Text
+      deriving (Eq, Show)
 
-throwError :: Params ps => Meta -> Format -> ps -> Result a
-throwError m f = Error m . (:[]) . LText.unpack . format f
+data Pat
+    = PWild
+    | PVar !Var
+    | PLit !Lit
+      deriving (Eq, Show)
 
-mkMeta :: String -> Meta
-mkMeta n = Meta n 0 0
+type Alt = (Pat, Exp)
 
-_meta :: UExp -> Meta
-_meta u = case u of
-    UNil            -> mkMeta "_meta"
-    UText m _       -> m
-    UBool m _       -> m
-    UNum  m _       -> m
-    UBld  m _       -> m
-    UVar  m _       -> m
-    UFun  m _       -> m
-    UApp  m _ _     -> m
-    UNeg  m _       -> m
-    UBin  m _ _ _   -> m
-    URel  m _ _ _   -> m
-    UCond m _ _ _   -> m
-    UCase m _ _ _   -> m
-    ULoop m _ _ _ _ -> m
-    UIncl m _ _     -> m
+data Exp
+    = ELit  !Delta !Lit
+    | EVar  !Delta !Var
+    | EFun  !Delta !Id
+    | EApp  !Delta !Exp  !Exp
+    | ELet  !Delta !Id   !Exp  !Exp
+    | ECase !Delta !Exp  [Alt]
+    | ELoop !Delta !Id   !Var  !Exp (Maybe Exp)
+    | EIncl !Delta !Text (Maybe Exp)
+      deriving (Eq, Show)
+
+instance HasDelta Exp where
+    delta = \case
+        ELit  d _       -> d
+        EVar  d _       -> d
+        EFun  d _       -> d
+        EApp  d _ _     -> d
+        ELet  d _ _ _   -> d
+        ECase d _ _     -> d
+        ELoop d _ _ _ _ -> d
+        EIncl d _ _     -> d
+
+var :: Id -> Var
+var = Var . (:| [])
+
+eapp :: Delta -> [Exp] -> Exp
+eapp d []     = ELit d (LText mempty)
+eapp _ [e]    = e
+eapp d (e:es) = foldl' (EApp d) e es
+
+efun :: Delta -> Id -> Exp -> Exp
+efun d = EApp d . EFun d
+
+ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
+ecase p ws f = ECase (delta p) p (ws ++ maybe [] ((:[]) . wild) f)
+
+eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
+eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
+  where
+    c (p, w) e = ECase (delta p) p [true w, false e]
+
+wild, true, false :: Exp -> Alt
+wild  = (PWild,)
+true  = (PLit (LBool True),)
+false = (PLit (LBool False),)
+
+bld :: Delta -> Exp
+bld = (`ELit` LText mempty)
+
+-- | Unwrap a 'Value' to an 'Object' safely.
+--
+-- See 'Aeson''s documentation for more details.
+fromValue :: Value -> Maybe Object
+fromValue (Object o) = Just o
+fromValue _          = Nothing
 
 -- | Create an 'Object' from a list of name/value 'Pair's.
+--
 -- See 'Aeson''s documentation for more details.
 fromPairs :: [Pair] -> Object
 fromPairs = (\(Object o) -> o) . object

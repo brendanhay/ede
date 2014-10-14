@@ -1,13 +1,47 @@
 {
   "text": "Lorem Ipsum",
-  "bool": true
+  "bool": true,
+  "number": 1.0,
+  "list": ["a", "b", "c", "d", "e"],
+  "object": {"key": "value"}
 }
 ---
-{{ text | lower }}
-{{ text | lower | upper }}
-{{ bool | show | lower }}
-{{ bool | show | upper }}
+Bool:
+{{ !bool }}
+{{ !false }}
 
+Eq:
+
+Ord:
+
+Num:
+
+RealFrac:
+
+Text:
+{{ text | lower }}
+{{ text | upper }}
+{{ text | lowerFirst }}
+{{ text | lower | upperFirst }}
 {% if text | lower == "lorem ipsum" %}
 text | lower == "lorem ipsum"
 {% endif %}
+
+Sequences:
+{{ "" | length }}
+{{ "123" | length }}
+{{ list | length }}
+{{ object | length }}
+{{ "" | empty }}
+{{ "supercalifragilistic" | empty }}
+{{ list | empty }}
+{{ object | empty }}
+
+Collections:
+
+Poly:
+{{ text | show }}
+{{ bool | show }}
+{{ number | show }}
+{{ list | show }}
+{{ object | show }}
