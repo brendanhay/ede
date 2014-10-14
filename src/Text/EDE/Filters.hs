@@ -1,5 +1,5 @@
 {-# LANGUAGE ExtendedDefaultRules       #-}
-{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
@@ -14,10 +14,35 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
+-- | A default set of prelude-like filters and the means to construct your own.
 module Text.EDE.Filters
     (
-    -- * Defaults
+    -- * Prelude
       defaultFilters
+
+    -- ** Boolean
+    -- $boolean
+
+    -- ** Equality
+    -- $equality
+
+    -- ** Relational
+    -- $relational
+
+    -- ** Numeric
+    -- $numeric
+
+    -- ** Fractional
+    -- $fractional
+
+    -- ** Textual
+    -- $textual
+
+    -- ** Collection
+    -- $collection
+
+    -- ** Polymorphic
+    -- $polymorphic
 
     -- * Constructing filters
     , Binding (..)
@@ -63,6 +88,14 @@ defaultFilters = Map.unions
     , polymorphic
     ]
 
+-- $boolean
+--
+-- * '!'  @:: Bool -> Bool@
+--
+-- * '&&' @:: Bool -> Bool -> Bool@
+--
+-- * '||' @:: Bool -> Bool -> Bool@
+
 boolean :: HashMap Text Binding
 boolean = Map.fromList
     [ "!"  @: quote not
@@ -70,11 +103,27 @@ boolean = Map.fromList
     , "||" @: quote (||)
     ]
 
+-- $equality
+--
+-- * '==' @:: a -> a -> Bool@
+--
+-- * @!=@ @:: a -> a -> Bool@ Equivalent: '/='
+
 equality :: HashMap Text Binding
 equality = Map.fromList
     [ "==" @: qpoly2 (==)
     , "!=" @: qpoly2 (/=)
     ]
+
+-- $relational
+--
+-- * '>'  @:: a -> a -> Bool@
+--
+-- * '>=' @:: a -> a -> Bool@
+--
+-- * '<=' @:: a -> a -> Bool@
+--
+-- * '<=' @:: a -> a -> Bool@
 
 relational :: HashMap Text Binding
 relational = Map.fromList
@@ -83,6 +132,20 @@ relational = Map.fromList
     , "<=" @: qnum2 (<=)
     , "<"  @: qnum2 (<)
     ]
+
+-- $numeric
+--
+-- * '+'      @:: Number -> Number -> Number@
+--
+-- * '-'      @:: Number -> Number -> Number@
+--
+-- * '*'      @:: Number -> Number -> Number@
+--
+-- * 'abs'    @:: Number -> Number@
+--
+-- * 'signum' @:: Number -> Number@
+--
+-- * 'negate' @:: Number -> Number@
 
 numeric :: HashMap Text Binding
 numeric = Map.fromList
@@ -94,6 +157,16 @@ numeric = Map.fromList
     , "negate" @: qnum1 negate
     ]
 
+-- $fractional
+--
+-- * 'truncate' @:: Number -> Number@
+--
+-- * 'round'    @:: Number -> Number@
+--
+-- * 'ceiling'  @:: Number -> Number@
+--
+-- * 'floor'    @:: Number -> Number@
+
 fractional :: HashMap Text Binding
 fractional = Map.fromList
     [ "truncate" @: qnum1 (fromIntegral . truncate)
@@ -101,6 +174,26 @@ fractional = Map.fromList
     , "ceiling"  @: qnum1 (fromIntegral . ceiling)
     , "floor"    @: qnum1 (fromIntegral . floor)
     ]
+
+-- $textual
+--
+-- * @lower@      @:: Text -> Text@
+--
+-- * @upper@      @:: Text -> Text@
+--
+-- * @lowerFirst@ @:: Text -> Text@
+--
+-- * @upperFirst@ @:: Text -> Text@
+--
+-- * @titleize@   @:: Text -> Text@
+--
+-- * @pascalize@  @:: Text -> Text@
+--
+-- * @camelize@   @:: Text -> Text@
+--
+-- * @underscore@ @:: Text -> Text@
+--
+-- * @hyphenate@  @:: Text -> Text@
 
 textual :: HashMap Text Binding
 textual = Map.fromList
@@ -115,12 +208,22 @@ textual = Map.fromList
     , "hyphenate"  @: quote hyphenate
     ]
 
+-- $collection
+--
+-- * @length@ @:: Collection a => a -> Number@
+--
+-- * @empty@  @:: Collection a => a -> Bool@
+
 collection :: HashMap Text Binding
 collection = Map.fromList
     [ "length" @: qcol1 Text.length Map.size Vector.length
     , "empty"  @: qcol1 Text.null   Map.null Vector.null
     -- , ("join",  quote hyphenate
     ]
+
+-- $polymorphic
+--
+-- * 'show' @:: a -> Text@
 
 polymorphic :: HashMap Text Binding
 polymorphic = Map.fromList
