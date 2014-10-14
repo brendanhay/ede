@@ -19,7 +19,7 @@ ED-E is a templating language written in Haskell with a specific set of features
   done ahead of time.
 * **Markup agnostic.** ED-E is used to write out everything from configuration files for
   system services to HTML and formatted emails.
-* **Easy to debug.** All parsing, type checking, and rendering steps report helpful
+* **Easy to debug.** All parsing, type assurances, and rendering steps report helpful
   error messages with line/column metadata. Variable shadowing, unprintable expressions,
   implicit type coercion, and unbound variable access are all considered errors.
 * **Control over purity.** Users can choose to introduce impure resolution of

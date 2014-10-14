@@ -8,7 +8,7 @@
 
   
 
-   {% if var %} 
+   {% if var %}    
        {{ var }}  
    {% endif %} 
   

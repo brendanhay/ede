@@ -1,4 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ExtendedDefaultRules       #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE OverloadedStrings          #-}
+
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- Module      : Text.EDE.Filters
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -12,127 +16,119 @@
 
 module Text.EDE.Filters
     (
-    -- * Default filter table
+    -- * Defaults
       defaultFilters
 
-    -- * Textual
-    , lower
-    , upper
-    , lowerFirst
-    , upperFirst
-    , titleize
-    , pascalize
-    , underscore
-    , hyphenate
+    -- * Constructing filters
+    , Binding (..)
 
-    -- * HashMap
-    , mapLength
+    -- ** Classes
+    , Quote   (..)
+    , Unquote (..)
 
-    -- * Vector
-    , listLength
+    -- ** Restricted quoters
+    , qapply
+    , qpoly2
+    , qnum1
+    , qnum2
+    , qcol1
 
-    -- * Filter signatures
-    , Fun   (..)
-    , TType (..)
+    -- ** Errors
+    , unexpected
+    , typeOf
     ) where
 
-import           Data.Char
-import           Data.HashMap.Strict        (HashMap)
-import qualified Data.HashMap.Strict        as Map
-import           Data.Scientific
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import           Data.Text.Unsafe           (unsafeHead, unsafeTail)
-import           Data.Vector                (Vector)
-import qualified Data.Vector                as Vector
-import           Text.EDE.Internal.Types
+import           Data.Aeson              (Value, encode)
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as Map
+import           Data.Text               (Text)
+import qualified Data.Text               as Text
+import qualified Data.Text.Lazy          as LText
+import qualified Data.Text.Lazy.Encoding as LText
+import qualified Data.Vector             as Vector
+import           Text.EDE.Internal.HOAS
+import           Text.EDE.Text
 
--- FIXME: Create polymorphic filters
-defaultFilters :: HashMap Text Fun
-defaultFilters = Map.fromList
-    [ ("lower",       Fun TText TText lower)
-    , ("upper",       Fun TText TText upper)
-    , ("lowerFirst",  Fun TText TText lowerFirst)
-    , ("upperFirst",  Fun TText TText upperFirst)
-    , ("titleize",    Fun TText TText titleize)
-    , ("pascalize",   Fun TText TText pascalize)
-    , ("camelize",    Fun TText TText camelize)
-    , ("underscore",  Fun TText TText underscore)
-    , ("hyphenate",   Fun TText TText hyphenate)
-    , ("listLength",  Fun TList TNum  listLength)
-    , ("mapLength",   Fun TMap  TNum  mapLength)
+default (Integer)
+
+defaultFilters :: HashMap Text Binding
+defaultFilters = Map.unions
+    [ boolean
+    , equality
+    , relational
+    , numeric
+    , fractional
+    , textual
+    , collection
+    , polymorphic
     ]
 
-lower :: Text -> Text
-lower = Text.toLower
+boolean :: HashMap Text Binding
+boolean = Map.fromList
+    [ "!"  @: quote not
+    , "&&" @: quote (&&)
+    , "||" @: quote (||)
+    ]
 
-upper :: Text -> Text
-upper = Text.toUpper
+equality :: HashMap Text Binding
+equality = Map.fromList
+    [ "==" @: qpoly2 (==)
+    , "!=" @: qpoly2 (/=)
+    ]
 
-lowerFirst :: Text -> Text
-lowerFirst t
-    | Text.null t = t
-    | isUpper h   = toLower h `Text.cons` Text.tail t
-    | otherwise   = t
-  where
-    h = Text.head t
+relational :: HashMap Text Binding
+relational = Map.fromList
+    [ ">"  @: qnum2 (>)
+    , ">=" @: qnum2 (>=)
+    , "<=" @: qnum2 (<=)
+    , "<"  @: qnum2 (<)
+    ]
 
-upperFirst :: Text -> Text
-upperFirst t
-    | Text.null t = t
-    | isLower h   = toUpper h `Text.cons` Text.tail t
-    | otherwise   = t
-  where
-    h = Text.head t
+numeric :: HashMap Text Binding
+numeric = Map.fromList
+    [ "+"      @: qnum2 (+)
+    , "-"      @: qnum2 (-)
+    , "*"      @: qnum2 (*)
+    , "abs"    @: qnum1 abs
+    , "signum" @: qnum1 signum
+    , "negate" @: qnum1 negate
+    ]
 
-titleize :: Text -> Text
-titleize = Text.toTitle
+fractional :: HashMap Text Binding
+fractional = Map.fromList
+    [ "truncate" @: qnum1 (fromIntegral . truncate)
+    , "round"    @: qnum1 (fromIntegral . round)
+    , "ceiling"  @: qnum1 (fromIntegral . ceiling)
+    , "floor"    @: qnum1 (fromIntegral . floor)
+    ]
 
-pascalize :: Text -> Text
-pascalize = substitute . Text.concat . map Text.toTitle . split . upperFirst
+textual :: HashMap Text Binding
+textual = Map.fromList
+    [ "lower"      @: quote Text.toLower
+    , "upper"      @: quote Text.toUpper
+    , "lowerFirst" @: quote lowerFirst
+    , "upperFirst" @: quote upperFirst
+    , "titleize"   @: quote titleize
+    , "pascalize"  @: quote pascalize
+    , "camelize"   @: quote camelize
+    , "underscore" @: quote underscore
+    , "hyphenate"  @: quote hyphenate
+    ]
 
-camelize :: Text -> Text
-camelize = lowerFirst . pascalize
+collection :: HashMap Text Binding
+collection = Map.fromList
+    [ "length" @: qcol1 Text.length Map.size Vector.length
+    , "empty"  @: qcol1 Text.null   Map.null Vector.null
+    -- , ("join",  quote hyphenate
+    ]
 
-underscore :: Text -> Text
-underscore = Text.intercalate (Text.singleton '_') . split
+polymorphic :: HashMap Text Binding
+polymorphic = Map.fromList
+    [ "show" @: quote value
+    ]
 
-hyphenate :: Text -> Text
-hyphenate = Text.intercalate (Text.singleton '-') . split
+(@:) :: Quote a => Text -> a -> (Text, Binding)
+k @: q = (k, quote q)
 
-listLength :: Vector a -> Scientific
-listLength = fromIntegral . Vector.length
-
-mapLength :: HashMap k v -> Scientific
-mapLength = fromIntegral . Map.size
-
-split :: Text -> [Text]
-split t
-    | Text.null t = []
-    | otherwise   = filter (/= "") $ loop t
-  where
-    loop s
-        | Text.null s' = [l]
-        | otherwise    = l : g (loop $ unsafeTail s')
-      where
-        g [] = []
-        g x'@(x:xs)
-            | Just c <- snd . f $ unsafeHead s' = (c `Text.cons` x) : xs
-            | otherwise = x'
-
-        (l, s') = Text.span (not . fst . f) s
-
-    f ' '           = (True, Nothing)
-    f '\n'          = (True, Nothing)
-    f '-'           = (True, Nothing)
-    f c | isUpper c = (True,  Just c)
-        | otherwise = (False, Nothing)
-
-substitute :: Text -> Text
-substitute = Text.concatMap f
-  where
-    f '.' = "_"
-    f '/' = "_"
-    f '(' = "_"
-    f ')' = ""
-    f  c  = Text.singleton c
+value :: Value -> LText.Text
+value = LText.decodeUtf8 . encode
