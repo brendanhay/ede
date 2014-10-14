@@ -1,0 +1,8 @@
+{
+  "var": true,
+  "list": [1,2,3,4,5]
+}
+---
+    {% if var %} this is a piece of text on a single line {% endif %}    
+
+{% for n in list %}{{ n.value }} {% endfor %}

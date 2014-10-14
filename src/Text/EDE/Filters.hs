@@ -102,6 +102,7 @@ defaultFilters = Map.fromList prelude
         -- , ("empty",  useq Text.null Map.null Vector.null)
 
         -- -- Collections
+        -- , ("hyphenate",  quote hyphenate)
 
         -- -- Poly
         , ("show", quote value)
