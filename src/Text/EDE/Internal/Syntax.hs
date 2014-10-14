@@ -20,6 +20,16 @@ import           Text.EDE.Internal.Types
 import           Text.Parser.Token.Style
 import           Text.Trifecta
 
+-- | The default ED-E syntax.
+--
+-- Delimieters:
+--
+-- * Inline: @{{ ... }}@
+--
+-- * Comments: @{# ... #}@
+--
+-- * Control Structures: @{% ... %}@
+--
 defaultSyntax :: Syntax
 defaultSyntax = Syntax
     { _delimRender  = ("{{", "}}")
@@ -27,6 +37,18 @@ defaultSyntax = Syntax
     , _delimBlock   = ("{%", "%}")
     }
 
+-- | An alternate syntax (based on Play/Scala templates) which is designed to
+-- be used when the default is potentially ambiguous due to another
+-- smarty based template syntax.
+--
+-- Delimiters:
+--
+-- * Inline: @\<\@ ... \@>@
+--
+-- * Comments: @\@* ... *\@@
+--
+-- * Control Structures: @\@( ... )\@@
+--
 alternateSyntax :: Syntax
 alternateSyntax = Syntax
     { _delimRender  = ("<@", "@>")

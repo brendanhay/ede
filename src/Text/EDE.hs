@@ -60,10 +60,6 @@ module Text.EDE
     , result
     , success
     , failure
-
-    , defaultSyntax
-    , alternateSyntax
-
     -- * Input
     -- $input
     , fromValue
@@ -79,6 +75,9 @@ module Text.EDE
     , delimRender
     , delimComment
     , delimBlock
+
+    , defaultSyntax
+    , alternateSyntax
 
     -- ** Comments
     -- $comments
@@ -131,7 +130,7 @@ import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
--- | EDE Version.
+-- | ED-E Version.
 version :: Version
 version = Paths.version
 
