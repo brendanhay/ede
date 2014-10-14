@@ -19,4 +19,4 @@ mv $DOCDIR/* .
 git add *.html *.js *.css *.gif *.png
 git commit -m "Generated documentation from $HEAD"
 git push origin gh-pages
-git checkout master
+git checkout develop
