@@ -23,3 +23,19 @@ unknown
 {% if yes == "graugh" %}
 yes == "graugh"
 {% endif %}
+
+{% if none1 %}
+none1
+{% elif none2 %}
+none2
+{% elif none3 %}
+none3
+{% else %}
+none!
+{% endif %}
+
+{% if no %}
+no
+{% elif yes %}
+yes!
+{% endif %}

@@ -25,10 +25,8 @@ import           Control.Lens               hiding (both, noneOf)
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
 import           Data.ByteString            (ByteString)
-import qualified Data.ByteString            as BS
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
-import           Data.List                  (nub)
 import           Data.List.NonEmpty         (NonEmpty(..))
 import qualified Data.List.NonEmpty         as NonEmpty
 import           Data.Scientific
@@ -83,14 +81,20 @@ render :: Parse m => m Exp
 render = between renderStart renderEnd term
 
 fragment :: Parse m => m Exp
-fragment = ELit <$> position <*> pack (notFollowedBy cond >> try l0 <|> l1)
+fragment = ELit <$> position <*> pack (notFollowedBy cond >> try line0 <|> line1)
   where
-    l0 = manyTill1 (noneOf "\n") (cond <|> eof)
-    l1 = manyEndBy1 anyChar newline
+    line0 = manyTill1 (noneOf "\n") (cond <|> eof)
+    line1 = manyEndBy1 anyChar newline
 
     cond = () <$ lookAhead (renderStart <|> try blockStart)
 
     pack = fmap (LText . Text.pack)
+
+-- -- FIXME: empty text
+-- comment :: Parse m => m Exp
+-- comment = ELit <$> position <*> pure (LText mempty) <* p
+--   where
+--     p = between (try (commentStart)) (rstrip commentEnd <|> commentEnd) (skipMany anyChar)
 
 statement :: Parse m => m Exp
 statement = trace "statement" $ choice
@@ -102,9 +106,7 @@ statement = trace "statement" $ choice
     ]
 
 block :: Parse m => String -> m a -> m a
-block k = between (try (blockStart *> keyword k)) (try rstrip <|> blockEnd)
-  where
-    rstrip = blockEnd <* skipMany (oneOf "\t ") <* newline
+block k = between (try (blockStart *> keyword k)) (rstrip blockEnd <|> blockEnd)
 
 ifelif :: Parse m => m Exp
 ifelif = eif
@@ -212,17 +214,11 @@ variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 identifier :: Parse m => m Id
 identifier = ident variableStyle
 
-comments :: Parse m => m ()
-comments = do
-    (start, end) <- syntax' delimComment
-    skipSome (try (string start) *> go (nub (start ++ end)) end)
-  where
-    go both end = ()
-        <$  try (string end)
-        <|> comments               *> go both end
-        <|> skipSome (noneOf both) *> go both end
-        <|> oneOf both             *> go both end
-        <?> "end of comment"
+rstrip :: Parse m => m a -> m a
+rstrip p = try (p <* spaces <* newline)
+
+spaces :: Parse m => m ()
+spaces = skipMany (oneOf "\t ")
 
 apply :: Parse m => (Delta -> a -> b) -> m a -> m b
 apply f p = f <$> position <*> p
@@ -235,19 +231,25 @@ manyEndBy1 p end = go
   where
     go = (:[]) <$> end <|> (:) <$> p <*> go
 
-renderStart, commentStart, blockStart :: Parse m => m String
-renderStart  = syntax' (delimRender  . _1) >>= symbol
-commentStart = syntax' (delimComment . _1) >>= string
-blockStart   = do
-    d <- syntax' (delimBlock   . _1)
+renderStart, renderEnd :: Parse m => m String
+renderStart = delimiter (delimRender._1) >>= symbol
+renderEnd   = delimiter (delimRender._2) >>= string
+
+-- commentStart, commentEnd :: Parse m => m String
+-- commentStart = insensitive (delimComment._1)
+-- commentEnd   = delimiter   (delimComment._2) >>= string
+
+blockStart, blockEnd :: Parse m => m String
+blockStart = insensitive (delimBlock._1)
+blockEnd   = delimiter   (delimBlock._2) >>= string
+
+insensitive :: Parse m => Getter Syntax String -> m String
+insensitive l = do
+    d <- delimiter l
     c <- column <$> position
     if c == 0
-        then skipMany (oneOf "\t ") *> symbol d
+        then spaces *> symbol d
         else symbol d
 
-renderEnd, blockEnd :: Parse m => m String
-renderEnd = syntax' (delimRender . _2) >>= string
-blockEnd  = syntax' (delimBlock  . _2) >>= string
-
-syntax' :: MonadState Env m => Getter Syntax a -> m a
-syntax' l = gets (view (syntax.l))
+delimiter :: MonadState Env m => Getter Syntax a -> m a
+delimiter l = gets (view (syntax.l))
