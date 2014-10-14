@@ -29,6 +29,7 @@ module Text.EDE
     , parse
     , parseIO
     , parseFile
+    , parseFileWith
     , parseWith
 
     -- ** Includes
@@ -163,8 +164,14 @@ parseIO p = parseWith defaultSyntax (includeFile p) "Text.EDE.parse"
 -- target (unless absolute paths are used).
 parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
-parseFile p = loadFile p >>= result failure
-    (parseWith defaultSyntax (includeFile (takeDirectory p)) (Text.pack p))
+parseFile = parseFileWith defaultSyntax
+
+-- | /See:/ 'parseFile'.
+parseFileWith :: Syntax   -- ^ Delimiters and parsing options.
+              -> FilePath -- ^ Path to the template to load and parse.
+              -> IO (Result Template)
+parseFileWith s p = loadFile p >>= result failure
+    (parseWith s (includeFile (takeDirectory p)) (Text.pack p))
 
 -- | Parse a 'Template' from a Strict 'ByteString' using a custom function for
 -- resolving @include@ expressions.
@@ -177,7 +184,7 @@ parseFile p = loadFile p >>= result failure
 --
 -- 'parseFile' for example, is defined as: 'parseWith' 'includeFile'.
 parseWith :: Monad m
-          => Syntax    -- ^ Delimiters and parsing options.
+          => Syntax     -- ^ Delimiters and parsing options.
           -> Resolver m -- ^ Function to resolve includes.
           -> Text       -- ^ Strict 'Text' name.
           -> ByteString -- ^ Strict 'ByteString' template definition.
@@ -238,8 +245,8 @@ render = renderWith defaultFilters
 
 -- | Render an 'Object' using the supplied 'Template'.
 renderWith :: HashMap Text Binding -- ^ Filters to make available in the environment.
-           -> Template            -- ^ Parsed 'Template' to render.
-           -> Object              -- ^ Bindings to make available in the environment.
+           -> Template             -- ^ Parsed 'Template' to render.
+           -> Object               -- ^ Bindings to make available in the environment.
            -> Result LText.Text
 renderWith fs (Template _ u ts) = fmap toLazyText . Eval.render ts fs u
 

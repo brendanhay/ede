@@ -67,14 +67,18 @@ main :: IO ()
 main = execParser optionInfo >>= render
   where
     render Options{..} = do
-        t <- parse template
+        t <- parse template alternate
         b <- maybe stdin return bindings
         EDE.result errRender Text.putStrLn (EDE.render t b)
 
-    parse t = do
-        p <- Dir.getPermissions t
-        unless (Dir.readable p) (errUnreadable t)
-        EDE.parseFile t >>=
+    parse f alt = do
+        p <- Dir.getPermissions f
+        unless (Dir.readable p) (errUnreadable f)
+
+        let syntax | alt       = EDE.alternateSyntax
+                   | otherwise = EDE.defaultSyntax
+
+        EDE.parseFileWith syntax f >>=
             EDE.result (error . show) return
 
     stdin = do
