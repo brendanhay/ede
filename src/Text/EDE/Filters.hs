@@ -107,7 +107,7 @@ boolean = Map.fromList
 --
 -- * '==' @:: a -> a -> Bool@
 --
--- * @!=@ @:: a -> a -> Bool@ Equivalent: '/='
+-- * @!=@ @:: a -> a -> Bool@ (/See/: '/=')
 
 equality :: HashMap Text Binding
 equality = Map.fromList
@@ -212,9 +212,9 @@ textual = Map.fromList
 
 -- $collection
 --
--- * @length@ @:: Collection a => a -> Number@
+-- * @length@ @:: Collection -> Number@ (/See/: 'Data.Text.length', 'Data.Vector.length', 'Data.HashMap.Strict.size')
 --
--- * @empty@  @:: Collection a => a -> Bool@
+-- * @empty@  @:: Collection -> Bool@ (/See/: 'Data.Text.null', 'Data.Vector.null', 'Data.HashMap.Strict.null')
 
 collection :: HashMap Text Binding
 collection = Map.fromList
