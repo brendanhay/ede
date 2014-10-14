@@ -16,11 +16,26 @@ module Text.EDE.Internal.Syntax where
 import           Control.Lens
 import           Data.HashSet            (HashSet)
 import qualified Data.HashSet            as Set
+import           Text.EDE.Internal.Types
 import           Text.Parser.Token.Style
 import           Text.Trifecta
 
--- commentStyle :: String -> String -> CommentStyle
--- commentStyle s e = emptyCommentStyle & commentStart .~ s & commentEnd .~ e
+defaultSyntax :: Syntax
+defaultSyntax = Syntax
+    { _delimRender  = ("{{", "}}")
+    , _delimComment = ("{#", "#}")
+    , _delimBlock   = ("{%", "%}")
+    }
+
+alternateSyntax :: Syntax
+alternateSyntax = Syntax
+    { _delimRender  = ("<@", "@>")
+    , _delimComment = ("@*", "*@")
+    , _delimBlock   = ("@(", ")@")
+    }
+
+commentStyle :: String -> String -> CommentStyle
+commentStyle s e = emptyCommentStyle & commentStart .~ s & commentEnd .~ e
 
 operatorStyle :: TokenParsing m => IdentifierStyle m
 operatorStyle = haskellOps & styleLetter .~ oneOf "-+!&|=><"

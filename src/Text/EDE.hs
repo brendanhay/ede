@@ -39,13 +39,12 @@ module Text.EDE
     , includeMap
     , includeFile
 
+    -- ** Filters
+    , defaultFilters
+
     -- ** Rendering
     , render
     , renderWith
-
-    -- ** Filters
-    , Quoted (..)
-    , defaultFilters
 
     -- ** Either Variants
     , eitherParse
@@ -63,19 +62,23 @@ module Text.EDE
     , success
     , failure
 
-    -- * Input
-    -- $input
-    , fromPairs
-    , (.=)
-
     -- * Syntax
     , Syntax
     , delimRender
     , delimComment
     , delimBlock
 
-    , smartySyntax
-    , playSyntax
+    , defaultSyntax
+    , alternateSyntax
+
+    -- * Input
+    -- $input
+    , fromValue
+    , fromPairs
+    , (.=)
+
+    -- * Version
+    , version
 
     -- ** Comments
     -- $comments
@@ -107,7 +110,6 @@ import           Data.Aeson                   ((.=))
 import           Data.Aeson.Types             (Object)
 import           Data.ByteString              (ByteString)
 import qualified Data.ByteString              as BS
-import           Data.Default.Class
 import           Data.Foldable                (foldrM)
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as Map
@@ -117,14 +119,21 @@ import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Lazy               as LText
 import           Data.Text.Lazy.Builder       (toLazyText)
+import           Data.Version                 (Version)
+import qualified Paths_ede                    as Paths
 import           System.Directory
 import           System.FilePath
 import           Text.EDE.Filters
-import qualified Text.EDE.Internal.Evaluator  as Eval
+import qualified Text.EDE.Internal.Eval       as Eval
 import qualified Text.EDE.Internal.Parser     as Parser
+import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
+
+-- | EDE Version.
+version :: Version
+version = Paths.version
 
 -- FIXME: detect include/import loops
 
@@ -137,7 +146,7 @@ import           Text.Trifecta.Delta
 -- dependencies.
 parse :: ByteString -- ^ Strict 'ByteString' template definition.
       -> Result Template
-parse = join . parseWith def (includeMap mempty) "Text.EDE.parse"
+parse = join . parseWith defaultSyntax (includeMap mempty) "Text.EDE.parse"
 
 -- | Parse 'Text' into a compiled 'Template'.
 --
@@ -146,7 +155,7 @@ parse = join . parseWith def (includeMap mempty) "Text.EDE.parse"
 parseIO :: FilePath   -- ^ Parent directory for relatively pathed includes.
         -> ByteString -- ^ Strict 'ByteString' template definition.
         -> IO (Result Template)
-parseIO p = parseWith def (includeFile p) "Text.EDE.parse"
+parseIO p = parseWith defaultSyntax (includeFile p) "Text.EDE.parse"
 
 -- | Load and parse a 'Template' from a file.
 --
@@ -155,10 +164,8 @@ parseIO p = parseWith def (includeFile p) "Text.EDE.parse"
 -- target (unless absolute paths are used).
 parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
-parseFile p = loadFile p >>= result failure (parseWith def (includeFile d) n)
-  where
-    n = Text.pack p
-    d = takeDirectory p
+parseFile p = loadFile p >>= result failure
+    (parseWith defaultSyntax (includeFile (takeDirectory p)) (Text.pack p))
 
 -- | Parse a 'Template' from a Strict 'ByteString' using a custom function for
 -- resolving @include@ expressions.

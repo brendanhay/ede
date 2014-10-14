@@ -4,7 +4,7 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE OverloadedStrings    #-}
 
--- Module      : Text.EDE.Internal.Quotes
+-- Module      : Text.EDE.Internal.HOAS
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -14,7 +14,7 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Quotes where
+module Text.EDE.Internal.HOAS where
 
 import           Control.Applicative
 import           Control.Monad
@@ -25,11 +25,35 @@ import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Types
 
+data Quoted
+    = QLit !Value
+    | QLam (Quoted -> Result Quoted)
+
+instance Show Quoted where
+    show (QLit v) = show v
+    show _        = "<function>"
+
+instance Eq Quoted where
+    QLit a == QLit b = a == b
+    _      == _      = False
+
+typeOf :: Value -> String
+typeOf = \case
+    Null     -> "Null"
+    Bool   _ -> "Bool"
+    Number _ -> "Number"
+    Object _ -> "Object"
+    Array  _ -> "Array"
+    String _ -> "String"
+
+typeFun :: String
+typeFun = "Function"
+
 qapp :: Quoted -> Quoted -> Result Quoted
 qapp a b = case (a, b) of
     (QLam f, x) -> f x
     (QLit x, _) -> throwError "unable to apply literal {} -> {}\n{}"
-        [typeof x, tfun, show x]
+        [typeOf x, typeFun, show x]
 
 bpoly :: Quote a => (Value -> Value -> a) -> Quoted
 bpoly = quote
@@ -46,8 +70,8 @@ useq f g h = QLam $ \x ->
        QLit (String t) -> pure . quote $ f t
        QLit (Object o) -> pure . quote $ g o
        QLit (Array  v) -> pure . quote $ h v
-       QLit y          -> err (typeof y)
-       _               -> err tfun
+       QLit y          -> err (typeOf y)
+       _               -> err typeFun
   where
     err t = throwError "expected a String, Object, or Array, but got {}" [t]
 
@@ -90,12 +114,12 @@ class Unquote a where
 instance Unquote Value where
     unquote = \case
         QLit v -> pure v
-        _      -> unexpected tfun "Literal"
+        _      -> unexpected typeFun "Literal"
 
 instance Unquote Text where
     unquote = unquote >=> \case
         String t -> pure t
-        v        -> unexpected (typeof v) "String"
+        v        -> unexpected (typeOf v) "String"
 
 instance Unquote LText.Text where
     unquote = fmap LText.fromStrict . unquote
@@ -103,13 +127,13 @@ instance Unquote LText.Text where
 instance Unquote Bool where
     unquote = unquote >=> \case
         Bool b -> pure b
-        v      -> unexpected (typeof v) "Bool"
+        v      -> unexpected (typeOf v) "Bool"
 
 instance Unquote Scientific where
     unquote = \case
         QLit (Number n) -> pure n
-        QLit v          -> unexpected (typeof v) "String"
-        _               -> unexpected tfun "String"
+        QLit v          -> unexpected (typeOf v) "String"
+        _               -> unexpected typeFun "String"
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
     quote f = QLam (fmap (quote . f) . unquote)

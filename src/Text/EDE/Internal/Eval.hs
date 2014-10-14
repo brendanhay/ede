@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
--- Module      : Text.EDE.Internal.Evaluator
+-- Module      : Text.EDE.Internal.Eval
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -12,7 +12,7 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Evaluator where
+module Text.EDE.Internal.Eval where
 
 import           Control.Applicative
 import           Control.Monad
@@ -37,7 +37,7 @@ import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
 import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
-import           Text.EDE.Internal.Quotes
+import           Text.EDE.Internal.HOAS
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen      (Pretty(..))
 import           Text.Trifecta.Delta
@@ -112,7 +112,7 @@ eval (ELoop d k v bdy ma) = variable v >>= go >>= loop k bdy ma
     go (Array  a) = return (Col (Vector.length a) (vec a))
     go x          =
         throwError' d "invalid loop target {}, expected {} or {}"
-            [typeof x, typeof (Object mempty), typeof (Array mempty)]
+            [typeOf x, typeOf (Object mempty), typeOf (Array mempty)]
 
     hmap :: HashMap Text Value -> [(Maybe Text, Value)]
     hmap = map (first Just) . sortBy (comparing fst) . Map.toList
@@ -165,7 +165,7 @@ variable (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
         nest (Object o) = return o
         nest x          =
             throwError' undefined "variable {} :: {} doesn't supported nested accessors."
-                [fmt (k:r), typeof x]
+                [fmt (k:r), typeOf x]
 
         fmt = Text.unpack . Text.intercalate "."
 
@@ -200,7 +200,7 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
         m <- asks _values
         maybe (return ())
               (\x -> throwError' (delta a) "binding {} shadows existing variable {} :: {}, {}"
-                  [Text.unpack k, show x, typeof x, show n])
+                  [Text.unpack k, show x, typeOf x, show n])
               (Map.lookup k m)
 
     context n (mk, v) = object
@@ -232,7 +232,7 @@ build _ (Number n)
     | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
     | otherwise             = return (scientificBuilder n)
 build d x =
-    throwError' d "unable to render literal {}\n{}" [typeof x, show x]
+    throwError' d "unable to render literal {}\n{}" [typeOf x, show x]
 
 throwError' :: Params ps => Delta -> Format -> ps -> Context a
 throwError' _ f = lift . throwError f

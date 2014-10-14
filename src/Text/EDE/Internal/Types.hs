@@ -27,7 +27,6 @@ import           Control.Applicative
 import           Control.Lens
 import           Data.Aeson                   hiding (Result(..))
 import           Data.Aeson.Types             (Pair)
-import           Data.Default.Class
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty)
@@ -110,23 +109,6 @@ data Syntax = Syntax
 
 makeLenses ''Syntax
 
-instance Default Syntax where
-    def = smartySyntax
-
-smartySyntax :: Syntax
-smartySyntax = Syntax
-    { _delimRender  = ("{{", "}}")
-    , _delimComment = ("{#", "#}")
-    , _delimBlock   = ("{%", "%}")
-    }
-
-playSyntax :: Syntax
-playSyntax = Syntax
-    { _delimRender  = ("<@", "@>")
-    , _delimComment = ("@*", "*@")
-    , _delimBlock   = ("@(", ")@")
-    }
-
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Syntax -> Text -> Delta -> m (Result Template)
 
@@ -140,30 +122,6 @@ data Template = Template
     , _tmplExp  :: !Exp
     , _tmplIncl :: HashMap Text Exp
     } deriving (Eq)
-
-data Quoted
-    = QLit !Value
-    | QLam (Quoted -> Result Quoted)
-
-instance Show Quoted where
-    show (QLit v) = show v
-    show _        = "<function>"
-
-instance Eq Quoted where
-    QLit a == QLit b = a == b
-    _      == _      = False
-
-typeof :: Value -> String
-typeof = \case
-    Null     -> "Null"
-    Bool   _ -> "Bool"
-    Number _ -> "Number"
-    Object _ -> "Object"
-    Array  _ -> "Array"
-    String _ -> "String"
-
-tfun :: String
-tfun = "Function"
 
 type Id = Text
 
@@ -210,7 +168,15 @@ instance HasDelta Exp where
 throwError :: Params ps => Format -> ps -> Result a
 throwError fmt = Failure . pretty . LText.unpack . format fmt
 
+-- | Unwrap a 'Value' to an 'Object' safely.
+--
+-- See 'Aeson''s documentation for more details.
+fromValue :: Value -> Maybe Object
+fromValue (Object o) = Just o
+fromValue _          = Nothing
+
 -- | Create an 'Object' from a list of name/value 'Pair's.
+--
 -- See 'Aeson''s documentation for more details.
 fromPairs :: [Pair] -> Object
 fromPairs = (\(Object o) -> o) . object

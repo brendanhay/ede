@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- Module      : Text.EDE
@@ -13,75 +12,83 @@
 
 module Main (main) where
 
-import           Control.Monad              (unless)
+import           Control.Monad
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Conduit
 import qualified Data.Conduit.Attoparsec    as Conduit
 import qualified Data.Conduit.Binary        as Conduit
+import           Data.Monoid
 import qualified Data.Text.Lazy.IO          as Text
 import           Data.Version               (showVersion)
 import           Options.Applicative
-import           Paths_ede                  (version)
-import           System.Directory           (getPermissions, readable)
-import           System.IO                  (hSetBinaryMode, stdin)
+import qualified System.Directory           as Dir
+import qualified System.IO                  as IO
 import qualified Text.EDE                   as EDE
 
-data Opts = Opts
-    { template :: FilePath
-    , bindings :: Maybe Object
+data Options = Options
+    { template  :: FilePath
+    , bindings  :: Maybe Object
+    , alternate :: !Bool
     } deriving (Eq, Show)
 
-parseOpts :: Parser Opts
-parseOpts = Opts
-    <$> ( strOption
-           ( short   't'
-          <> long    "template"
-          <> metavar "FILE"
-          <> help    "ED-E template to render."
-           )
-       <|> argument str (metavar "FILE")
-        )
-    <*> optional
-        ( option (eitherReader readJSON)
-          ( short   'd'
-         <> long    "data"
-         <> metavar "JSON"
-         <> help    ( "Bindings to make available in the environment, as JSON. "
-                   ++ "If not given, standard input is read.")
-          )
-        )
-  where
-    readJSON = either Left jObject . eitherDecode . LBS.pack
+optionParser :: Parser Options
+optionParser = Options
+    <$> (strOption
+         ( short   't'
+        <> long    "template"
+        <> metavar "FILE"
+        <> help    "ED-E template to render."
+         )
+        <|> argument str (metavar "FILE"))
 
-optInfo :: ParserInfo Opts
-optInfo = info (helper <*> parseOpts)
+    <*> optional (option (eitherReader reader)
+         ( short   'd'
+        <> long    "data"
+        <> metavar "JSON"
+        <> help    ("Bindings to make available in the environment, as JSON. \
+                    \If not given, standard input is read.")
+         ))
+
+    <*> switch
+         ( short 'a'
+        <> long  "alternate-syntax"
+        <> help  "Use alternate template syntax."
+         )
+
+optionInfo :: ParserInfo Options
+optionInfo = info (helper <*> optionParser)
     ( fullDesc
-   <> header   ("ed-e v" ++ showVersion version)
+   <> header   ("ed-e v" ++ showVersion EDE.version)
    <> progDesc "ED-E Template Engine CLI."
     )
 
 main :: IO ()
-main = execParser optInfo >>= \ Opts{..} -> do
-    t <- readTemplate template
-    b <- maybe fromStdin return bindings
-    EDE.result errRender Text.putStrLn $ EDE.render t b
+main = execParser optionInfo >>= render
   where
-    readTemplate t = do
-        p <- getPermissions t
-        unless (readable p) $ errUnreadable t
-        EDE.parseFile t >>= EDE.result (error . show) return
+    render Options{..} = do
+        t <- parse template
+        b <- maybe stdin return bindings
+        EDE.result errRender Text.putStrLn (EDE.render t b)
 
-    fromStdin = do
-        hSetBinaryMode stdin True
-        j <- Conduit.sourceHandle stdin $$ Conduit.sinkParser json'
-        either error pure $ jObject j
+    parse t = do
+        p <- Dir.getPermissions t
+        unless (Dir.readable p) (errUnreadable t)
+        EDE.parseFile t >>=
+            EDE.result (error . show) return
 
-    errRender m es = error . unlines $
-        "Error rendering template:" : show m : es
+    stdin = do
+        IO.hSetBinaryMode IO.stdin True
+        v <- Conduit.sourceHandle IO.stdin $$ Conduit.sinkParser json'
+        either (error . show) return (fromValue v)
 
-    errUnreadable t = error $ t ++ " is not readable"
+    errRender = error . mappend "Error rendering template:\n" . show
 
-jObject :: Value -> Either String Object
-jObject (Object o) = Right o
-jObject _          = Left  "Bindings must be given as a JSON object"
+    errUnreadable = error . (<> " is not readable")
+
+reader :: String -> Either String Object
+reader = join . fmap fromValue . eitherDecode . LBS.pack
+
+fromValue :: Value -> Either String Object
+fromValue = maybe (Left "Bindings must be given as a JSON object") Right
+    . EDE.fromValue

@@ -47,4 +47,3 @@ false = (PLit (LBool False),)
 
 bld :: Delta -> Exp
 bld = (`ELit` LText mempty)
-
