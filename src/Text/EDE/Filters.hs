@@ -27,7 +27,7 @@ module Text.EDE.Filters
     , Unquote (..)
 
     -- ** Restricted quoters
-    , qapp
+    , qapply
     , qpoly2
     , qnum1
     , qnum2

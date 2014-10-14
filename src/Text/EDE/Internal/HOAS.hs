@@ -48,8 +48,8 @@ typeOf = \case
 typeFun :: String
 typeFun = "Function"
 
-qapp :: Binding -> Binding -> Result Binding
-qapp a b = case (a, b) of
+qapply :: Binding -> Binding -> Result Binding
+qapply a b = case (a, b) of
     (BLam f, x) -> f x
     (BVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
         [typeOf x, typeFun, show x]

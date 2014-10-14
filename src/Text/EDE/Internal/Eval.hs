@@ -81,7 +81,7 @@ eval (EFun d i) = do
 eval (EApp d a b) = do
     x <- eval a
     y <- eval b
-    qappend d x y
+    qapplyend d x y
 
 eval (ELet _ k rhs bdy) = do
     q <- eval rhs
@@ -193,7 +193,7 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
     iter (n, p) x = do
         shadowed n
         q <- bind (Map.insert k (context n x)) (eval a)
-        r <- qappend (delta a) p q
+        r <- qapplyend (delta a) p q
         return (n + 1, r)
 
     shadowed n = do
@@ -217,11 +217,11 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
         , "even"       .= (n `mod` 2 == 0)
         ]
 
-qappend :: Delta -> Binding -> Binding -> Context Binding
-qappend d x y =
+qapplyend :: Delta -> Binding -> Binding -> Context Binding
+qapplyend d x y =
     case (x, y) of
         (BVal l, BVal r) -> quote <$> liftM2 (<>) (build d l) (build d r)
-        _                -> lift (qapp x y)
+        _                -> lift (qapply x y)
 
 build :: Delta -> Value -> Context Builder
 build _ Null         = return mempty
