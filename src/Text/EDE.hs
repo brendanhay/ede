@@ -243,15 +243,15 @@ renderWith :: HashMap Text Binding -- ^ Filters to make available in the environ
            -> Result LText.Text
 renderWith fs (Template _ u ts) = fmap toLazyText . Eval.render ts fs u
 
--- | See: 'parse'
+-- | /See:/ 'parse'
 eitherParse :: ByteString -> Either String Template
 eitherParse = eitherResult . parse
 
--- | See: 'parseFile'
+-- | /See:/ 'parseFile'
 eitherParseFile :: FilePath -> IO (Either String Template)
 eitherParseFile = fmap eitherResult . parseFile
 
--- | See: 'parseWith'
+-- | /See:/ 'parseWith'
 eitherParseWith :: (Functor m, Monad m)
                 => Syntax
                 -> Resolver m
@@ -260,13 +260,13 @@ eitherParseWith :: (Functor m, Monad m)
                 -> m (Either String Template)
 eitherParseWith o f n = fmap eitherResult . parseWith o f n
 
--- | See: 'render'
+-- | /See:/ 'render'
 eitherRender :: Template
              -> Object
              -> Either String LText.Text
 eitherRender t = eitherResult . render t
 
--- | See: 'renderWith'
+-- | /See:/ 'renderWith'
 eitherRenderWith :: HashMap Text Binding
                  -> Template
                  -> Object
