@@ -90,7 +90,7 @@ defaultFilters = Map.unions
 
 -- $boolean
 --
--- * '!'  @:: Bool -> Bool@
+-- * @!@  @:: Bool -> Bool@ (/See:/ 'not')
 --
 -- * '&&' @:: Bool -> Bool -> Bool@
 --
