@@ -28,10 +28,10 @@ module Text.EDE.Filters
 
     -- ** Restricted quoters
     , qapp
-    , bpoly
-    , unum
-    , bnum
-    , useq
+    , qpoly2
+    , qnum1
+    , qnum2
+    , qcol1
 
     -- ** Errors
     , unexpected
@@ -72,34 +72,34 @@ boolean = Map.fromList
 
 equality :: HashMap Text Binding
 equality = Map.fromList
-    [ "==" @: bpoly (==)
-    , "!=" @: bpoly (/=)
+    [ "==" @: qpoly2 (==)
+    , "!=" @: qpoly2 (/=)
     ]
 
 relational :: HashMap Text Binding
 relational = Map.fromList
-    [ ">"  @: bnum (>)
-    , ">=" @: bnum (>=)
-    , "<=" @: bnum (<=)
-    , "<"  @: bnum (<)
+    [ ">"  @: qnum2 (>)
+    , ">=" @: qnum2 (>=)
+    , "<=" @: qnum2 (<=)
+    , "<"  @: qnum2 (<)
     ]
 
 numeric :: HashMap Text Binding
 numeric = Map.fromList
-    [ "+"      @: bnum (+)
-    , "-"      @: bnum (-)
-    , "*"      @: bnum (*)
-    , "abs"    @: unum abs
-    , "signum" @: unum signum
-    , "negate" @: unum negate
+    [ "+"      @: qnum2 (+)
+    , "-"      @: qnum2 (-)
+    , "*"      @: qnum2 (*)
+    , "abs"    @: qnum1 abs
+    , "signum" @: qnum1 signum
+    , "negate" @: qnum1 negate
     ]
 
 fractional :: HashMap Text Binding
 fractional = Map.fromList
-    [ "truncate" @: unum (fromIntegral . truncate)
-    , "round"    @: unum (fromIntegral . round)
-    , "ceiling"  @: unum (fromIntegral . ceiling)
-    , "floor"    @: unum (fromIntegral . floor)
+    [ "truncate" @: qnum1 (fromIntegral . truncate)
+    , "round"    @: qnum1 (fromIntegral . round)
+    , "ceiling"  @: qnum1 (fromIntegral . ceiling)
+    , "floor"    @: qnum1 (fromIntegral . floor)
     ]
 
 textual :: HashMap Text Binding
@@ -117,8 +117,8 @@ textual = Map.fromList
 
 collection :: HashMap Text Binding
 collection = Map.fromList
-    [ "length" @: useq Text.length Map.size Vector.length
-    , "empty"  @: useq Text.null Map.null Vector.null
+    [ "length" @: qcol1 Text.length Map.size Vector.length
+    , "empty"  @: qcol1 Text.null   Map.null Vector.null
     -- , ("join",  quote hyphenate
     ]
 

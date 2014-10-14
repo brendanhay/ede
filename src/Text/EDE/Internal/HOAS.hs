@@ -54,17 +54,17 @@ qapp a b = case (a, b) of
     (BVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
         [typeOf x, typeFun, show x]
 
-bpoly :: Quote a => (Value -> Value -> a) -> Binding
-bpoly = quote
+qpoly2 :: Quote a => (Value -> Value -> a) -> Binding
+qpoly2 = quote
 
-unum :: (Scientific -> Scientific) -> Binding
-unum = quote
+qnum1 :: (Scientific -> Scientific) -> Binding
+qnum1 = quote
 
-bnum :: Quote a => (Scientific -> Scientific -> a) -> Binding
-bnum = quote
+qnum2 :: Quote a => (Scientific -> Scientific -> a) -> Binding
+qnum2 = quote
 
-useq :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Binding
-useq f g h = BLam $ \case
+qcol1 :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Binding
+qcol1 f g h = BLam $ \case
     BVal (String t) -> pure . quote $ f t
     BVal (Object o) -> pure . quote $ g o
     BVal (Array  v) -> pure . quote $ h v
