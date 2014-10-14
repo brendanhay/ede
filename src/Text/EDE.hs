@@ -370,7 +370,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- >>> render (fromPairs [ "foo" .= "value", "bar" .= 1 ]) :: Template -> Result Text
 
--- $variables #syntax
+-- #syntax#
+--
+-- $variables
 --
 -- Variables are substituted directly for their 'Buildable' representation.
 -- An error is raised if the varaible being substituted is not a literal type
