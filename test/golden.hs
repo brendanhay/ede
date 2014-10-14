@@ -12,7 +12,6 @@
 
 module Main (main) where
 
-import Debug.Trace
 import           Control.Applicative
 import qualified Data.Aeson              as Aeson
 import           Data.Bifunctor

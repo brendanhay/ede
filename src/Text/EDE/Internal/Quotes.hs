@@ -90,7 +90,7 @@ class Unquote a where
 instance Unquote Value where
     unquote = \case
         QLit v -> pure v
-        _      -> throwError "unable to unquote {} -> Literal" [tfun]
+        _      -> unexpected tfun "Literal"
 
 instance Unquote Text where
     unquote = unquote >=> \case
@@ -122,4 +122,4 @@ instance (Unquote a, Unquote b, Quote c) => Quote (a -> b -> c) where
                 _      -> quote <$> (f <$> unquote x <*> unquote y)
 
 unexpected :: String -> String -> Result b
-unexpected x y = throwError "unable to unquote {} -> {}" [x, y]
+unexpected x y = throwError "unable to coerce {} -> {}" [x, y]

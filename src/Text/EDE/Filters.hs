@@ -44,8 +44,10 @@ import           Data.Char                hiding (ord)
 import           Data.HashMap.Strict      (HashMap)
 import qualified Data.HashMap.Strict      as Map
 import           Data.Text                (Text)
+import qualified Data.Text                as Text
 import qualified Data.Text.Lazy           as LText
 import qualified Data.Text.Lazy.Encoding  as LText
+import qualified Data.Vector              as Vector
 import           Text.EDE.Internal.Quotes
 import           Text.EDE.Internal.Types
 
@@ -89,28 +91,24 @@ defaultFilters = Map.fromList prelude
         -- Text
         , ("lower",      quote lower)
         , ("upper",      quote upper)
-        -- , ("lowerFirst", quote lowerFirst)
-        -- , ("upperFirst", quote upperFirst)
-        -- , ("titleize",   quote titleize)
-        -- , ("pascalize",  quote pascalize)
-        -- , ("camelize",   quote camelize)
-        -- , ("underscore", quote underscore)
-        -- , ("hyphenate",  quote hyphenate)
+        , ("lowerFirst", quote lowerFirst)
+        , ("upperFirst", quote upperFirst)
+        , ("titleize",   quote titleize)
+        , ("pascalize",  quote pascalize)
+        , ("camelize",   quote camelize)
+        , ("underscore", quote underscore)
+        , ("hyphenate",  quote hyphenate)
 
-        -- -- Sequences
-        -- , ("length", useq Text.length Map.size Vector.length)
-        -- , ("empty",  useq Text.null Map.null Vector.null)
+        -- Sequences
+        , ("length", useq Text.length Map.size Vector.length)
+        , ("empty",  useq Text.null Map.null Vector.null)
 
         -- -- Collections
-        -- , ("hyphenate",  quote hyphenate)
+        -- , ("join",  quote hyphenate)
 
         -- -- Poly
         , ("show", quote value)
-        -- , ("|", apply)
         ]
-
-    -- (.) :: (b -> c) -> (a -> b) -> a -> c
-    -- apply = QLam $ \f -> return . QLam $ \g -> trace (show (f, g)) (qapp f g)
 
 value :: Value -> LText.Text
 value = LText.decodeUtf8 . encode
