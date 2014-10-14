@@ -545,7 +545,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- Filters are typed functions which can be applied to variables and literals.
 -- An example of rendering a lower cased boolean would be:
 --
--- > {{ True | show | lower }}
+-- > {{ true | show | lower }}
 --
 -- The input is on the LHS and chained filters (delimited by '|') are on the RHS,
 -- with filters being applied left associatively.
