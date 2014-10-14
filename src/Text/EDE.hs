@@ -2,7 +2,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 
--- |
 -- Module      : Text.EDE
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -12,12 +11,11 @@
 -- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
---
--- A (mostly logicless) textual templating language with similar syntax to
+
+-- | A (mostly logicless) textual templating language with similar syntax to
 -- <https://github.com/Shopify/liquid Liquid> or <http://jinja.pocoo.org/docs/ Jinja2>.
 --
 -- (ED-E is a character from Fallout New Vegas, pronounced iː-diː-iː, or Eddie.)
-
 module Text.EDE
     (
     -- * How to use this library

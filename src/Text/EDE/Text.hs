@@ -10,6 +10,10 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
+-- | A suite of helpful 'Data.Text.Text' functions which are offered
+-- as part of the prelude offered by "Text.EDE.Filters".
+--
+-- This module is re-exported for convenience.
 module Text.EDE.Text
     ( lowerFirst
     , upperFirst
