@@ -15,10 +15,7 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Parser
-    ( Includes
-    , runParser
-    ) where
+module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
 import           Control.Lens               hiding (both, noneOf)
@@ -47,11 +44,9 @@ import           Text.Trifecta.Delta
 -- whitespace
 -- comments
 
-type Includes = HashMap Text (NonEmpty Delta)
-
 data Env = Env
     { _syntax  :: !Syntax
-    , _includes :: Includes
+    , _includes :: HashMap Text (NonEmpty Delta)
     }
 
 makeLenses ''Env
@@ -64,7 +59,10 @@ type Parse m =
     , LookAheadParsing m
     )
 
-runParser :: Syntax -> Text -> ByteString -> Result (Exp, Includes)
+runParser :: Syntax
+          -> Text
+          -> ByteString
+          -> Result (Exp, HashMap Text (NonEmpty Delta))
 runParser o n = res . parseByteString (runStateT (document <* eof) env) pos
   where
     env = Env o mempty

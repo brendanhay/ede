@@ -102,9 +102,9 @@ throwError fmt = Failure . pretty . LText.unpack . format fmt
 type Delim = (String, String)
 
 data Syntax = Syntax
-    { _delimRender  :: Delim
-    , _delimComment :: Delim
-    , _delimBlock   :: Delim
+    { _delimRender  :: !Delim
+    , _delimComment :: !Delim
+    , _delimBlock   :: !Delim
     }
 
 makeLenses ''Syntax
