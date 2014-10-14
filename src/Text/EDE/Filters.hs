@@ -20,7 +20,7 @@ module Text.EDE.Filters
       defaultFilters
 
     -- * Constructing filters
-    , Binding  (..)
+    , Binding (..)
 
     -- ** Classes
     , Quote   (..)

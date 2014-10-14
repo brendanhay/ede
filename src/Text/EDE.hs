@@ -357,8 +357,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $input
 --
--- 'fromPairs' is a wrapper around Aeson's 'object' function which safely strips the outer
--- 'Value' constructor, providing the correct type signature for input into 'render'.
+-- 'fromPairs' (or 'fromValue') is a wrapper around Aeson's 'object' function which
+--  safely strips the outer 'Value' constructor, providing the correct type
+-- signature for input into 'render'.
 --
 -- It is used in combination with the re-exported '.=' as follows:
 --
@@ -422,7 +423,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- expression if they exist in the supplied environment.
 --
 -- The following logical expressions are supported as predicates in conditional statements
--- with parameters being type checked and an error is raised if the left and right
+-- with parameters type checked and an error raised if the left and right
 -- hand sides are not type equivalent.
 --
 -- * @And@: '&&'

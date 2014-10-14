@@ -24,6 +24,8 @@ import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Types
 
+-- | A HOAS representation of (possibly partially applied) values
+-- in the environment.
 data Binding
     = BVal !Value
     | BLam (Binding -> Result Binding)
@@ -36,6 +38,7 @@ instance Eq Binding where
     BVal a == BVal b = a == b
     _      == _      = False
 
+-- | Retrieve a consistent type from a 'Value' to use in error messages.
 typeOf :: Value -> String
 typeOf = \case
     Null     -> "Null"
@@ -45,24 +48,31 @@ typeOf = \case
     Array  _ -> "Array"
     String _ -> "String"
 
+-- | The default type for partially applied 'Binding's in error messages.
 typeFun :: String
 typeFun = "Function"
 
+-- | Attempt to apply two 'Binding's.
 qapply :: Binding -> Binding -> Result Binding
 qapply a b = case (a, b) of
     (BLam f, x) -> f x
     (BVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
         [typeOf x, typeFun, show x]
 
+-- | Quote a binary function which takes the most general binding value.
 qpoly2 :: Quote a => (Value -> Value -> a) -> Binding
 qpoly2 = quote
 
+-- | Quote an unary numeric function.
 qnum1 :: (Scientific -> Scientific) -> Binding
 qnum1 = quote
 
+-- | Quote a binary numeric function.
 qnum2 :: Quote a => (Scientific -> Scientific -> a) -> Binding
 qnum2 = quote
 
+-- | Quote a comprehensive set of unary functions to create a binding
+-- that supports all collection types.
 qcol1 :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Binding
 qcol1 f g h = BLam $ \case
     BVal (String t) -> pure . quote $ f t
