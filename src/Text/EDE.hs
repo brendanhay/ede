@@ -73,6 +73,7 @@ module Text.EDE
     , version
 
     -- * Syntax
+    , Delim
     , Syntax
     , delimRender
     , delimComment
