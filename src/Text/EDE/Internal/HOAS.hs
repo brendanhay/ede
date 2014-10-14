@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE OverloadedStrings    #-}
 
 -- Module      : Text.EDE.Internal.HOAS
@@ -25,16 +24,16 @@ import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import           Text.EDE.Internal.Types
 
-data Quoted
-    = QLit !Value
-    | QLam (Quoted -> Result Quoted)
+data Binding
+    = BVal !Value
+    | BLam (Binding -> Result Binding)
 
-instance Show Quoted where
-    show (QLit v) = show v
+instance Show Binding where
+    show (BVal v) = show v
     show _        = "<function>"
 
-instance Eq Quoted where
-    QLit a == QLit b = a == b
+instance Eq Binding where
+    BVal a == BVal b = a == b
     _      == _      = False
 
 typeOf :: Value -> String
@@ -49,48 +48,48 @@ typeOf = \case
 typeFun :: String
 typeFun = "Function"
 
-qapp :: Quoted -> Quoted -> Result Quoted
+qapp :: Binding -> Binding -> Result Binding
 qapp a b = case (a, b) of
-    (QLam f, x) -> f x
-    (QLit x, _) -> throwError "unable to apply literal {} -> {}\n{}"
+    (BLam f, x) -> f x
+    (BVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
         [typeOf x, typeFun, show x]
 
-bpoly :: Quote a => (Value -> Value -> a) -> Quoted
+bpoly :: Quote a => (Value -> Value -> a) -> Binding
 bpoly = quote
 
-unum :: (Scientific -> Scientific) -> Quoted
+unum :: (Scientific -> Scientific) -> Binding
 unum = quote
 
-bnum :: Quote a => (Scientific -> Scientific -> a) -> Quoted
+bnum :: Quote a => (Scientific -> Scientific -> a) -> Binding
 bnum = quote
 
-useq :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Quoted
-useq f g h = QLam $ \case ->
-    QLit (String t) -> pure . quote $ f t
-    QLit (Object o) -> pure . quote $ g o
-    QLit (Array  v) -> pure . quote $ h v
-    QLit y          -> err (typeOf y)
+useq :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Binding
+useq f g h = BLam $ \case
+    BVal (String t) -> pure . quote $ f t
+    BVal (Object o) -> pure . quote $ g o
+    BVal (Array  v) -> pure . quote $ h v
+    BVal y          -> err (typeOf y)
     _               -> err typeFun
   where
     err = throwError "expected a String, Object, or Array, but got {}" . (:[])
 
 class Quote a where
-    quote :: a -> Quoted
+    quote :: a -> Binding
 
-instance Quote Quoted where
+instance Quote Binding where
     quote = id
 
 instance Quote Lit where
     quote = \case
-        LBool b -> QLit (Bool b)
-        LNum  n -> QLit (Number n)
-        LText t -> QLit (String t)
+        LBool b -> BVal (Bool b)
+        LNum  n -> BVal (Number n)
+        LText t -> BVal (String t)
 
 instance Quote Value where
-    quote = QLit
+    quote = BVal
 
 instance Quote Text where
-    quote = QLit . String
+    quote = BVal . String
 
 instance Quote LText.Text where
     quote = quote . LText.toStrict
@@ -99,20 +98,20 @@ instance Quote Builder where
     quote = quote . toLazyText
 
 instance Quote Bool where
-    quote = QLit . Bool
+    quote = BVal . Bool
 
 instance Quote Int where
-    quote = QLit . Number . fromIntegral
+    quote = BVal . Number . fromIntegral
 
 instance Quote Scientific where
-    quote = QLit . Number
+    quote = BVal . Number
 
 class Unquote a where
-    unquote :: Quoted -> Result a
+    unquote :: Binding -> Result a
 
 instance Unquote Value where
     unquote = \case
-        QLit v -> pure v
+        BVal v -> pure v
         _      -> unexpected typeFun "Literal"
 
 instance Unquote Text where
@@ -130,19 +129,12 @@ instance Unquote Bool where
 
 instance Unquote Scientific where
     unquote = \case
-        QLit (Number n) -> pure n
-        QLit v          -> unexpected (typeOf v) "String"
+        BVal (Number n) -> pure n
+        BVal v          -> unexpected (typeOf v) "String"
         _               -> unexpected typeFun "String"
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
-    quote f = QLam (fmap (quote . f) . unquote)
-
-instance (Unquote a, Unquote b, Quote c) => Quote (a -> b -> c) where
-    quote f = QLam $ \x ->
-        pure . QLam $ \y ->
-            \case
-                QLam g -> join (qapp (quote f) <$> g x)
-                _      -> quote <$> (f <$> unquote x <*> unquote y)
+    quote f = BLam (fmap (quote . f) . unquote)
 
 unexpected :: String -> String -> Result b
 unexpected x y = throwError "unable to coerce {} -> {}" [x, y]

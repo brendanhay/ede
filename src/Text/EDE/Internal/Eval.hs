@@ -44,32 +44,32 @@ import           Text.Trifecta.Delta
 
 -- FIXME: look at adding a whnf step to reduce everything before storing as a template
 -- (optimisation passes, case reducation etc.)
--- maybe Exp -> Quoted (aka Val) is the first step, without substituting from
+-- maybe Exp -> Binding (aka Val) is the first step, without substituting from
 -- env/filters
 
 data Env = Env
     { _templates :: HashMap Text Exp
-    , _quoted    :: HashMap Text Quoted
+    , _quoted    :: HashMap Text Binding
     , _values    :: HashMap Text Value
     }
 
 type Context = ReaderT Env Result
 
 render :: HashMap Text Exp
-       -> HashMap Text Quoted
+       -> HashMap Text Binding
        -> Exp
        -> HashMap Text Value
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
   where
-    nf (QLit v) = build d v
+    nf (BVal v) = build d v
     nf _        = lift (Failure err)
 
     err = "unable to evaluate partially applied template to normal form."
 
     d = delta e
 
-eval :: Exp -> Context Quoted
+eval :: Exp -> Context Binding
 eval (ELit _ l) = return (quote l)
 eval (EVar _ v) = quote <$> variable v
 eval (EFun d i) = do
@@ -98,10 +98,10 @@ eval (ECase d p ws) = go ws
             PVar v -> eval (EVar d v) >>= cond e as
             PLit l -> eval (ELit d l) >>= cond e as
 
-    cond e as y@(QLit Bool{}) = do
+    cond e as y@(BVal Bool{}) = do
         x <- predicate p
         if x == y then eval e else go as
-    cond e as y@QLit{} = do
+    cond e as y@BVal{} = do
         x <- eval p
         if x == y then eval e else go as
     cond _ as _  = go as
@@ -170,14 +170,14 @@ variable (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
         fmt = Text.unpack . Text.intercalate "."
 
 -- | A variable can be tested for truthiness, but a non-whnf expr cannot.
-predicate :: Exp -> Context Quoted
+predicate :: Exp -> Context Binding
 predicate x = do
     r <- runReaderT (eval x) <$> ask
     lift $ case r of
         Success q
-            | QLit Bool{} <- q -> Success q
+            | BVal Bool{} <- q -> Success q
         Success q
-            | QLit Null   <- q -> Success (quote False)
+            | BVal Null   <- q -> Success (quote False)
         Success _              -> Success (quote True)
         Failure _
             | EVar{}      <- x -> Success (quote False)
@@ -186,7 +186,7 @@ predicate x = do
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
 
-loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Quoted
+loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Binding
 loop _ a b (Col 0 _)  = eval (fromMaybe (ELit (delta a) (LText mempty)) b)
 loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
   where
@@ -217,10 +217,10 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
         , "even"       .= (n `mod` 2 == 0)
         ]
 
-qappend :: Delta -> Quoted -> Quoted -> Context Quoted
+qappend :: Delta -> Binding -> Binding -> Context Binding
 qappend d x y =
     case (x, y) of
-        (QLit l, QLit r) -> quote <$> liftM2 (<>) (build d l) (build d r)
+        (BVal l, BVal r) -> quote <$> liftM2 (<>) (build d l) (build d r)
         _                -> lift (qapp x y)
 
 build :: Delta -> Value -> Context Builder

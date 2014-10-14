@@ -52,12 +52,12 @@ library
       , Text.EDE.Text
 
     other-modules:
-        Text.EDE.Internal.AST
-      , Text.EDE.Internal.Eval
+        Text.EDE.Internal.Eval
       , Text.EDE.Internal.HOAS
       , Text.EDE.Internal.Parser
       , Text.EDE.Internal.Syntax
       , Text.EDE.Internal.Types
+      , Paths_ede
 
     ghc-options:       -Wall
 

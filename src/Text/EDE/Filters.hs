@@ -20,7 +20,7 @@ module Text.EDE.Filters
       defaultFilters
 
     -- * Constructing filters
-    , Quoted  (..)
+    , Binding  (..)
 
     -- ** Classes
     , Quote   (..)
@@ -51,7 +51,7 @@ import           Text.EDE.Text
 
 default (Integer)
 
-defaultFilters :: HashMap Text Quoted
+defaultFilters :: HashMap Text Binding
 defaultFilters = Map.unions
     [ boolean
     , equality
@@ -63,20 +63,20 @@ defaultFilters = Map.unions
     , polymorphic
     ]
 
-boolean :: HashMap Text Quoted
+boolean :: HashMap Text Binding
 boolean = Map.fromList
     [ "!"  @: quote not
     , "&&" @: quote (&&)
     , "||" @: quote (||)
     ]
 
-equality :: HashMap Text Quoted
+equality :: HashMap Text Binding
 equality = Map.fromList
     [ "==" @: bpoly (==)
     , "!=" @: bpoly (/=)
     ]
 
-relational :: HashMap Text Quoted
+relational :: HashMap Text Binding
 relational = Map.fromList
     [ ">"  @: bnum (>)
     , ">=" @: bnum (>=)
@@ -84,7 +84,7 @@ relational = Map.fromList
     , "<"  @: bnum (<)
     ]
 
-numeric :: HashMap Text Quoted
+numeric :: HashMap Text Binding
 numeric = Map.fromList
     [ "+"      @: bnum (+)
     , "-"      @: bnum (-)
@@ -94,7 +94,7 @@ numeric = Map.fromList
     , "negate" @: unum negate
     ]
 
-fractional :: HashMap Text Quoted
+fractional :: HashMap Text Binding
 fractional = Map.fromList
     [ "truncate" @: unum (fromIntegral . truncate)
     , "round"    @: unum (fromIntegral . round)
@@ -102,7 +102,7 @@ fractional = Map.fromList
     , "floor"    @: unum (fromIntegral . floor)
     ]
 
-textual :: HashMap Text Quoted
+textual :: HashMap Text Binding
 textual = Map.fromList
     [ "lower"      @: quote Text.toLower
     , "upper"      @: quote Text.toUpper
@@ -115,19 +115,19 @@ textual = Map.fromList
     , "hyphenate"  @: quote hyphenate
     ]
 
-collection :: HashMap Text Quoted
+collection :: HashMap Text Binding
 collection = Map.fromList
     [ "length" @: useq Text.length Map.size Vector.length
     , "empty"  @: useq Text.null Map.null Vector.null
     -- , ("join",  quote hyphenate
     ]
 
-polymorphic :: HashMap Text Quoted
+polymorphic :: HashMap Text Binding
 polymorphic = Map.fromList
     [ "show" @: quote value
     ]
 
-(@:) :: Quote a => Text -> a -> (Text, Quoted)
+(@:) :: Quote a => Text -> a -> (Text, Binding)
 k @: q = (k, quote q)
 
 value :: Value -> LText.Text

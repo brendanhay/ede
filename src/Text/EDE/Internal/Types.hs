@@ -1,15 +1,11 @@
-{-# LANGUAGE DeriveFoldable             #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE DeriveTraversable          #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -29,8 +25,9 @@ import           Data.Aeson                   hiding (Result(..))
 import           Data.Aeson.Types             (Pair)
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
-import           Data.List.NonEmpty           (NonEmpty)
+import           Data.List.NonEmpty           (NonEmpty(..))
 import           Data.Monoid                  hiding ((<>))
+import           Data.Maybe
 import           Data.Scientific
 import           Data.Semigroup
 import           Data.Text                    (Text)
@@ -99,6 +96,9 @@ success = return . Success
 failure :: Monad m => Doc -> m (Result a)
 failure = return . Failure
 
+throwError :: Params ps => Format -> ps -> Result a
+throwError fmt = Failure . pretty . LText.unpack . format fmt
+
 type Delim = (String, String)
 
 data Syntax = Syntax
@@ -126,7 +126,7 @@ data Template = Template
 type Id = Text
 
 newtype Var = Var (NonEmpty Id)
-    deriving (Eq, Show, Semigroup)
+    deriving (Eq, Show)
 
 -- FIXME: implement constructors, remove hardcoded bool keywords, etc.
 data Lit
@@ -165,8 +165,32 @@ instance HasDelta Exp where
         ELoop d _ _ _ _ -> d
         EIncl d _ _     -> d
 
-throwError :: Params ps => Format -> ps -> Result a
-throwError fmt = Failure . pretty . LText.unpack . format fmt
+var :: Id -> Var
+var = Var . (:| [])
+
+eapp :: Delta -> [Exp] -> Exp
+eapp d []     = ELit d (LText mempty)
+eapp _ [e]    = e
+eapp d (e:es) = foldl' (EApp d) e es
+
+efun :: Delta -> Id -> Exp -> Exp
+efun d = EApp d . EFun d
+
+ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
+ecase p ws f = ECase (delta p) p (ws ++ maybe [] ((:[]) . wild) f)
+
+eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
+eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
+  where
+    c (p, w) e = ECase (delta p) p [true w, false e]
+
+wild, true, false :: Exp -> Alt
+wild  = (PWild,)
+true  = (PLit (LBool True),)
+false = (PLit (LBool False),)
+
+bld :: Delta -> Exp
+bld = (`ELit` LText mempty)
 
 -- | Unwrap a 'Value' to an 'Object' safely.
 --

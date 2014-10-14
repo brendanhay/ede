@@ -53,7 +53,7 @@ tests = files >>= mapM test
             name      = Text.pack (n ++ ".ede")
 
         return . goldenVsStringDiff n diff (n ++ ".golden") $ do
-            r <- parseWith smartySyntax include name src
+            r <- parseWith defaultSyntax include name src
             result (error  . show)
                    (return . LText.encodeUtf8)
                    (r >>= (`render` js))

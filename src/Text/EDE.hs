@@ -238,7 +238,7 @@ render :: Template -- ^ Parsed 'Template' to render.
 render = renderWith defaultFilters
 
 -- | Render an 'Object' using the supplied 'Template'.
-renderWith :: HashMap Text Quoted -- ^ Filters to make available in the environment.
+renderWith :: HashMap Text Binding -- ^ Filters to make available in the environment.
            -> Template            -- ^ Parsed 'Template' to render.
            -> Object              -- ^ Bindings to make available in the environment.
            -> Result LText.Text
@@ -268,7 +268,7 @@ eitherRender :: Template
 eitherRender t = eitherResult . render t
 
 -- | See: 'renderWith'
-eitherRenderWith :: HashMap Text Quoted
+eitherRenderWith :: HashMap Text Binding
                  -> Template
                  -> Object
                  -> Either String LText.Text
