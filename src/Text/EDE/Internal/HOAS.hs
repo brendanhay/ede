@@ -65,15 +65,14 @@ bnum :: Quote a => (Scientific -> Scientific -> a) -> Quoted
 bnum = quote
 
 useq :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Quoted
-useq f g h = QLam $ \x ->
-   case x of
-       QLit (String t) -> pure . quote $ f t
-       QLit (Object o) -> pure . quote $ g o
-       QLit (Array  v) -> pure . quote $ h v
-       QLit y          -> err (typeOf y)
-       _               -> err typeFun
+useq f g h = QLam $ \case ->
+    QLit (String t) -> pure . quote $ f t
+    QLit (Object o) -> pure . quote $ g o
+    QLit (Array  v) -> pure . quote $ h v
+    QLit y          -> err (typeOf y)
+    _               -> err typeFun
   where
-    err t = throwError "expected a String, Object, or Array, but got {}" [t]
+    err = throwError "expected a String, Object, or Array, but got {}" . (:[])
 
 class Quote a where
     quote :: a -> Quoted
@@ -141,7 +140,7 @@ instance (Unquote a, Quote b) => Quote (a -> b) where
 instance (Unquote a, Unquote b, Quote c) => Quote (a -> b -> c) where
     quote f = QLam $ \x ->
         pure . QLam $ \y ->
-            case y of
+            \case
                 QLam g -> join (qapp (quote f) <$> g x)
                 _      -> quote <$> (f <$> unquote x <*> unquote y)
 
