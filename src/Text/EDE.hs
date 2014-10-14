@@ -320,7 +320,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- >         , "list" .= [5..10]
 -- >         ]
 --
--- Please see the <#syntax syntax> section for more information about available
+-- Please see the syntax section for more information about available
 -- statements and expressions.
 
 -- $parsing_and_rendering
