@@ -515,7 +515,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- They can be used to abstract out common snippets and idioms into partials.
 --
 -- If 'parseFile' or the 'includeFile' resolver is used, templates will be loaded
--- from 'FilePath's, for example:
+-- using 'FilePath's.
+--
+-- For example:
 --
 -- > {% include "/var/tmp/partial.ede" %}
 --
@@ -523,7 +525,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- The current environment is made directly available to the included template.
 -- Additional bindings can be created (/See:/ @let@) which will be additionally
--- available with a specific identifier:
+-- available only within the include under a specific identifier:
 --
 -- > {% include "/var/tmp/partial.ede" with some_number = 123 %}
 --
