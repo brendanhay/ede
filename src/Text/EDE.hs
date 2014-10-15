@@ -558,4 +558,12 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $comments
 --
--- /Important:/ For the current version of ED-E comments are not supported.
+-- Comments are ignored by the parser and omitted from the rendered output.
+--
+-- > {# singleline comment #}
+--
+-- > {#
+-- >    multiline
+-- >    comment
+-- > #}
+--

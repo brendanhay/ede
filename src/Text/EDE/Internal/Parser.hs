@@ -38,6 +38,7 @@ import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
 import           Text.Parser.LookAhead
+import           Text.Parser.Token.Style    (buildSomeSpaceParser)
 import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
@@ -102,7 +103,7 @@ document :: Parser m => m Exp
 document = eapp <$> position <*> many (statement <|> substitute <|> fragment)
 
 substitute :: Parser m => m Exp
-substitute = between subStart subEnd term
+substitute = between subl subr term
 
 fragment :: Parser m => m Exp
 fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1)
@@ -110,8 +111,8 @@ fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1
     line0 = manyTill1 (noneOf "\n") (try (lookAhead end0) <|> eof)
     line1 = manyEndBy1 anyChar newline
 
-    end0 = void (subStart <|> blockStart <|> try end1)
-    end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockEnd))
+    end0 = void (subl <|> blockl <|> try end1)
+    end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockr))
 
 statement :: Parser m => m Exp
 statement = choice
@@ -121,24 +122,17 @@ statement = choice
     , include
     , binding
     , raw
+    , comment
     ]
 
 block :: Parser m => String -> m a -> m a
 block k p = try (multiLine (keyword k) p) <|> singleLine (keyword k) p
 
 multiLine :: Parser m => m b -> m a -> m a
-multiLine s = between (try (lstrip blockStart *> s)) (rstrip blockEnd)
-  where
-    lstrip p = do
-        c <- column <$> position
-        if c == 0
-            then spaces *> p
-            else fail "left whitespace removal failed"
-
-    rstrip p = p <* spaces <* newline
+multiLine s = between (try (lstrip blockl *> s)) (rstrip blockr)
 
 singleLine :: Parser m => m b -> m a -> m a
-singleLine s = between (try (blockStart *> s)) blockEnd
+singleLine s = between (try (blockl *> s)) blockr
 
 ifelif :: Parser m => m Exp
 ifelif = eif
@@ -194,6 +188,18 @@ raw = ELit
   where
     start = block "raw" (pure ())
     end   = exit "endraw"
+
+-- FIXME: this is due to the whitespace sensitive nature of the parser making
+-- it difficult to do what most applicative parsers do by skipping comments
+-- as part of the whitespace.
+comment :: Parser m => m Exp
+comment = ELit
+    <$> position
+    <*> pure (LText mempty)
+    <*  (try (lstrip (rstrip go)) <|> go)
+  where
+    go = (commentStyle <$> commentl <*> commentr) >>=
+        buildSomeSpaceParser (fail "whitespace significant")
 
 else' :: Parser m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)
@@ -271,13 +277,27 @@ manyEndBy1 p end = go
 pack :: Functor f => f String -> f Lit
 pack = fmap (LText . Text.pack)
 
-subStart, subEnd :: Parser m => m String
-subStart = syntax (delimSubstitute._1) symbol
-subEnd   = syntax (delimSubstitute._2) string
+lstrip :: Parser m => m a -> m a
+lstrip p = do
+    c <- column <$> position
+    if c == 0
+        then spaces *> p
+        else fail "left whitespace removal failed"
 
-blockStart, blockEnd :: Parser m => m String
-blockStart = syntax (delimBlock._1) symbol
-blockEnd   = syntax (delimBlock._2) string
+rstrip :: Parser m => m a -> m a
+rstrip p = p <* spaces <* newline
 
-syntax :: MonadState Env m => Getter Syntax a -> (a -> m b) -> m b
-syntax l f = gets (view (settings.l)) >>= f
+commentl, commentr :: MonadState Env m => m String
+commentl = syntax (delimComment._1)
+commentr = syntax (delimComment._2)
+
+subl, subr :: Parser m => m String
+subl = syntax (delimSubstitute._1) >>= symbol
+subr = syntax (delimSubstitute._2) >>= string
+
+blockl, blockr :: Parser m => m String
+blockl = syntax (delimBlock._1) >>= symbol
+blockr = syntax (delimBlock._2) >>= string
+
+syntax :: MonadState Env m => Getter Syntax a -> m a
+syntax l = gets (view (settings.l))
