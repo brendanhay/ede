@@ -43,6 +43,8 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
+-- FIXME: add benchmarks
+
 -- FIXME: add capture
 
 -- FIXME: add pragmas to control syntax
@@ -133,7 +135,7 @@ block :: Parser m => String -> m a -> m a
 block k p = try (multiLine (keyword k) p) <|> singleLine (keyword k) p
 
 multiLine :: Parser m => m b -> m a -> m a
-multiLine s = between (try (stripl blockl *> s)) (stripr blockr)
+multiLine s = between (try (triml blockl *> s)) (trimr blockr)
 
 singleLine :: Parser m => m b -> m a -> m a
 singleLine s = between (try (blockl *> s)) blockr
@@ -206,7 +208,7 @@ comment :: Parser m => m Exp
 comment = ELit
     <$> position
     <*> pure (LText mempty)
-    <*  (try (stripl (stripr go)) <|> go)
+    <*  (try (triml (trimr go)) <|> go)
   where
     go = (commentStyle <$> commentl <*> commentr) >>=
         buildSomeSpaceParser (fail "whitespace significant")
@@ -287,15 +289,15 @@ manyEndBy1 p end = go
 pack :: Functor f => f String -> f Lit
 pack = fmap (LText . Text.pack)
 
-stripl :: Parser m => m a -> m a
-stripl p = do
+triml :: Parser m => m a -> m a
+triml p = do
     c <- column <$> position
     if c == 0
         then spaces *> p
         else fail "left whitespace removal failed"
 
-stripr :: Parser m => m a -> m a
-stripr p = p <* spaces <* newline
+trimr :: Parser m => m a -> m a
+trimr p = p <* spaces <* newline
 
 commentl, commentr :: MonadState Env m => m String
 commentl = syntax (delimComment._1)
