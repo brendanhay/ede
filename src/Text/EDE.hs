@@ -515,7 +515,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- They can be used to abstract out common snippets and idioms into partials.
 --
 -- If 'parseFile' or the 'includeFile' resolver is used, templates will be loaded
--- using 'FilePath's.
+-- using 'FilePath's. (This is the default.)
 --
 -- For example:
 --
