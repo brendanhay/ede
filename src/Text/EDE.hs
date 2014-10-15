@@ -72,8 +72,8 @@ module Text.EDE
     -- * Syntax
     , Delim
     , Syntax
-    , delimRender
     , delimComment
+    , delimSubstitute
     , delimBlock
 
     , defaultSyntax
@@ -547,7 +547,14 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $raw
 --
--- /Important:/ For the current version of ED-E raw blocks are not supported.
+-- You can disable template processing for blocks of text using the @raw@ section:
+--
+-- > {% raw %}
+-- > Some {{{ handlebars }}} or {{ mustache }} or {{ jinja2 }} output tags etc.
+-- > {% endraw %}
+--
+-- This can be used to avoid parsing expressions which would otherwise be
+-- considered valid @ED-E@ syntax.
 
 -- $comments
 --

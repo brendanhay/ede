@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -23,6 +24,7 @@ import           Control.Lens               hiding (both, noneOf)
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
 import           Data.ByteString            (ByteString)
+import           Data.Char                  (isSpace)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import           Data.List.NonEmpty         (NonEmpty(..))
@@ -37,7 +39,7 @@ import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
 import           Text.Parser.LookAhead
 import qualified Text.Trifecta              as Tri
-import           Text.Trifecta              hiding (Result(..), render, spaces)
+import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
 -- FIXME: the numerous 'try' calls were added during development,
@@ -50,7 +52,7 @@ data Env = Env
 
 makeLenses ''Env
 
-type Parse m =
+type Parser m =
     ( Monad m
     , MonadState Env m
     , TokenParsing m
@@ -58,56 +60,73 @@ type Parse m =
     , LookAheadParsing m
     )
 
-instance DeltaParsing (Unlined Parser) where
-    line         = lift Tri.line
-    position     = lift position
-    slicedWith f = lift . slicedWith f . runUnlined
+newtype EDE a = EDE { runEDE :: Tri.Parser a }
+    deriving
+        ( Functor
+        , Applicative
+        , Alternative
+        , Monad
+        , MonadPlus
+        , Parsing
+        , CharParsing
+        , DeltaParsing
+        , LookAheadParsing
+        )
 
-instance LookAheadParsing (Unlined Parser) where
-    lookAhead = lift . lookAhead . runUnlined
+instance TokenParsing EDE where
+  nesting (EDE m) = EDE (nesting m)
+  {-# INLINE nesting #-}
+
+  someSpace = skipMany (satisfy $ \c -> c /= '\n' && isSpace c)
+  {-# INLINE someSpace #-}
+
+  semi = EDE semi
+  {-# INLINE semi #-}
+
+  highlight h (EDE m) = EDE (highlight h m)
+  {-# INLINE highlight #-}
 
 runParser :: Syntax
           -> Text
           -> ByteString
           -> Result (Exp, HashMap Text (NonEmpty Delta))
-runParser o n = res . parseByteString (runUnlined (runStateT (document <* eof) env)) pos
+runParser o n = res . parseByteString (runEDE run) pos
   where
-    env = Env o mempty
+    run = runStateT (document <* eof) (Env o mempty)
     pos = Directed (Text.encodeUtf8 n) 0 0 0 0
 
     res (Tri.Success x) = Success (_includes `second` x)
     res (Tri.Failure e) = Failure e
 
-document :: Parse m => m Exp
-document = eapp <$> position <*> many (statement <|> render <|> fragment)
+document :: Parser m => m Exp
+document = eapp <$> position <*> many (statement <|> substitute <|> fragment)
 
-render :: Parse m => m Exp
-render = between renderStart renderEnd term
+substitute :: Parser m => m Exp
+substitute = between subStart subEnd term
 
-fragment :: Parse m => m Exp
+fragment :: Parser m => m Exp
 fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1)
   where
     line0 = manyTill1 (noneOf "\n") (try (lookAhead end0) <|> eof)
     line1 = manyEndBy1 anyChar newline
 
-    end0 = void (renderStart <|> blockStart <|> try end1)
+    end0 = void (subStart <|> blockStart <|> try end1)
     end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockEnd))
 
-    pack = fmap (LText . Text.pack)
-
-statement :: Parse m => m Exp
+statement :: Parser m => m Exp
 statement = choice
     [ ifelif
     , cases
     , loop
     , include
     , binding
+    , raw
     ]
 
-block :: Parse m => String -> m a -> m a
+block :: Parser m => String -> m a -> m a
 block k p = try (multiLine (keyword k) p) <|> singleLine (keyword k) p
 
-multiLine :: Parse m => m b -> m a -> m a
+multiLine :: Parser m => m b -> m a -> m a
 multiLine s = between (try (lstrip blockStart *> s)) (rstrip blockEnd)
   where
     lstrip p = do
@@ -118,10 +137,10 @@ multiLine s = between (try (lstrip blockStart *> s)) (rstrip blockEnd)
 
     rstrip p = p <* spaces <* newline
 
-singleLine :: Parse m => m b -> m a -> m a
+singleLine :: Parser m => m b -> m a -> m a
 singleLine s = between (try (blockStart *> s)) blockEnd
 
-ifelif :: Parse m => m Exp
+ifelif :: Parser m => m Exp
 ifelif = eif
     <$> branch "if"
     <*> many (branch "elif")
@@ -130,7 +149,7 @@ ifelif = eif
   where
     branch k = (,) <$> block k term <*> document
 
-cases :: Parse m => m Exp
+cases :: Parser m => m Exp
 cases = ecase
     <$> block "case" term
     <*> many
@@ -139,7 +158,7 @@ cases = ecase
     <*> else'
     <*  exit "endcase"
 
-loop :: Parse m => m Exp
+loop :: Parser m => m Exp
 loop = do
     d <- position
     uncurry (ELoop d)
@@ -150,7 +169,7 @@ loop = do
         <*> else'
         <*  exit "endfor"
 
-include :: Parse m => m Exp
+include :: Parser m => m Exp
 include = do
     d <- position
     block "include" $ do
@@ -158,7 +177,7 @@ include = do
         includes %= Map.insertWith (<>) k (d:|[])
         EIncl d k <$> optional (keyword "with" *> term)
 
-binding :: Parse m => m Exp
+binding :: Parser m => m Exp
 binding = do
     d <- position
     uncurry (ELet d)
@@ -168,13 +187,21 @@ binding = do
         <*> document
         <*  exit "endlet"
 
-else' :: Parse m => m (Maybe Exp)
+raw :: Parser m => m Exp
+raw = ELit
+   <$> position
+   <*> (start *> pack (manyTill anyChar (lookAhead end)) <* end)
+  where
+    start = block "raw" (pure ())
+    end   = exit "endraw"
+
+else' :: Parser m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)
 
-exit :: Parse m => String -> m ()
+exit :: Parser m => String -> m ()
 exit k = block k (pure ())
 
-term :: Parse m => m Exp
+term :: Parser m => m Exp
 term = buildExpressionParser table expr
   where
     table =
@@ -202,35 +229,35 @@ term = buildExpressionParser table expr
 
     expr = parens term <|> apply EVar variable <|> apply ELit literal
 
-pattern :: Parse m => m Pat
+pattern :: Parser m => m Pat
 pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
 
-literal :: Parse m => m Lit
+literal :: Parser m => m Lit
 literal = LBool <$> boolean <|> LNum <$> number <|> LText <$> stringLiteral
 
-number :: Parse m => m Scientific
+number :: Parser m => m Scientific
 number = either fromIntegral fromFloatDigits <$> integerOrDouble
 
-boolean :: Parse m => m Bool
+boolean :: Parser m => m Bool
 boolean = symbol "true " *> return True
       <|> symbol "false" *> return False
 
-operator :: Parse m => Text -> m Delta
+operator :: Parser m => Text -> m Delta
 operator n = position <* reserveText operatorStyle n
 
-keyword :: Parse m => String -> m Delta
+keyword :: Parser m => String -> m Delta
 keyword k = position <* try (reserve keywordStyle k)
 
-variable :: Parse m => m Var
+variable :: Parser m => m Var
 variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 
-identifier :: Parse m => m Id
+identifier :: Parser m => m Id
 identifier = ident variableStyle
 
-spaces :: Parse m => m ()
+spaces :: Parser m => m ()
 spaces = skipMany (oneOf "\t ")
 
-apply :: Parse m => (Delta -> a -> b) -> m a -> m b
+apply :: Parser m => (Delta -> a -> b) -> m a -> m b
 apply f p = f <$> position <*> p
 
 manyTill1 :: Alternative m => m a -> m b -> m [a]
@@ -241,13 +268,16 @@ manyEndBy1 p end = go
   where
     go = (:[]) <$> end <|> (:) <$> p <*> go
 
-renderStart, renderEnd :: Parse m => m String
-renderStart = syntax (delimRender._1) >>= symbol
-renderEnd   = syntax (delimRender._2) >>= string
+pack :: Functor f => f String -> f Lit
+pack = fmap (LText . Text.pack)
 
-blockStart, blockEnd :: Parse m => m String
-blockStart = syntax (delimBlock._1) >>= symbol
-blockEnd   = syntax (delimBlock._2) >>= string
+subStart, subEnd :: Parser m => m String
+subStart = syntax (delimSubstitute._1) symbol
+subEnd   = syntax (delimSubstitute._2) string
 
-syntax :: MonadState Env m => Getter Syntax a -> m a
-syntax l = gets (view (settings.l))
+blockStart, blockEnd :: Parser m => m String
+blockStart = syntax (delimBlock._1) symbol
+blockEnd   = syntax (delimBlock._2) string
+
+syntax :: MonadState Env m => Getter Syntax a -> (a -> m b) -> m b
+syntax l f = gets (view (settings.l)) >>= f

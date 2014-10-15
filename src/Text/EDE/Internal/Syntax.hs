@@ -32,9 +32,9 @@ import           Text.Trifecta
 --
 defaultSyntax :: Syntax
 defaultSyntax = Syntax
-    { _delimRender  = ("{{", "}}")
-    , _delimComment = ("{#", "#}")
-    , _delimBlock   = ("{%", "%}")
+    { _delimComment    = ("{#", "#}")
+    , _delimSubstitute = ("{{", "}}")
+    , _delimBlock      = ("{%", "%}")
     }
 
 -- | An alternate syntax (based on Play/Scala templates) designed to
@@ -51,8 +51,8 @@ defaultSyntax = Syntax
 --
 alternateSyntax :: Syntax
 alternateSyntax = Syntax
-    { _delimRender  = ("<@", "@>")
-    , _delimComment = ("@*", "*@")
+    { _delimComment = ("@*", "*@")
+    , _delimSubstitute  = ("<@", "@>")
     , _delimBlock   = ("@(", ")@")
     }
 
