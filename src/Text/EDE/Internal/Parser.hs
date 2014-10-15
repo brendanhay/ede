@@ -114,7 +114,7 @@ fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1
     line0 = manyTill1 (noneOf "\n") (try (lookAhead end0) <|> eof)
     line1 = manyEndBy1 anyChar newline
 
-    end0 = void (subl <|> blockl <|> try end1)
+    end0 = void (inlinel <|> blockl <|> try end1)
     end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockr))
 
 statement :: Parser m => m Exp
