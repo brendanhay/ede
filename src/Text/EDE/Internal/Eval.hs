@@ -78,7 +78,7 @@ eval (EFun d i) = do
 eval (EApp d a b) = do
     x <- eval a
     y <- eval b
-    qapplyend d x y
+    binding d x y
 
 eval (ELet _ k rhs bdy) = do
     q <- eval rhs
@@ -117,33 +117,12 @@ eval (ELoop d i v bdy ma) = variable v >>= go >>= loop i bdy ma
     vec :: Vector Value -> Vector (Maybe Text, Value)
     vec = Vector.map (Nothing,)
 
-eval (EIncl d i mu) = do
+eval (EIncl d i) = do
     ts <- asks _templates
-    t  <- maybe
-        (throwError' d "template {} is not in scope: {}"
-            [i, Text.intercalate "," $ Map.keys ts])
-        return
-        (Map.lookup i ts)
-    s  <- maybe (return global) local' mu
-    bind s (eval t)
-  where
-    -- Use the global environment.
-    global o = fromPairs ["scope" .= o]
-
-    -- Ignore the global environment (const)
-    -- and set to the specified expression.
-    local' u = do
-        x <- case u of
-            ELit _ l -> return (enc l)
-            EVar _ v -> variable v
-            _        ->
-                throwError' d "unexpected template scope {}"
-                    [show (delta u)]
-        return . const $ fromPairs ["scope" .= x]
-
-    enc (LBool b) = toJSON b
-    enc (LNum  n) = toJSON n
-    enc (LText t) = toJSON t
+    case Map.lookup i ts of
+        Just e  -> eval e
+        Nothing -> throwError' d "template {} is not in scope: {}"
+            [i, Text.intercalate "," $ Map.keys ts]
 
 bind :: (Object -> Object) -> Context a -> Context a
 bind f = withReaderT (\x -> x { _values = f (_values x) })
@@ -190,7 +169,7 @@ loop i a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
     iter (n, p) x = do
         shadowed n
         q <- bind (Map.insert i (context n x)) (eval a)
-        r <- qapplyend (delta a) p q
+        r <- binding (delta a) p q
         return (n + 1, r)
 
     shadowed n = do
@@ -216,8 +195,8 @@ loop i a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
     key (Just k) = ["key" .= k]
     key Nothing  = []
 
-qapplyend :: Delta -> Binding -> Binding -> Context Binding
-qapplyend d x y =
+binding :: Delta -> Binding -> Binding -> Context Binding
+binding d x y =
     case (x, y) of
         (BVal l, BVal r) -> quote <$> liftM2 (<>) (build d l) (build d r)
         _                -> lift (qapply x y)

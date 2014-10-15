@@ -521,13 +521,11 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- Loads @partial.ede@ from the file system.
 --
--- By default, the current environment is made available to the included template,
--- but this can be overriden by specifying a specific binding to make available:
+-- The current environment is made directly available to the included template.
+-- Additional bindings can be created (/See:/ @let@) which will be additionally
+-- available with a specific identifier:
 --
--- > {% include "/var/tmp/partial.ede" with value %}
---
--- Will ensure only the key @value@ (and descendents) is available in the
--- partial's environment.
+-- > {% include "/var/tmp/partial.ede" with some_number = 123 %}
 --
 -- Includes can also be resolved using pure 'Resolver's such as 'includeMap',
 -- which will treat the @include@ expression's identifier as a 'HashMap' key:

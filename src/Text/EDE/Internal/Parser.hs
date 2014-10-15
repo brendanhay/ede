@@ -169,10 +169,16 @@ loop = do
 include :: Parser m => m Exp
 include = do
     d <- position
-    block "include" $ do
+    block "include" (incl d)
+  where
+    incl d = do
         k <- stringLiteral
         includes %= Map.insertWith (<>) k (d:|[])
-        EIncl d k <$> optional (keyword "with" *> term)
+        ($ EIncl d k) . maybe id (uncurry (ELet d)) <$> scope
+
+    scope = optional $
+        (,) <$> (keyword "with" *> identifier)
+            <*> (symbol  "="    *> term)
 
 binding :: Parser m => m Exp
 binding = do

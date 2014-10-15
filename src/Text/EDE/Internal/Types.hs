@@ -151,7 +151,7 @@ data Exp
     | ELet  !Delta !Id   !Exp  !Exp
     | ECase !Delta !Exp  [Alt]
     | ELoop !Delta !Id   !Var  !Exp (Maybe Exp)
-    | EIncl !Delta !Text (Maybe Exp)
+    | EIncl !Delta !Text
       deriving (Eq, Show)
 
 instance HasDelta Exp where
@@ -163,7 +163,7 @@ instance HasDelta Exp where
         ELet  d _ _ _   -> d
         ECase d _ _     -> d
         ELoop d _ _ _ _ -> d
-        EIncl d _ _     -> d
+        EIncl d _       -> d
 
 var :: Id -> Var
 var = Var . (:| [])
