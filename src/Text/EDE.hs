@@ -102,6 +102,9 @@ module Text.EDE
 
     -- ** Comments
     -- $comments
+
+    -- ** Let Expressions
+    -- $let
     ) where
 
 import           Control.Monad
@@ -567,3 +570,14 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- >    comment
 -- > #}
 --
+
+-- $let
+--
+-- You can also bind an identifier to values which will be available within
+-- the following expression scope.
+--
+-- For example:
+--
+-- > {% let var = false %}
+-- >     {{ var }}
+-- > {% endlet %}

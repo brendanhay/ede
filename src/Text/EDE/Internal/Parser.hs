@@ -43,6 +43,9 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
+-- FIXME: make include always have 'scope' as the parent, and inject
+-- the 'with <ident> = <expr>' as <ident> into the top-level (not scope)
+
 -- FIXME: the numerous 'try' calls were added during development,
 -- these should now be reduced where possible.
 
