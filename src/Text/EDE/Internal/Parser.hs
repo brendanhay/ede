@@ -43,8 +43,9 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
--- FIXME: make include always have 'scope' as the parent, and inject
--- the 'with <ident> = <expr>' as <ident> into the top-level (not scope)
+-- FIXME: add capture
+
+-- FIXME: add pragmas to control syntax
 
 -- FIXME: the numerous 'try' calls were added during development,
 -- these should now be reduced where possible.
@@ -132,7 +133,7 @@ block :: Parser m => String -> m a -> m a
 block k p = try (multiLine (keyword k) p) <|> singleLine (keyword k) p
 
 multiLine :: Parser m => m b -> m a -> m a
-multiLine s = between (try (lstrip blockl *> s)) (rstrip blockr)
+multiLine s = between (try (stripl blockl *> s)) (stripr blockr)
 
 singleLine :: Parser m => m b -> m a -> m a
 singleLine s = between (try (blockl *> s)) blockr
@@ -205,7 +206,7 @@ comment :: Parser m => m Exp
 comment = ELit
     <$> position
     <*> pure (LText mempty)
-    <*  (try (lstrip (rstrip go)) <|> go)
+    <*  (try (stripl (stripr go)) <|> go)
   where
     go = (commentStyle <$> commentl <*> commentr) >>=
         buildSomeSpaceParser (fail "whitespace significant")
@@ -286,15 +287,15 @@ manyEndBy1 p end = go
 pack :: Functor f => f String -> f Lit
 pack = fmap (LText . Text.pack)
 
-lstrip :: Parser m => m a -> m a
-lstrip p = do
+stripl :: Parser m => m a -> m a
+stripl p = do
     c <- column <$> position
     if c == 0
         then spaces *> p
         else fail "left whitespace removal failed"
 
-rstrip :: Parser m => m a -> m a
-rstrip p = p <* spaces <* newline
+stripr :: Parser m => m a -> m a
+stripr p = p <* spaces <* newline
 
 commentl, commentr :: MonadState Env m => m String
 commentl = syntax (delimComment._1)
