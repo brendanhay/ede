@@ -28,13 +28,13 @@ import           Text.Trifecta
 --
 -- * Comments: @{# ... #}@
 --
--- * Control Structures: @{% ... %}@
+-- * Blocks: @{% ... %}@
 --
 defaultSyntax :: Syntax
 defaultSyntax = Syntax
-    { _delimComment    = ("{#", "#}")
-    , _delimSubstitute = ("{{", "}}")
-    , _delimBlock      = ("{%", "%}")
+    { _delimInline  = ("{{", "}}")
+    , _delimComment = ("{#", "#}")
+    , _delimBlock   = ("{%", "%}")
     }
 
 -- | An alternate syntax (based on Play/Scala templates) designed to
@@ -47,12 +47,12 @@ defaultSyntax = Syntax
 --
 -- * Comments: @\@* ... *\@@
 --
--- * Control Structures: @\@( ... )\@@
+-- * Blocks: @\@( ... )\@@
 --
 alternateSyntax :: Syntax
 alternateSyntax = Syntax
-    { _delimComment = ("@*", "*@")
-    , _delimSubstitute  = ("<@", "@>")
+    { _delimInline  = ("<@", "@>")
+    , _delimComment = ("@*", "*@")
     , _delimBlock   = ("@(", ")@")
     }
 

@@ -103,10 +103,10 @@ runParser o n = res . parseByteString (runEDE run) pos
     res (Tri.Failure e) = Failure e
 
 document :: Parser m => m Exp
-document = eapp <$> position <*> many (statement <|> substitute <|> fragment)
+document = eapp <$> position <*> many (statement <|> inline <|> fragment)
 
-substitute :: Parser m => m Exp
-substitute = between subl subr term
+inline :: Parser m => m Exp
+inline = between inlinel inliner term
 
 fragment :: Parser m => m Exp
 fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1)
@@ -300,9 +300,9 @@ commentl, commentr :: MonadState Env m => m String
 commentl = syntax (delimComment._1)
 commentr = syntax (delimComment._2)
 
-subl, subr :: Parser m => m String
-subl = syntax (delimSubstitute._1) >>= symbol
-subr = syntax (delimSubstitute._2) >>= string
+inlinel, inliner :: Parser m => m String
+inlinel = syntax (delimInline._1) >>= symbol
+inliner = syntax (delimInline._2) >>= string
 
 blockl, blockr :: Parser m => m String
 blockl = syntax (delimBlock._1) >>= symbol
