@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE RankNTypes        #-}
@@ -31,7 +32,6 @@ import           Data.Semigroup
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
-import           Debug.Trace
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
@@ -40,8 +40,11 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Result(..), render, spaces)
 import           Text.Trifecta.Delta
 
+-- FIXME: the numerous 'try' calls were added during development,
+-- these should now be reduced where possible.
+
 data Env = Env
-    { _syntax  :: !Syntax
+    { _settings :: !Syntax
     , _includes :: HashMap Text (NonEmpty Delta)
     }
 
@@ -55,11 +58,19 @@ type Parse m =
     , LookAheadParsing m
     )
 
+instance DeltaParsing (Unlined Parser) where
+    line         = lift Tri.line
+    position     = lift position
+    slicedWith f = lift . slicedWith f . runUnlined
+
+instance LookAheadParsing (Unlined Parser) where
+    lookAhead = lift . lookAhead . runUnlined
+
 runParser :: Syntax
           -> Text
           -> ByteString
           -> Result (Exp, HashMap Text (NonEmpty Delta))
-runParser o n = res . parseByteString (runStateT (document <* eof) env) pos
+runParser o n = res . parseByteString (runUnlined (runStateT (document <* eof) env)) pos
   where
     env = Env o mempty
     pos = Directed (Text.encodeUtf8 n) 0 0 0 0
@@ -74,17 +85,18 @@ render :: Parse m => m Exp
 render = between renderStart renderEnd term
 
 fragment :: Parse m => m Exp
-fragment = ELit <$> position <*> pack (notFollowedBy cond >> try line0 <|> line1)
+fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1)
   where
-    line0 = manyTill1 (noneOf "\n") (cond <|> eof)
+    line0 = manyTill1 (noneOf "\n") (try (lookAhead end0) <|> eof)
     line1 = manyEndBy1 anyChar newline
 
-    cond = () <$ lookAhead (renderStart <|> try blockStart)
+    end0 = void (renderStart <|> blockStart <|> try end1)
+    end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockEnd))
 
     pack = fmap (LText . Text.pack)
 
 statement :: Parse m => m Exp
-statement = trace "statement" $ choice
+statement = choice
     [ ifelif
     , cases
     , loop
@@ -93,7 +105,21 @@ statement = trace "statement" $ choice
     ]
 
 block :: Parse m => String -> m a -> m a
-block k = between (try (blockStart *> keyword k)) (rstrip blockEnd <|> blockEnd)
+block k p = try (multiLine (keyword k) p) <|> singleLine (keyword k) p
+
+multiLine :: Parse m => m b -> m a -> m a
+multiLine s = between (try (lstrip blockStart *> s)) (rstrip blockEnd)
+  where
+    lstrip p = do
+        c <- column <$> position
+        if c == 0
+            then spaces *> p
+            else fail "left whitespace removal failed"
+
+    rstrip p = p <* spaces <* newline
+
+singleLine :: Parse m => m b -> m a -> m a
+singleLine s = between (try (blockStart *> s)) blockEnd
 
 ifelif :: Parse m => m Exp
 ifelif = eif
@@ -201,9 +227,6 @@ variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 identifier :: Parse m => m Id
 identifier = ident variableStyle
 
-rstrip :: Parse m => m a -> m a
-rstrip p = try (p <* spaces <* newline)
-
 spaces :: Parse m => m ()
 spaces = skipMany (oneOf "\t ")
 
@@ -219,20 +242,12 @@ manyEndBy1 p end = go
     go = (:[]) <$> end <|> (:) <$> p <*> go
 
 renderStart, renderEnd :: Parse m => m String
-renderStart = delimiter (delimRender._1) >>= symbol
-renderEnd   = delimiter (delimRender._2) >>= string
+renderStart = syntax (delimRender._1) >>= symbol
+renderEnd   = syntax (delimRender._2) >>= string
 
 blockStart, blockEnd :: Parse m => m String
-blockStart = insensitive (delimBlock._1)
-blockEnd   = delimiter   (delimBlock._2) >>= string
+blockStart = syntax (delimBlock._1) >>= symbol
+blockEnd   = syntax (delimBlock._2) >>= string
 
-insensitive :: Parse m => Getter Syntax String -> m String
-insensitive l = do
-    d <- delimiter l
-    c <- column <$> position
-    if c == 0
-        then spaces *> symbol d
-        else symbol d
-
-delimiter :: MonadState Env m => Getter Syntax a -> m a
-delimiter l = gets (view (syntax.l))
+syntax :: MonadState Env m => Getter Syntax a -> m a
+syntax l = gets (view (settings.l))
