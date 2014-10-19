@@ -19,11 +19,11 @@ Num:
 RealFrac:
 
 Text:
-{{ text | lower }}
-{{ text | upper }}
-{{ text | lowerFirst }}
-{{ text | lower | upperFirst }}
-{% if text | lower == "lorem ipsum" %}
+{{ text | toLower }}
+{{ text | toUpper }}
+{{ text | lowerHead }}
+{{ text | toLower | upperHead }}
+{% if text | toLower == "lorem ipsum" %}
 text | lower == "lorem ipsum"
 {% endif %}
 

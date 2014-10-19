@@ -6,7 +6,8 @@
     "a": 1.0,
     "b": 2.0,
     "c": 3.0
-  }
+  },
+  "empty": []
 }
 ---
 {% for n in numbers %}
@@ -23,4 +24,10 @@
 
 {% for var in keyed %}
   {{ var.key }}:{{ var.value }}
+{% endfor %}
+
+{% for var in empty %}
+  Shit!
+{% else %}
+  empty
 {% endfor %}

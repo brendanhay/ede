@@ -133,11 +133,11 @@ import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
+-- FIXME: detect include/import loops
+
 -- | ED-E Version.
 version :: Version
 version = Paths.version
-
--- FIXME: detect include/import loops
 
 -- | Parse Lazy 'LText.Text' into a compiled 'Template'.
 --

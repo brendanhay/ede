@@ -175,12 +175,12 @@ cases = ecase
 
 loop :: Parser m => m Exp
 loop = do
-    d <- position
-    uncurry (ELoop d)
-        <$> block "for"
-            ((,) <$> identifier
-                 <*> (keyword "in" *> variable))
-        <*> document
+    d      <- position
+    (i, v) <- block "for"
+        ((,) <$> identifier
+             <*> (keyword "in" *> variable))
+    eempty d v
+        <$> (ELoop d i v <$> document)
         <*> else'
         <*  exit "endfor"
 
@@ -192,7 +192,7 @@ include = do
     incl d = do
         k <- stringLiteral
         includes %= Map.insertWith (<>) k (d:|[])
-        ($ EIncl d k) . maybe id (uncurry (ELet d)) <$> scope
+        elet d (EIncl d k) <$> scope
 
     scope = optional $
         (,) <$> (keyword "with" *> identifier)

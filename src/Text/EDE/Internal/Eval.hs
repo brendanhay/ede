@@ -24,7 +24,6 @@ import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
 import           Data.List                         (sortBy)
 import qualified Data.List.NonEmpty                as NonEmpty
-import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
 import           Data.Scientific                   (base10Exponent)
@@ -39,13 +38,9 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.HOAS
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen      (Pretty(..))
 import           Text.Trifecta.Delta
 
--- FIXME: look at adding a whnf step to reduce everything before storing as a template
--- (optimisation passes, case reducation etc.)
--- maybe Exp -> Binding (aka Val) is the first step, without substituting from
--- env/filters
+-- FIXME: add pretty printer formatted error messages
 
 data Env = Env
     { _templates :: HashMap Text Exp
@@ -103,7 +98,7 @@ eval (ECase d p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
-eval (ELoop d i v bdy ma) = variable v >>= go >>= loop i bdy ma
+eval (ELoop d i v bdy) = variable v >>= go >>= loop i bdy
   where
     go (Object o) = return (Col (Map.size o) (hmap o))
     go (Array  a) = return (Col (Vector.length a) (vec a))
@@ -162,9 +157,8 @@ predicate x = do
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
 
-loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Binding
-loop _ a b (Col 0 _)  = eval (fromMaybe (ELit (delta a) (LText mempty)) b)
-loop i a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+loop :: Text -> Exp -> Collection -> Context Binding
+loop i a (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
   where
     iter (n, p) x = do
         shadowed n
