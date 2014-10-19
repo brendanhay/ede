@@ -102,12 +102,13 @@ throwError fmt = Failure . pretty . LText.unpack . format fmt
 type Delim = (String, String)
 
 data Syntax = Syntax
-    { _delimInline  :: !Delim
+    { _delimPragma  :: !Delim
+    , _delimInline  :: !Delim
     , _delimComment :: !Delim
     , _delimBlock   :: !Delim
     }
 
-makeLenses ''Syntax
+makeClassy ''Syntax
 
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Syntax -> Text -> Delta -> m (Result Template)

@@ -1,7 +1,9 @@
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -50,6 +52,9 @@ data Env = Env
 
 makeLenses ''Env
 
+instance HasSyntax Env where
+    syntax = settings
+
 type Parser m =
     ( Monad m
     , MonadState Env m
@@ -90,11 +95,38 @@ runParser :: Syntax
           -> Result (Exp, HashMap Text (NonEmpty Delta))
 runParser o n = res . parseByteString (runEDE run) pos
   where
-    run = runStateT (document <* eof) (Env o mempty)
+    run = runStateT (syntax' *> document <* eof) (Env o mempty)
     pos = Directed (Text.encodeUtf8 n) 0 0 0 0
 
     res (Tri.Success x) = Success (_includes `second` x)
     res (Tri.Failure e) = Failure e
+
+-- FIXME: Documentation
+syntax' :: Parser m => m ()
+syntax' = skipOptional (pragma "EDE_SYNTAX" eval)
+  where
+    eval = do
+        !xs <- sepBy delim spaces
+        forM_ xs $ \(f, x) ->
+            setter f .= x
+
+    field = (,)
+        <$> ident variableStyle <* symbol "="
+        <*> parens delim
+
+    delim = (,)
+        <$> stringLiteral <* symbol ","
+        <*> stringLiteral
+
+    setter = \case
+        "pragma"  -> delimPragma
+        "inline"  -> delimInline
+        "comment" -> delimComment
+        "block"   -> delimBlock
+        n         -> fail ("Non-existent syntax field: " ++ n)
+
+pragma :: Parser m => String -> m a -> m ()
+pragma k = between (pragmal *> symbol k) (trimr pragmar) . void
 
 document :: Parser m => m Exp
 document = eapp <$> position <*> many (statement <|> inline <|> fragment)
@@ -290,17 +322,22 @@ triml p = do
 trimr :: Parser m => m a -> m a
 trimr p = p <* spaces <* newline
 
+pragmal, pragmar :: Parser m => m String
+pragmal = left  delimPragma >>= symbol
+pragmar = right delimPragma >>= string
+
 commentl, commentr :: MonadState Env m => m String
-commentl = syntax (delimComment._1)
-commentr = syntax (delimComment._2)
+commentl = left  delimComment
+commentr = right delimComment
 
 inlinel, inliner :: Parser m => m String
-inlinel = syntax (delimInline._1) >>= symbol
-inliner = syntax (delimInline._2) >>= string
+inlinel = left  delimInline >>= symbol
+inliner = right delimInline >>= string
 
 blockl, blockr :: Parser m => m String
-blockl = syntax (delimBlock._1) >>= symbol
-blockr = syntax (delimBlock._2) >>= string
+blockl = left  delimBlock >>= symbol
+blockr = right delimBlock >>= string
 
-syntax :: MonadState Env m => Getter Syntax a -> m a
-syntax l = gets (view (settings.l))
+left, right :: MonadState s m => Getter s Delim -> m String
+left  d = gets (fst . view d)
+right d = gets (snd . view d)

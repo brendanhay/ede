@@ -24,6 +24,8 @@ import           Text.Trifecta
 --
 -- Delimiters:
 --
+-- * Pragma: @{! ... !}@
+--
 -- * Inline: @{{ ... }}@
 --
 -- * Comments: @{# ... #}@
@@ -32,7 +34,8 @@ import           Text.Trifecta
 --
 defaultSyntax :: Syntax
 defaultSyntax = Syntax
-    { _delimInline  = ("{{", "}}")
+    { _delimPragma  = ("{!", "!}")
+    , _delimInline  = ("{{", "}}")
     , _delimComment = ("{#", "#}")
     , _delimBlock   = ("{%", "%}")
     }
@@ -51,7 +54,8 @@ defaultSyntax = Syntax
 --
 alternateSyntax :: Syntax
 alternateSyntax = Syntax
-    { _delimInline  = ("<@", "@>")
+    { _delimPragma  = ("@!", "!@")
+    , _delimInline  = ("<@", "@>")
     , _delimComment = ("@*", "*@")
     , _delimBlock   = ("@(", ")@")
     }

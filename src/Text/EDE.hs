@@ -72,6 +72,7 @@ module Text.EDE
     -- * Syntax
     , Delim
     , Syntax
+    , delimPragma
     , delimInline
     , delimComment
     , delimBlock
