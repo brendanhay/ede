@@ -204,7 +204,7 @@ fractional = Map.fromList
 --
 -- * @toOrdinal@ @:: Number -> Text@
 --
--- /See:/ <http://http://hackage.haskell.org/package/text-manipulate text-manipulate>
+-- /See:/ <http://hackage.haskell.org/package/text-manipulate text-manipulate>
 
 textual :: HashMap Text Binding
 textual = Map.fromList
