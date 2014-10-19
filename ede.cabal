@@ -33,7 +33,7 @@ description:
     .
     * No surprises. All parsing, type assurances, and rendering steps report helpful
     error messages with line/column metadata. Variable shadowing, unprintable expressions,
-    implicit type coercion, and unbound variable access are all treated as errors errors.
+    implicit type coercion, and unbound variable access are all treated as errors.
 
 extra-source-files:
     README.md
