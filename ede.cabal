@@ -23,17 +23,17 @@ description:
     .
     * Stateless. Parsing and rendering are separate steps so that loading, parsing,
     include resolution, and embedding of the compiled template can optionally be
-    done ahead of time.
+    done ahead of time, amortising cost.
     .
     * Markup agnostic. ED-E is used to write out everything from configuration files for
-    system services to HTML and formatted emails.
+    system services, to HTML and formatted emails.
     .
-    * Easy to debug. All parsing, type assurances, and rendering steps report helpful
+    * Control over purity. Users can choose pure or IO-based resolution of
+    @include@ expressions.
+    .
+    * No surprises. All parsing, type assurances, and rendering steps report helpful
     error messages with line/column metadata. Variable shadowing, unprintable expressions,
-    implicit type coercion, and unbound variable access are all considered errors.
-    .
-    * Control over purity. Users can choose to introduce impure resolution of
-    @include@ expressions or to use their own pure mechanism.
+    implicit type coercion, and unbound variable access are all treated as errors errors.
 
 extra-source-files:
     README.md
