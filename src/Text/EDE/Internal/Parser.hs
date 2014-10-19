@@ -43,29 +43,13 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
--- If the environment was quoted .. EFun/EVar could be merged
-
--- use comonads for the delta annotation, and convert it to meta after parsing?
-
--- {%- tags to deliberately strip/trim whitespace
-
--- check if {% include %} behaves properly re:indentation of contents
-
--- conduits
-
--- FIXME: add constructors, use exp for loop target
--- maybe the loop can be turned into a let/fold?
-
--- FIXME: else case for loops can be created using a case exp wrapping
-
+-- FIXME: {%- tags to deliberately strip/trim whitespace
+-- FIXME: test {% include %} behaves properly re:indentation of contents
+-- FIXME: conduits
 -- FIXME: add benchmarks
-
 -- FIXME: add capture
-
 -- FIXME: add pragmas to control syntax
-
--- FIXME: the numerous 'try' calls were added during development,
--- these should now be reduced where possible.
+-- FIXME: numerous 'try' calls were added during development, these should now be reduced.
 
 data Env = Env
     { _settings :: !Syntax
