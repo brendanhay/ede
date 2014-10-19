@@ -40,8 +40,10 @@ doc:
 dist: $(DEB)
 	cabal sdist
 
-$(BIN): build
-	cabal copy --destdir=dist/release && upx $@
+$(BIN): dist/setup-config
+	cabal build $(addprefix -,$(findstring j,$(MAKEFLAGS))) -fbuild-executable && \
+ cabal copy --destdir=dist/release && \
+ upx $@
 
 %.deb: $(BIN)
 	makedeb --name=$(NAME) \

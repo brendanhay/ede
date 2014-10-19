@@ -43,15 +43,15 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
-If the environment was quoted .. EFun/EVar could be merged
+-- If the environment was quoted .. EFun/EVar could be merged
 
-use comonads for the delta annotation, and convert it to meta after parsing?
+-- use comonads for the delta annotation, and convert it to meta after parsing?
 
-{%- tags to deliberately strip/trim whitespace
+-- {%- tags to deliberately strip/trim whitespace
 
-check if {% include %} behaves properly .. what about indentation of contents
+-- check if {% include %} behaves properly re:indentation of contents
 
-conduits
+-- conduits
 
 -- FIXME: add constructors, use exp for loop target
 -- maybe the loop can be turned into a let/fold?

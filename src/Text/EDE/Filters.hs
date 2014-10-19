@@ -66,6 +66,7 @@ module Text.EDE.Filters
 import           Data.Aeson              (Value, encode)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
+import           Data.Scientific         (Scientific)
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
@@ -73,7 +74,6 @@ import qualified Data.Text.Lazy.Encoding as LText
 import           Data.Text.Manipulate
 import qualified Data.Vector             as Vector
 import           Text.EDE.Internal.HOAS
-import           Text.EDE.Text
 
 default (Integer)
 
@@ -220,7 +220,7 @@ textual = Map.fromList
     , "toTrain"   @: quote toTrain
     , "toUpper"   @: quote Text.toUpper
     , "toLower"   @: quote Text.toLower
-    , "toOrdinal" @: (toOrdinal :: Scientific -> Text)
+    , "toOrdinal" @: (toOrdinal . truncate :: Scientific -> Text)
     ]
 
 -- $collection
@@ -233,7 +233,7 @@ collection :: HashMap Text Binding
 collection = Map.fromList
     [ "length" @: qcol1 Text.length Map.size Vector.length
     , "empty"  @: qcol1 Text.null   Map.null Vector.null
-    -- , ("join",  quote hyphenate
+    -- , ("join",  quote
     ]
 
 -- $polymorphic
