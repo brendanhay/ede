@@ -43,6 +43,21 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
+If the environment was quoted .. EFun/EVar could be merged
+
+use comonads for the delta annotation, and convert it to meta after parsing?
+
+{%- tags to deliberately strip/trim whitespace
+
+check if {% include %} behaves properly .. what about indentation of contents
+
+conduits
+
+-- FIXME: add constructors, use exp for loop target
+-- maybe the loop can be turned into a let/fold?
+
+-- FIXME: else case for loops can be created using a case exp wrapping
+
 -- FIXME: add benchmarks
 
 -- FIXME: add capture

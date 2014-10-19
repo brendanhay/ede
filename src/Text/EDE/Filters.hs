@@ -237,3 +237,7 @@ k @: q = (k, quote q)
 
 value :: Value -> LText.Text
 value = LText.decodeUtf8 . encode
+
+
+filter (/= 'z') . take 5 . map (\c -> c) "zsofia"
+
