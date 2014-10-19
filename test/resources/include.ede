@@ -2,3 +2,5 @@
 ---
 {% include "include.child1" %}
 {% include "include.child2" with binding = "123" %}
+
+     include: {% include "include.child3" %}

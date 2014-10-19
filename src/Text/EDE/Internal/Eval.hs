@@ -116,7 +116,7 @@ eval (EIncl d i) = do
     ts <- asks _templates
     case Map.lookup i ts of
         Just e  -> eval e
-        Nothing -> throwError' d "template {} is not in scope: {}"
+        Nothing -> throwError' d "template {} is not in scope: [{}]"
             [i, Text.intercalate "," $ Map.keys ts]
 
 bind :: (Object -> Object) -> Context a -> Context a
