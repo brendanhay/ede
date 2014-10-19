@@ -133,7 +133,14 @@ import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
+-- FIXME: add pragmas to control syntax
 -- FIXME: detect include/import loops
+-- FIXME: {%- tags to deliberately strip/trim whitespace
+-- FIXME: ... {% include %} inline adds a trailing newline
+-- FIXME: streaming io
+-- FIXME: add benchmarks
+-- FIXME: add capture
+-- FIXME: numerous 'try' calls were added during development, these should now be reduced.
 
 -- | ED-E Version.
 version :: Version
@@ -579,5 +586,6 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- For example:
 --
 -- > {% let var = false %}
--- >     {{ var }}
--- > {% endlet %}
+-- > ...
+-- > {{ var }}
+-- > ...

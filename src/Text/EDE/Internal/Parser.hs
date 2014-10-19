@@ -43,15 +43,6 @@ import qualified Text.Trifecta              as Tri
 import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
--- FIXME: add pragmas to control syntax
-
--- FIXME: {%- tags to deliberately strip/trim whitespace
--- FIXME: ... {% include %} inline adds a trailing newline
--- FIXME: streaming io
--- FIXME: add benchmarks
--- FIXME: add capture
--- FIXME: numerous 'try' calls were added during development, these should now be reduced.
-
 data Env = Env
     { _settings :: !Syntax
     , _includes :: HashMap Text (NonEmpty Delta)
