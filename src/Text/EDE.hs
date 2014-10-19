@@ -15,7 +15,7 @@
 -- | A (mostly logicless) textual templating language with similar syntax to
 -- <https://github.com/Shopify/liquid Liquid> or <http://jinja.pocoo.org/docs/ Jinja2>.
 --
--- (ED-E is a character from Fallout New Vegas, pronounced iː-diː-iː, or Eddie.)
+-- (ED-E is a character from Fallout New Vegas, pronounced 'Eddie'.)
 module Text.EDE
     (
     -- * How to use this library
