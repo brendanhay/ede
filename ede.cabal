@@ -1,6 +1,6 @@
 name:                  ede
 version:               0.2.0
-synopsis:              Textual Templating Language
+synopsis:              Templating language with similar syntax and features to jinja2.
 homepage:              http://github.com/brendanhay/ede
 license:               OtherLicense
 license-file:          LICENSE
