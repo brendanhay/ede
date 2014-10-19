@@ -70,6 +70,7 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
 import qualified Data.Text.Lazy.Encoding as LText
+import           Data.Text.Manipulate
 import qualified Data.Vector             as Vector
 import           Text.EDE.Internal.HOAS
 import           Text.EDE.Text
@@ -177,37 +178,49 @@ fractional = Map.fromList
 
 -- $textual
 --
--- * @lower@      @:: Text -> Text@
+-- * @takeWord@  @:: Text -> Text@
 --
--- * @upper@      @:: Text -> Text@
+-- * @dropWord@  @:: Text -> Text@
 --
--- * @lowerFirst@ @:: Text -> Text@
+-- * @lowerHead@ @:: Text -> Text@
 --
--- * @upperFirst@ @:: Text -> Text@
+-- * @upperHead@ @:: Text -> Text@
 --
--- * @titleize@   @:: Text -> Text@
+-- * @toTitle@   @:: Text -> Text@
 --
--- * @pascalize@  @:: Text -> Text@
+-- * @toCamel@   @:: Text -> Text@
 --
--- * @camelize@   @:: Text -> Text@
+-- * @toPascal@  @:: Text -> Text@
 --
--- * @underscore@ @:: Text -> Text@
+-- * @toSnake@   @:: Text -> Text@
 --
--- * @hyphenate@  @:: Text -> Text@
+-- * @toSpinal@  @:: Text -> Text@
 --
--- /See:/ "Text.EDE.Text"
+-- * @toTrain@   @:: Text -> Text@
+--
+-- * @toLower@   @:: Text -> Text@
+--
+-- * @toUpper@   @:: Text -> Text@
+--
+-- * @toOrdinal@ @:: Number -> Text@
+--
+-- /See:/ "Data.Text.Manipulate"
 
 textual :: HashMap Text Binding
 textual = Map.fromList
-    [ "lower"      @: quote Text.toLower
-    , "upper"      @: quote Text.toUpper
-    , "lowerFirst" @: quote lowerFirst
-    , "upperFirst" @: quote upperFirst
-    , "titleize"   @: quote titleize
-    , "pascalize"  @: quote pascalize
-    , "camelize"   @: quote camelize
-    , "underscore" @: quote underscore
-    , "hyphenate"  @: quote hyphenate
+    [ "takeWord"  @: quote takeWord
+    , "dropWord"  @: quote dropWord
+    , "lowerHead" @: quote lowerHead
+    , "upperHead" @: quote upperHead
+    , "toTitle"   @: quote toTitle
+    , "toCamel"   @: quote toCamel
+    , "toPascal"  @: quote toPascal
+    , "toSnake"   @: quote toSnake
+    , "toSpinal"  @: quote toSpinal
+    , "toTrain"   @: quote toTrain
+    , "toUpper"   @: quote Text.toUpper
+    , "toLower"   @: quote Text.toLower
+    , "toOrdinal" @: (toOrdinal :: Scientific -> Text)
     ]
 
 -- $collection
@@ -237,7 +250,3 @@ k @: q = (k, quote q)
 
 value :: Value -> LText.Text
 value = LText.decodeUtf8 . encode
-
-
-filter (/= 'z') . take 5 . map (\c -> c) "zsofia"
-

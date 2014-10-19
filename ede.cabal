@@ -54,7 +54,6 @@ library
     exposed-modules:
         Text.EDE
       , Text.EDE.Filters
-      , Text.EDE.Text
 
     other-modules:
         Text.EDE.Internal.Eval
