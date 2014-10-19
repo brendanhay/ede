@@ -20,6 +20,7 @@ ED-E is a templating language written in Haskell with a specific set of features
 Please see the [documentation](http://brendanhay.github.io/ede/Text-EDE.html)
 for more information.
 
+
 ## Syntax
 
 A set of syntatic/semantic fragments for all supported expressions can be
