@@ -44,8 +44,8 @@ import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
 -- FIXME: {%- tags to deliberately strip/trim whitespace
--- FIXME: test {% include %} behaves properly re:indentation of contents
--- FIXME: conduits
+-- FIXME: ... {% include %} inline adds a trailing newline
+-- FIXME: streaming io
 -- FIXME: add benchmarks
 -- FIXME: add capture
 -- FIXME: add pragmas to control syntax
