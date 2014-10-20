@@ -408,9 +408,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * Inline: @\#\@ ... \@\#@
 --
--- * Comment: @\<\# comment \#>@
+-- * Comment: @\<\# ... \#>@
 --
--- * Block: @\#[ block ]\#@
+-- * Block: @\#[ ... ]\#@
 --
 -- /Note:/ @EDE_SYNTAX@ pragmas only take effect for the current template, not
 -- child includes. If you want to override the syntax for all templates use 'parseWith'
