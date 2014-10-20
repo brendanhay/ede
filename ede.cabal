@@ -43,7 +43,7 @@ source-repository head
     location: git://github.com/brendanhay/ede.git
 
 flag build-executable
-    description: Whether to build the ed-e executable.
+    description: Whether to build the ede executable.
     default:     False
     manual:      True
 
