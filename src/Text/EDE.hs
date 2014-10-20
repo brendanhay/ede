@@ -84,7 +84,7 @@ module Text.EDE
     -- $pragmas
 
     -- ** Expressions
-    -- $expression
+    -- $expressions
 
     -- ** Variables
     -- $variables
