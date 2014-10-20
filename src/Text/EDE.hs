@@ -386,7 +386,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- #syntax#
 --
--- $pragma
+-- $pragmas
 --
 -- Syntax can be modified either via the arguments to `parseWith` or alternatively
 -- by specifying the delimiters via an @EDE_SYNTAX@ pragma.
