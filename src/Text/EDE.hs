@@ -584,7 +584,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- by a blank newline, without a trailing at the end of the document.
 --
 -- Valid loop targets are 'Object's, 'Array's, and 'String's, with only 'Object's
--- having a an available {{ <var>.key }} in scope.
+-- having an available @{{ <var>.key }}@ in scope.
 
 -- $includes
 --
