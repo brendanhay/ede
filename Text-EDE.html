@@ -62,12 +62,16 @@ main = do
 ...</pre><p>Would result in the following syntax:</p><ul><li>Pragmas: <code>{* ... *}</code></li><li>Inline: <code>#@ ... @#</code></li><li>Comment: <code>&lt;# ... #&gt;</code></li><li>Block: <code>#[ ... ]#</code></li></ul><p><em>Note:</em> <code>EDE_SYNTAX</code> pragmas only take effect for the current template, not
  child includes. If you want to override the syntax for all templates use <code><a href="Text-EDE.html#v:parseWith">parseWith</a></code>
  and custom <code><a href="Text-EDE.html#t:Syntax">Syntax</a></code> settings.</p></div><h2 id="g:13">Expressions</h2><div class="doc"><p>Expressions behave as any simplistic programming language with a variety of
- prefix, infix, and postifx operators available. (<em>See:</em> <a href="Text-EDE-Filters.html">Text.EDE.Filters</a>)</p><p>A simplistic version of the expression grammar is:</p><pre>expression := literal | identifier
-literal    := boolean | number | string
-boolean    := true | false
-number     := integer | double
-string     := &quot;char+|escape&quot;
-identifier := [a-zA-Z_]{1}[0-9A-Za-z_']*</pre><p><em>Note:</em></p><ul><li>Identifiers are named similarly to Haskell's rules.</li><li>Booleans are lowered cased.</li><li>The string quoting and escaping follows Haskell's rules.</li><li>The Numeric format shares the same characteristics as the <a href="http://json.org/">JSON specification.</a></li></ul></div><h2 id="g:14">Variables</h2><div class="doc"><p>Variables are substituted directly for their renderable representation.
+ prefix, infix, and postifx operators available. (<em>See:</em> <a href="Text-EDE-Filters.html">Text.EDE.Filters</a>)</p><p>A rough overview of the expression grammar:</p><pre>expression ::= literal | identifier
+identifier ::= [a-zA-Z_]{1}[0-9A-Za-z_']*
+object     ::= '{' pairs '}'
+pairs      ::= string ':' literal | string ':' literal ',' pairs
+array      ::= '[' elements ']'
+elements   ::= literal | literal ',' elements
+literal    ::= object | array | boolean | number | string
+boolean    ::= true | false
+number     ::= integer | double
+string     ::= &quot;char+|escape&quot;</pre></div><h2 id="g:14">Variables</h2><div class="doc"><p>Variables are substituted directly for their renderable representation.
  An error is raised if the varaible being substituted is not a literal type
  (ie. an <code>Array</code> or <code><a href="file:///Users/brendanhay/Projects/ede/.cabal-sandbox/share/doc/x86_64-osx-ghc-7.8.2/aeson-0.8.0.2/html/Data-Aeson-Types.html#t:Object">Object</a></code>) or doesn't exist in the supplied environment.</p><pre>{{ var }}</pre><p>Nested variable access is also supported for variables which resolve to an <code><a href="file:///Users/brendanhay/Projects/ede/.cabal-sandbox/share/doc/x86_64-osx-ghc-7.8.2/aeson-0.8.0.2/html/Data-Aeson-Types.html#t:Object">Object</a></code>.
  Dot delimiters are used to chain access through multiple nested <code><a href="file:///Users/brendanhay/Projects/ede/.cabal-sandbox/share/doc/x86_64-osx-ghc-7.8.2/aeson-0.8.0.2/html/Data-Aeson-Types.html#t:Object">Object</a></code>s.
