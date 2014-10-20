@@ -24,6 +24,7 @@ module Text.EDE.Internal.Parser where
 import           Control.Applicative
 import           Control.Lens               hiding (both, noneOf)
 import           Control.Monad.State.Strict
+import           Data.Aeson.Types           (Array, Object, Value(..))
 import           Data.Bifunctor
 import           Data.ByteString            (ByteString)
 import           Data.Char                  (isSpace)
@@ -36,6 +37,7 @@ import           Data.Semigroup
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
+import qualified Data.Vector                as Vector
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
@@ -178,7 +180,7 @@ loop = do
     d      <- position
     (i, v) <- block "for"
         ((,) <$> identifier
-             <*> (keyword "in" *> variable))
+             <*> (keyword "in" *> collection))
     eempty d v
         <$> (ELoop d i v <$> document)
         <*> else'
@@ -222,7 +224,7 @@ raw = ELit
 comment :: Parser m => m Exp
 comment = ELit
     <$> position
-    <*> pure (LText mempty)
+    <*> pure (String mempty)
     <*  (try (triml (trimr go)) <|> go)
   where
     go = (commentStyle <$> commentl <*> commentr) >>=
@@ -265,15 +267,35 @@ term = buildExpressionParser table expr
 pattern :: Parser m => m Pat
 pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
 
-literal :: Parser m => m Lit
-literal = LBool <$> boolean <|> LNum <$> number <|> LText <$> stringLiteral
+collection :: Parser m => m Exp
+collection = EVar <$> position <*> variable <|> ELit <$> position <*> col
+  where
+    col = Object <$> object
+      <|> Array  <$> array
+      <|> String <$> stringLiteral
+
+literal :: Parser m => m Value
+literal = Bool   <$> bool
+      <|> Number <$> number
+      <|> String <$> stringLiteral
+      <|> Object <$> object
+      <|> Array  <$> array
 
 number :: Parser m => m Scientific
 number = either fromIntegral fromFloatDigits <$> integerOrDouble
 
-boolean :: Parser m => m Bool
-boolean = symbol "true " *> return True
-      <|> symbol "false" *> return False
+bool :: Parser m => m Bool
+bool = symbol "true" *> return True <|> symbol "false" *> return False
+
+object :: Parser m => m Object
+object = Map.fromList <$> braces (commaSep pair)
+  where
+    pair = (,)
+        <$> (stringLiteral <* spaces)
+        <*> (char ':' *> spaces *> literal)
+
+array :: Parser m => m Array
+array = Vector.fromList <$> brackets (commaSep literal)
 
 operator :: Parser m => Text -> m Delta
 operator n = position <* reserveText operatorStyle n
@@ -301,8 +323,8 @@ manyEndBy1 p end = go
   where
     go = (:[]) <$> end <|> (:) <$> p <*> go
 
-pack :: Functor f => f String -> f Lit
-pack = fmap (LText . Text.pack)
+pack :: Functor f => f String -> f Value
+pack = fmap (String . Text.pack)
 
 triml :: Parser m => m a -> m a
 triml p = do

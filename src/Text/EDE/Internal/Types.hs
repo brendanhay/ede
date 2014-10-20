@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs             #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -21,14 +22,12 @@ module Text.EDE.Internal.Types where
 
 import           Control.Applicative
 import           Control.Lens
-import           Data.Aeson                   hiding (Result(..))
-import           Data.Aeson.Types             (Pair)
+import           Data.Aeson.Types             hiding (Result(..))
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty(..))
 import           Data.Monoid                  hiding ((<>))
 import           Data.Maybe
-import           Data.Scientific
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import           Data.Text.Format             (Format, format)
@@ -129,29 +128,25 @@ type Id = Text
 newtype Var = Var (NonEmpty Id)
     deriving (Eq, Show)
 
--- FIXME: implement constructors, remove hardcoded bool keywords, etc.
-data Lit
-    = LBool !Bool
-    | LNum  !Scientific
-    | LText !Text
-      deriving (Eq, Show)
+data Collection where
+    Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
 
 data Pat
     = PWild
     | PVar !Var
-    | PLit !Lit
+    | PLit !Value
       deriving (Eq, Show)
 
 type Alt = (Pat, Exp)
 
 data Exp
-    = ELit  !Delta !Lit
+    = ELit  !Delta !Value
     | EVar  !Delta !Var
     | EFun  !Delta !Id
     | EApp  !Delta !Exp  !Exp
     | ELet  !Delta !Id   !Exp  !Exp
     | ECase !Delta !Exp  [Alt]
-    | ELoop !Delta !Id   !Var  !Exp
+    | ELoop !Delta !Id   !Exp  !Exp
     | EIncl !Delta !Text
       deriving (Eq, Show)
 
@@ -170,7 +165,7 @@ var :: Id -> Var
 var = Var . (:| [])
 
 eapp :: Delta -> [Exp] -> Exp
-eapp d []     = ELit d (LText mempty)
+eapp d []     = ELit d (String mempty)
 eapp _ [e]    = e
 eapp d (e:es) = foldl' (EApp d) e es
 
@@ -190,18 +185,16 @@ eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
   where
     c (p, w) e = ECase (delta p) p [true w, false e]
 
-eempty :: Delta -> Var -> Exp -> Maybe Exp -> Exp
-eempty d v e = maybe e (eif (p, e) [] . Just)
-  where
-    p = efun d "!" (efun d "empty" (EVar d v))
+eempty :: Delta -> Exp -> Exp -> Maybe Exp -> Exp
+eempty d v e = maybe e (eif (efun d "!" (efun d "empty" v), e) [] . Just)
 
 wild, true, false :: Exp -> Alt
 wild  = (PWild,)
-true  = (PLit (LBool True),)
-false = (PLit (LBool False),)
+true  = (PLit (Bool True),)
+false = (PLit (Bool False),)
 
 bld :: Delta -> Exp
-bld = (`ELit` LText mempty)
+bld = (`ELit` String mempty)
 
 -- | Unwrap a 'Value' to an 'Object' safely.
 --

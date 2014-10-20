@@ -110,7 +110,7 @@ test-suite golden
     default-language:  Haskell2010
     type:              exitcode-stdio-1.0
     hs-source-dirs:    test
-    main-is:           golden.hs
+    main-is:           Main.hs
 
     ghc-options:       -Wall -threaded
 

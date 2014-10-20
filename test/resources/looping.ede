@@ -18,9 +18,9 @@
   {{ var.value }}
 {% endfor %}
 
-{% for var in indexed %}
+  {% for var in indexed %}
   {{ var.index }}:{{ var.value }}
-{% endfor %}
+  {% endfor %}
 
 {% for var in keyed %}
   {{ var.key }}:{{ var.value }}
@@ -31,3 +31,11 @@
 {% else %}
   empty
 {% endfor %}
+
+{% for item in [1,2,3,4,5] %} {{ item.value }}{% endfor %}
+
+{% for item in {"a": true, "b": false} %}
+{{ item.key }} => {{ item.value }}
+{% endfor %}
+
+{% for char in "testicles" %}{{ char.value }}{% endfor %}
