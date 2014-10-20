@@ -31,7 +31,6 @@ import           Data.Text.Format                  (Format)
 import           Data.Text.Format.Params           (Params)
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
-import           Data.Vector                       (Vector)
 import           Text.EDE.Internal.HOAS
 import           Text.EDE.Internal.Types
 import           Text.Trifecta.Delta
@@ -94,26 +93,28 @@ eval (ECase d p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
-eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop i bdy
+eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop
   where
-    loop :: Text -> Exp -> Collection -> Context Binding
-    loop i a (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+    d = delta bdy
+
+    loop :: Collection -> Context Binding
+    loop (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
       where
         iter (n, p) x = do
             shadowed n
-            q <- bind (Map.insert i (context n x)) (eval a)
-            r <- binding (delta a) p q
+            q <- bind (Map.insert i (context n x)) (eval bdy)
+            r <- binding d p q
             return (n + 1, r)
 
         shadowed n = do
             m <- asks _values
             maybe (return ())
-                  (\x -> throwError' (delta a) "binding {} shadows variable {} :: {}, {}"
+                  (\x -> throwError' d "binding {} shadows variable {} :: {}, {}"
                       [Text.unpack i, show x, typeOf x, show n])
                   (Map.lookup i m)
 
-        context n (k, v) = object $
-            [ "value"      .= v
+        context n (k, x) = object $
+            [ "value"      .= x
             , "length"     .= l
             , "index"      .= n
             , "index0"     .= (n - 1)

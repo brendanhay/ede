@@ -421,14 +421,19 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- Expressions behave as any simplistic programming language with a variety of
 -- prefix, infix, and postifx operators available. (/See:/ "Text.EDE.Filters")
 --
--- A simplistic version of the expression grammar is:
+-- A rough overview of the expression grammar:
 --
--- > expression := literal | identifier
--- > literal    := boolean | number | string
--- > boolean    := true | false
--- > number     := integer | double
--- > string     := "char+|escape"
--- > identifier := [a-zA-Z_]{1}[0-9A-Za-z_']*
+-- > expression ::= literal | identifier
+-- > identifier ::= [a-zA-Z_]{1}[0-9A-Za-z_']*
+-- > object     ::= '{' pairs '}'
+-- > pairs      ::= string ':' literal | string ':' literal ',' pairs
+-- > array      ::= '[' elements ']'
+-- > elements   ::= literal | literal ',' elements
+-- > literal    ::= object | array | boolean | number | string
+-- > boolean    ::= true | false
+-- > number     ::= integer | double
+-- > string     ::= "char+|escape"
+
 --
 -- /Note:/
 --
