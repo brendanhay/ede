@@ -83,6 +83,9 @@ module Text.EDE
     -- ** Pragmas
     -- $pragmas
 
+    -- ** Expressions
+    -- $expression
+
     -- ** Variables
     -- $variables
 
@@ -137,7 +140,6 @@ import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
--- FIXME: add pragmas to control syntax
 -- FIXME: detect include/import loops
 -- FIXME: {%- tags to deliberately strip/trim whitespace
 -- FIXME: ... {% include %} inline adds a trailing newline
@@ -413,6 +415,30 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- /Note:/ @EDE_SYNTAX@ pragmas only take effect for the current template, not
 -- child includes. If you want to override the syntax for all templates use 'parseWith'
 -- and custom 'Syntax' settings.
+
+-- $expressions
+--
+-- Expressions behave as any simplistic programming language with a variety of
+-- prefix, infix, and postifx operators available. (/See:/ "Text.EDE.Filters")
+--
+-- A simplistic version of the expression grammar is:
+--
+-- > expression := literal | identifier
+-- > literal    := boolean | number | string
+-- > boolean    := true | false
+-- > number     := integer | double
+-- > string     := "char+|escape"
+-- > identifier := [a-zA-Z_]{1}[0-9A-Za-z_']*
+--
+-- /Note:/
+--
+-- * Identifiers are named similarly to Haskell's rules.
+--
+-- * Booleans are lowered cased.
+--
+-- * The string quoting and escaping follows Haskell's rules.
+--
+-- * The Numeric format sharing the same characteristics as the <http://json.org/ JSON specification.>
 
 -- $variables
 --
