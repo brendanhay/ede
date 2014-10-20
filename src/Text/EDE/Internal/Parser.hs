@@ -111,20 +111,14 @@ pragma = void . many $ do
     !xs <- pragmal *> symbol "EDE_SYNTAX" *> sepBy field spaces <* trimr pragmar
     mapM_ (uncurry assign) xs
   where
-    field = (,)
-        <$> (ident variableStyle >>= setter) <* symbol "="
-        <*> parens delim
+    field = (,) <$> setter <* symbol "=" <*> parens delim
 
-    delim = (,)
-        <$> stringLiteral <* symbol ","
-        <*> stringLiteral
+    delim = (,) <$> stringLiteral <* symbol "," <*> stringLiteral
 
-    setter = \case
-        "pragma"  -> pure delimPragma
-        "inline"  -> pure delimInline
-        "comment" -> pure delimComment
-        "block"   -> pure delimBlock
-        n         -> raiseErr (failed ("unrecognised pragma key: " ++ n))
+    setter = pragmak "pragma"  *> pure delimPragma
+         <|> pragmak "inline"  *> pure delimInline
+         <|> pragmak "comment" *> pure delimComment
+         <|> pragmak "block"   *> pure delimBlock
 
 document :: Parser m => m Exp
 document = eapp <$> position <*> many (statement <|> inline <|> fragment)
@@ -319,6 +313,9 @@ triml p = do
 
 trimr :: Parser m => m a -> m a
 trimr p = p <* spaces <* newline
+
+pragmak :: Parser m => String -> m ()
+pragmak = reserve pragmaStyle
 
 pragmal, pragmar :: Parser m => m String
 pragmal = left  delimPragma >>= symbol

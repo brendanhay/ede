@@ -70,7 +70,9 @@ variableStyle :: TokenParsing m => IdentifierStyle m
 variableStyle = keywordStyle & styleName .~ "variable"
 
 keywordStyle :: TokenParsing m => IdentifierStyle m
-keywordStyle = haskellIdents & styleReserved .~ keywordSet & styleName .~ "keyword"
+keywordStyle = haskellIdents
+    & styleReserved .~ keywordSet
+    & styleName     .~ "keyword"
 
 keywordSet :: HashSet String
 keywordSet = Set.fromList
@@ -92,4 +94,17 @@ keywordSet = Set.fromList
     , "."
     , "true"
     , "false"
+    ]
+
+pragmaStyle :: TokenParsing m => IdentifierStyle m
+pragmaStyle = haskellIdents
+    & styleReserved .~ pragmaSet
+    & styleName     .~ "pragma field"
+
+pragmaSet :: HashSet String
+pragmaSet = Set.fromList
+    [ "pragma"
+    , "inline"
+    , "comment"
+    , "block"
     ]
