@@ -5,7 +5,7 @@ NAME          := ede
 VERSION       := $(shell sed -n 's/^version: *\(.*\)$$/\1/p' $(NAME).cabal)
 BUILD_NUMBER  ?= 0
 DEB           := dist/$(NAME)_$(VERSION)+$(BUILD_NUMBER)_amd64.deb
-BIN           := dist/image/bin/ed-e
+BIN           := dist/image/bin/ede
 
 .PHONY: test doc
 
