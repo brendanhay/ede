@@ -620,8 +620,8 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- > {{ true | show | lower }}
 --
--- The input is on the LHS and chained filters (delimited by '|') are on the RHS,
--- with filters being applied left associatively.
+-- The input is on the LHS and chained filters (delimited by the pipe operator @|@)
+-- are on the RHS, with filters being applied postfix, left associatively.
 --
 -- /See:/ "Text.EDE.Filters"
 
