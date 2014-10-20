@@ -1,8 +1,10 @@
 { "var": 12 }
 ---
-{! EDE_SYNTAX pragma=("!!", "!!") inline=("#@", "@#") block=("#[", "]#") !}
+{! EDE_SYNTAX pragma=("{*", "*}") inline=("#@", "@#") !}
+{* EDE_SYNTAX penis=("#[", "]#")  *}
 {! EDE_SYNTAX inline=("{{", "}}") !}
 
+  #@ var @#
     {{ var }}
 
   {% for nothing in var %}

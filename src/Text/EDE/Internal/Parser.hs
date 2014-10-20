@@ -61,6 +61,7 @@ type Parser m =
     , TokenParsing m
     , DeltaParsing m
     , LookAheadParsing m
+    , Errable m
     )
 
 newtype EDE a = EDE { runEDE :: Tri.Parser a }
@@ -74,6 +75,7 @@ newtype EDE a = EDE { runEDE :: Tri.Parser a }
         , CharParsing
         , DeltaParsing
         , LookAheadParsing
+        , Errable
         )
 
 instance TokenParsing EDE where
@@ -89,29 +91,28 @@ instance TokenParsing EDE where
   highlight h (EDE m) = EDE (highlight h m)
   {-# INLINE highlight #-}
 
+instance Errable (StateT Env EDE) where
+    raiseErr = lift . raiseErr
+
 runParser :: Syntax
           -> Text
           -> ByteString
           -> Result (Exp, HashMap Text (NonEmpty Delta))
 runParser o n = res . parseByteString (runEDE run) pos
   where
-    run = runStateT (syntax' *> document <* eof) (Env o mempty)
+    run = runStateT (pragma *> document <* eof) (Env o mempty)
     pos = Directed (Text.encodeUtf8 n) 0 0 0 0
 
     res (Tri.Success x) = Success (_includes `second` x)
     res (Tri.Failure e) = Failure e
 
--- FIXME: Documentation
-syntax' :: Parser m => m ()
-syntax' = skipOptional (pragma "EDE_SYNTAX" eval)
+pragma :: Parser m => m ()
+pragma = void . many $ do
+    !xs <- pragmal *> symbol "EDE_SYNTAX" *> sepBy field spaces <* trimr pragmar
+    mapM_ (uncurry assign) xs
   where
-    eval = do
-        !xs <- sepBy delim spaces
-        forM_ xs $ \(f, x) ->
-            setter f .= x
-
     field = (,)
-        <$> ident variableStyle <* symbol "="
+        <$> (ident variableStyle >>= setter) <* symbol "="
         <*> parens delim
 
     delim = (,)
@@ -119,14 +120,11 @@ syntax' = skipOptional (pragma "EDE_SYNTAX" eval)
         <*> stringLiteral
 
     setter = \case
-        "pragma"  -> delimPragma
-        "inline"  -> delimInline
-        "comment" -> delimComment
-        "block"   -> delimBlock
-        n         -> fail ("Non-existent syntax field: " ++ n)
-
-pragma :: Parser m => String -> m a -> m ()
-pragma k = between (pragmal *> symbol k) (trimr pragmar) . void
+        "pragma"  -> pure delimPragma
+        "inline"  -> pure delimInline
+        "comment" -> pure delimComment
+        "block"   -> pure delimBlock
+        n         -> raiseErr (failed ("unrecognised pragma key: " ++ n))
 
 document :: Parser m => m Exp
 document = eapp <$> position <*> many (statement <|> inline <|> fragment)

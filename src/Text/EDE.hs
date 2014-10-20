@@ -80,6 +80,9 @@ module Text.EDE
     , defaultSyntax
     , alternateSyntax
 
+    -- ** Pragmas
+    -- $pragmas
+
     -- ** Variables
     -- $variables
 
@@ -383,6 +386,22 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- #syntax#
 --
+-- $pragma
+--
+-- Syntax can be modified either via the arguments to `parseWith` or alternatively
+-- by specifying the delimiters via an @EDE_SYNTAX@ pragma.
+--
+-- /Note:/ The pragmas /must/ start on line1. Subsequently encountered
+-- pragmas are parsed as textual template contents.
+--
+-- For example:
+--
+-- > {! EDE_SYNTAX pragma=("{*", "*}") inline=("#@", "@#") comment=("<#", "#>") block=("$$", "$$") !}
+-- > {* EDE_SYNTAX block=("#[", "]#")  *}
+-- > ...
+--
+-- Would result in @{* pragma *}@, @#\@ inline \@#@, @<# comment #>@, and @#[ block ]#@ syntax.
+
 -- $variables
 --
 -- Variables are substituted directly for their 'Buildable' representation.
