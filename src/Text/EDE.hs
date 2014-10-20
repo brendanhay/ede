@@ -423,7 +423,8 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- A rough overview of the expression grammar:
 --
--- > expression ::= literal | identifier
+-- > expression ::= literal | identifier | '|' filter
+-- > filter     ::= identifier
 -- > identifier ::= [a-zA-Z_]{1}[0-9A-Za-z_']*
 -- > object     ::= '{' pairs '}'
 -- > pairs      ::= string ':' literal | string ':' literal ',' pairs
