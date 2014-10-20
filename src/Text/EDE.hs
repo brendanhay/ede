@@ -438,11 +438,11 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * The string quoting and escaping follows Haskell's rules.
 --
--- * The Numeric format sharing the same characteristics as the <http://json.org/ JSON specification.>
+-- * The Numeric format shares the same characteristics as the <http://json.org/ JSON specification.>
 
 -- $variables
 --
--- Variables are substituted directly for their 'Buildable' representation.
+-- Variables are substituted directly for their renderable representation.
 -- An error is raised if the varaible being substituted is not a literal type
 -- (ie. an 'Array' or 'Object') or doesn't exist in the supplied environment.
 --
@@ -450,7 +450,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- Nested variable access is also supported for variables which resolve to an 'Object'.
 -- Dot delimiters are used to chain access through multiple nested 'Object's.
--- The right-most accessor must resolve to a 'Buildable' type as with the previous
+-- The right-most accessor must resolve to a renderable type as with the previous
 -- non-nested variable access.
 --
 -- > {{ nested.var.access }}
