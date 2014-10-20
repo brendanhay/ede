@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TupleSections        #-}
 
 -- Module      : Text.EDE.Internal.HOAS
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -17,11 +18,17 @@ module Text.EDE.Internal.HOAS where
 
 import           Control.Applicative
 import           Control.Monad
-import           Data.Aeson              hiding (Result, Success, Error)
+import           Data.Aeson              hiding (Result(..))
+import           Data.Bifunctor
+import qualified Data.HashMap.Strict     as Map
+import           Data.List               (sortBy)
+import           Data.Ord                (comparing)
 import           Data.Scientific
 import           Data.Text               (Text)
+import qualified Data.Text               as Text
 import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
+import qualified Data.Vector             as Vector
 import           Text.EDE.Internal.Types
 
 -- | A HOAS representation of (possibly partially applied) values
@@ -89,12 +96,6 @@ class Quote a where
 instance Quote Binding where
     quote = id
 
-instance Quote Lit where
-    quote = \case
-        LBool b -> BVal (Bool b)
-        LNum  n -> BVal (Number n)
-        LText t -> BVal (String t)
-
 instance Quote Value where
     quote = BVal
 
@@ -113,8 +114,20 @@ instance Quote Bool where
 instance Quote Int where
     quote = BVal . Number . fromIntegral
 
+instance Quote Integer where
+    quote = BVal . Number . fromInteger
+
+instance Quote Double where
+    quote = BVal . Number . fromFloatDigits
+
 instance Quote Scientific where
     quote = BVal . Number
+
+instance Quote Object where
+    quote = BVal . Object
+
+instance Quote Array where
+    quote = BVal . Array
 
 class Unquote a where
     unquote :: Binding -> Result a
@@ -140,8 +153,36 @@ instance Unquote Bool where
 instance Unquote Scientific where
     unquote = \case
         BVal (Number n) -> pure n
-        BVal v          -> unexpected (typeOf v) "String"
-        _               -> unexpected typeFun "String"
+        BVal v          -> unexpected (typeOf v) "Number"
+        _               -> unexpected typeFun "Number"
+
+instance Unquote Collection where
+    unquote q = text    <$> unquote q
+            <|> hashMap <$> unquote q
+            <|> vector  <$> unquote q
+      where
+        text t = Col (Text.length t)
+            . map (\c -> (Nothing, String (Text.singleton c)))
+            $ Text.unpack t
+
+        hashMap m = Col (Map.size m)
+            . map (first Just)
+            . sortBy (comparing fst)
+            $ Map.toList m
+
+        vector v = Col (Vector.length v) (Vector.map (Nothing,) v)
+
+instance Unquote Object where
+    unquote = \case
+        BVal (Object o) -> pure o
+        BVal v          -> unexpected (typeOf v) "Object"
+        _               -> unexpected typeFun "Object"
+
+instance Unquote Array where
+    unquote = \case
+        BVal (Array a) -> pure a
+        BVal v         -> unexpected (typeOf v) "Array"
+        _              -> unexpected typeFun "Array"
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
     quote f = BLam (fmap (quote . f) . unquote)

@@ -83,6 +83,9 @@ module Text.EDE
     -- ** Pragmas
     -- $pragmas
 
+    -- ** Expressions
+    -- $expressions
+
     -- ** Variables
     -- $variables
 
@@ -137,7 +140,6 @@ import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
--- FIXME: add pragmas to control syntax
 -- FIXME: detect include/import loops
 -- FIXME: {%- tags to deliberately strip/trim whitespace
 -- FIXME: ... {% include %} inline adds a trailing newline
@@ -406,17 +408,47 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * Inline: @\#\@ ... \@\#@
 --
--- * Comment: @\<\# comment \#>@
+-- * Comment: @\<\# ... \#>@
 --
--- * Block: @\#[ block ]\#@
+-- * Block: @\#[ ... ]\#@
 --
 -- /Note:/ @EDE_SYNTAX@ pragmas only take effect for the current template, not
 -- child includes. If you want to override the syntax for all templates use 'parseWith'
 -- and custom 'Syntax' settings.
 
+-- $expressions
+--
+-- Expressions behave as any simplistic programming language with a variety of
+-- prefix, infix, and postifx operators available. (/See:/ "Text.EDE.Filters")
+--
+-- A rough overview of the expression grammar:
+--
+-- > expression ::= literal | identifier | '|' filter
+-- > filter     ::= identifier
+-- > identifier ::= [a-zA-Z_]{1}[0-9A-Za-z_']*
+-- > object     ::= '{' pairs '}'
+-- > pairs      ::= string ':' literal | string ':' literal ',' pairs
+-- > array      ::= '[' elements ']'
+-- > elements   ::= literal | literal ',' elements
+-- > literal    ::= object | array | boolean | number | string
+-- > boolean    ::= true | false
+-- > number     ::= integer | double
+-- > string     ::= "char+|escape"
+
+--
+-- /Note:/
+--
+-- * Identifiers are named similarly to Haskell's rules.
+--
+-- * Booleans are lowered cased.
+--
+-- * The string quoting and escaping follows Haskell's rules.
+--
+-- * The Numeric format shares the same characteristics as the <http://json.org/ JSON specification.>
+
 -- $variables
 --
--- Variables are substituted directly for their 'Buildable' representation.
+-- Variables are substituted directly for their renderable representation.
 -- An error is raised if the varaible being substituted is not a literal type
 -- (ie. an 'Array' or 'Object') or doesn't exist in the supplied environment.
 --
@@ -424,7 +456,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- Nested variable access is also supported for variables which resolve to an 'Object'.
 -- Dot delimiters are used to chain access through multiple nested 'Object's.
--- The right-most accessor must resolve to a 'Buildable' type as with the previous
+-- The right-most accessor must resolve to a renderable type as with the previous
 -- non-nested variable access.
 --
 -- > {{ nested.var.access }}
@@ -550,6 +582,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- Will render each item with its (1-based) loop index as a prefix, separated
 -- by a blank newline, without a trailing at the end of the document.
+--
+-- Valid loop targets are 'Object's, 'Array's, and 'String's, with only 'Object's
+-- having an available @{{ <var>.key }}@ in scope.
 
 -- $includes
 --
@@ -585,8 +620,8 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- > {{ true | show | lower }}
 --
--- The input is on the LHS and chained filters (delimited by '|') are on the RHS,
--- with filters being applied left associatively.
+-- The input is on the LHS and chained filters (delimited by the pipe operator @|@)
+-- are on the RHS, with filters being applied postfix, left associatively.
 --
 -- /See:/ "Text.EDE.Filters"
 
