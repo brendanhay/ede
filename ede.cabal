@@ -103,7 +103,7 @@ executable ed-e
           , conduit-extra        == 1.1.*
           , directory
           , ede
-          , optparse-applicative == 0.10.*
+          , optparse-applicative == 0.11.*
           , text
 
 test-suite golden
