@@ -388,10 +388,10 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- $pragmas
 --
--- Syntax can be modified either via the arguments to `parseWith` or alternatively
+-- Syntax can be modified either via the arguments to 'parseWith' or alternatively
 -- by specifying the delimiters via an @EDE_SYNTAX@ pragma.
 --
--- /Note:/ The pragmas /must/ start on line1. Subsequently encountered
+-- /Note:/ The pragmas must start on line1. Subsequently encountered
 -- pragmas are parsed as textual template contents.
 --
 -- For example:
@@ -400,7 +400,19 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- > {* EDE_SYNTAX block=("#[", "]#")  *}
 -- > ...
 --
--- Would result in @{* pragma *}@, @#\@ inline \@#@, @<# comment #>@, and @#[ block ]#@ syntax.
+-- Would result in the following syntax:
+--
+-- * Pragmas: @{* ... *}@
+--
+-- * Inline: @\#\@ ... \@\#@
+--
+-- * Comment: @\<\# comment \#>@
+--
+-- * Block: @\#[ block ]\#@
+--
+-- /Note:/ @EDE_SYNTAX@ pragmas only take effect for the current template, not
+-- child includes. If you want to override the syntax for all templates use 'parseWith'
+-- and custom 'Syntax' settings.
 
 -- $variables
 --
@@ -477,6 +489,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- > {% else %}
 -- >    .. alternate expressions
 -- > {% endcase %}
+--
+-- Patterns take the form of @variables@, @literals@, or the wild-card
+-- pattern @_@ to match anything.
 
 -- $loops
 --
