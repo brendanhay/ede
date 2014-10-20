@@ -15,6 +15,12 @@
 -- Portability : non-portable (GHC extensions)
 
 -- | A default set of prelude-like filters and the means to construct your own.
+--
+-- Please be aware that some of the 'defaultFilters' are assumed to be present
+-- (for example during loop unrolling and assignment of else branches via 'empty').
+--
+-- It's recommended you supplement the default filters rather than replacing them
+-- completely. (But hey, it's your call!)
 module Text.EDE.Filters
     (
     -- * Prelude
