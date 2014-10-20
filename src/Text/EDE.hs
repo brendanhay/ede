@@ -491,7 +491,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- > {% endcase %}
 --
 -- Patterns take the form of @variables@, @literals@, or the wild-card
--- pattern @_@ to match anything.
+-- '@_@' pattern (which matches anything).
 
 -- $loops
 --
