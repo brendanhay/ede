@@ -62,7 +62,8 @@ main = do
 ...</pre><p>Would result in the following syntax:</p><ul><li>Pragmas: <code>{* ... *}</code></li><li>Inline: <code>#@ ... @#</code></li><li>Comment: <code>&lt;# ... #&gt;</code></li><li>Block: <code>#[ ... ]#</code></li></ul><p><em>Note:</em> <code>EDE_SYNTAX</code> pragmas only take effect for the current template, not
  child includes. If you want to override the syntax for all templates use <code><a href="Text-EDE.html#v:parseWith">parseWith</a></code>
  and custom <code><a href="Text-EDE.html#t:Syntax">Syntax</a></code> settings.</p></div><h2 id="g:13">Expressions</h2><div class="doc"><p>Expressions behave as any simplistic programming language with a variety of
- prefix, infix, and postifx operators available. (<em>See:</em> <a href="Text-EDE-Filters.html">Text.EDE.Filters</a>)</p><p>A rough overview of the expression grammar:</p><pre>expression ::= literal | identifier
+ prefix, infix, and postifx operators available. (<em>See:</em> <a href="Text-EDE-Filters.html">Text.EDE.Filters</a>)</p><p>A rough overview of the expression grammar:</p><pre>expression ::= literal | identifier | '|' filter
+filter     ::= identifier
 identifier ::= [a-zA-Z_]{1}[0-9A-Za-z_']*
 object     ::= '{' pairs '}'
 pairs      ::= string ':' literal | string ':' literal ',' pairs
