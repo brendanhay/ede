@@ -18,14 +18,11 @@ import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Aeson                        hiding (Result(..))
-import           Data.Bifunctor                    (first)
-import           Data.Foldable                     (Foldable, foldlM)
+import           Data.Foldable                     (foldlM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
-import           Data.List                         (sortBy)
 import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Monoid
-import           Data.Ord
 import           Data.Scientific                   (base10Exponent)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
@@ -35,7 +32,6 @@ import           Data.Text.Format.Params           (Params)
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
 import           Data.Vector                       (Vector)
-import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.HOAS
 import           Text.EDE.Internal.Types
 import           Text.Trifecta.Delta
@@ -83,7 +79,7 @@ eval (ELet _ k rhs bdy) = do
 -- FIXME: We have to recompute c everytime due to the predicate ..
 eval (ECase d p ws) = go ws
   where
-    go []          = return (quote (LText mempty))
+    go []          = return (quote (String mempty))
     go ((a, e):as) =
         case a of
             PWild  -> eval e
@@ -98,19 +94,39 @@ eval (ECase d p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
-eval (ELoop d i v bdy) = variable v >>= go >>= loop i bdy
+eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop i bdy
   where
-    go (Object o) = return (Col (Map.size o) (hmap o))
-    go (Array  a) = return (Col (Vector.length a) (vec a))
-    go x          =
-        throwError' d "invalid loop target {}, expected {} or {}"
-            [typeOf x, typeOf (Object mempty), typeOf (Array mempty)]
+    loop :: Text -> Exp -> Collection -> Context Binding
+    loop i a (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+      where
+        iter (n, p) x = do
+            shadowed n
+            q <- bind (Map.insert i (context n x)) (eval a)
+            r <- binding (delta a) p q
+            return (n + 1, r)
 
-    hmap :: HashMap Text Value -> [(Maybe Text, Value)]
-    hmap = map (first Just) . sortBy (comparing fst) . Map.toList
+        shadowed n = do
+            m <- asks _values
+            maybe (return ())
+                  (\x -> throwError' (delta a) "binding {} shadows variable {} :: {}, {}"
+                      [Text.unpack i, show x, typeOf x, show n])
+                  (Map.lookup i m)
 
-    vec :: Vector Value -> Vector (Maybe Text, Value)
-    vec = Vector.map (Nothing,)
+        context n (k, v) = object $
+            [ "value"      .= v
+            , "length"     .= l
+            , "index"      .= n
+            , "index0"     .= (n - 1)
+            , "remainder"  .= (l - n)
+            , "remainder0" .= (l - n - 1)
+            , "first"      .= (n == 1)
+            , "last"       .= (n == l)
+            , "odd"        .= (n `mod` 2 == 1)
+            , "even"       .= (n `mod` 2 == 0)
+            ] ++ key k
+
+        key (Just k) = ["key" .= k]
+        key Nothing  = []
 
 eval (EIncl d i) = do
     ts <- asks _templates
@@ -153,41 +169,6 @@ predicate x = do
         Failure _
             | EVar{}      <- x -> Success (quote False)
         Failure e              -> Failure e
-
-data Collection where
-    Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
-
-loop :: Text -> Exp -> Collection -> Context Binding
-loop i a (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
-  where
-    iter (n, p) x = do
-        shadowed n
-        q <- bind (Map.insert i (context n x)) (eval a)
-        r <- binding (delta a) p q
-        return (n + 1, r)
-
-    shadowed n = do
-        m <- asks _values
-        maybe (return ())
-              (\x -> throwError' (delta a) "binding {} shadows existing variable {} :: {}, {}"
-                  [Text.unpack i, show x, typeOf x, show n])
-              (Map.lookup i m)
-
-    context n (k, v) = object $
-        [ "value"      .= v
-        , "length"     .= l
-        , "index"      .= n
-        , "index0"     .= (n - 1)
-        , "remainder"  .= (l - n)
-        , "remainder0" .= (l - n - 1)
-        , "first"      .= (n == 1)
-        , "last"       .= (n == l)
-        , "odd"        .= (n `mod` 2 == 1)
-        , "even"       .= (n `mod` 2 == 0)
-        ] ++ key k
-
-    key (Just k) = ["key" .= k]
-    key Nothing  = []
 
 binding :: Delta -> Binding -> Binding -> Context Binding
 binding d x y =
