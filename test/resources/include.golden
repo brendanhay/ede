@@ -1,1 +1,5 @@
-Hi, Robert!
+global: some_thing!
+binding: 123!
+
+     include:  some_thing variable :: !Int  
+

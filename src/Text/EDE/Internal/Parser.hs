@@ -1,9 +1,13 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TemplateHaskell            #-}
 
 -- Module      : Text.EDE.Internal.Parser
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -15,16 +19,14 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Parser
-    ( Includes
-    , runParser
-    ) where
+module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
 import           Control.Lens               hiding (both, noneOf)
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
 import           Data.ByteString            (ByteString)
+import           Data.Char                  (isSpace)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import           Data.List.NonEmpty         (NonEmpty(..))
@@ -34,80 +36,126 @@ import           Data.Semigroup
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
-import           Debug.Trace
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
 import           Text.Parser.LookAhead
+import           Text.Parser.Token.Style    (buildSomeSpaceParser)
 import qualified Text.Trifecta              as Tri
-import           Text.Trifecta              hiding (Result(..), render, spaces)
+import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
--- FIXME: add 'raw' tag
--- whitespace
--- comments
-
-type Includes = HashMap Text (NonEmpty Delta)
-
 data Env = Env
-    { _syntax  :: !Syntax
-    , _includes :: Includes
+    { _settings :: !Syntax
+    , _includes :: HashMap Text (NonEmpty Delta)
     }
 
 makeLenses ''Env
 
-type Parse m =
+instance HasSyntax Env where
+    syntax = settings
+
+type Parser m =
     ( Monad m
     , MonadState Env m
     , TokenParsing m
     , DeltaParsing m
     , LookAheadParsing m
+    , Errable m
     )
 
-runParser :: Syntax -> Text -> ByteString -> Result (Exp, Includes)
-runParser o n = res . parseByteString (runStateT (document <* eof) env) pos
+newtype EDE a = EDE { runEDE :: Tri.Parser a }
+    deriving
+        ( Functor
+        , Applicative
+        , Alternative
+        , Monad
+        , MonadPlus
+        , Parsing
+        , CharParsing
+        , DeltaParsing
+        , LookAheadParsing
+        , Errable
+        )
+
+instance TokenParsing EDE where
+  nesting (EDE m) = EDE (nesting m)
+  {-# INLINE nesting #-}
+
+  someSpace = skipMany (satisfy $ \c -> c /= '\n' && isSpace c)
+  {-# INLINE someSpace #-}
+
+  semi = EDE semi
+  {-# INLINE semi #-}
+
+  highlight h (EDE m) = EDE (highlight h m)
+  {-# INLINE highlight #-}
+
+instance Errable (StateT Env EDE) where
+    raiseErr = lift . raiseErr
+
+runParser :: Syntax
+          -> Text
+          -> ByteString
+          -> Result (Exp, HashMap Text (NonEmpty Delta))
+runParser o n = res . parseByteString (runEDE run) pos
   where
-    env = Env o mempty
+    run = runStateT (pragma *> document <* eof) (Env o mempty)
     pos = Directed (Text.encodeUtf8 n) 0 0 0 0
 
     res (Tri.Success x) = Success (_includes `second` x)
     res (Tri.Failure e) = Failure e
 
-document :: Parse m => m Exp
-document = eapp <$> position <*> many (statement <|> render <|> fragment)
-
-render :: Parse m => m Exp
-render = between renderStart renderEnd term
-
-fragment :: Parse m => m Exp
-fragment = ELit <$> position <*> pack (notFollowedBy cond >> try line0 <|> line1)
+pragma :: Parser m => m ()
+pragma = void . many $ do
+    !xs <- pragmal *> symbol "EDE_SYNTAX" *> sepBy field spaces <* trimr pragmar
+    mapM_ (uncurry assign) xs
   where
-    line0 = manyTill1 (noneOf "\n") (cond <|> eof)
+    field = (,) <$> setter <* symbol "=" <*> parens delim
+
+    delim = (,) <$> stringLiteral <* symbol "," <*> stringLiteral
+
+    setter = pragmak "pragma"  *> pure delimPragma
+         <|> pragmak "inline"  *> pure delimInline
+         <|> pragmak "comment" *> pure delimComment
+         <|> pragmak "block"   *> pure delimBlock
+
+document :: Parser m => m Exp
+document = eapp <$> position <*> many (statement <|> inline <|> fragment)
+
+inline :: Parser m => m Exp
+inline = between inlinel inliner term
+
+fragment :: Parser m => m Exp
+fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1)
+  where
+    line0 = manyTill1 (noneOf "\n") (try (lookAhead end0) <|> eof)
     line1 = manyEndBy1 anyChar newline
 
-    cond = () <$ lookAhead (renderStart <|> try blockStart)
+    end0 = void (inlinel <|> blockl <|> try end1)
+    end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockr))
 
-    pack = fmap (LText . Text.pack)
-
--- -- FIXME: empty text
--- comment :: Parse m => m Exp
--- comment = ELit <$> position <*> pure (LText mempty) <* p
---   where
---     p = between (try (commentStart)) (rstrip commentEnd <|> commentEnd) (skipMany anyChar)
-
-statement :: Parse m => m Exp
-statement = trace "statement" $ choice
+statement :: Parser m => m Exp
+statement = choice
     [ ifelif
     , cases
     , loop
     , include
     , binding
+    , raw
+    , comment
     ]
 
-block :: Parse m => String -> m a -> m a
-block k = between (try (blockStart *> keyword k)) (rstrip blockEnd <|> blockEnd)
+block :: Parser m => String -> m a -> m a
+block k p = try (multiLine (keyword k) p) <|> singleLine (keyword k) p
 
-ifelif :: Parse m => m Exp
+multiLine :: Parser m => m b -> m a -> m a
+multiLine s = between (try (triml blockl *> s)) (trimr blockr)
+
+singleLine :: Parser m => m b -> m a -> m a
+singleLine s = between (try (blockl *> s)) blockr
+
+ifelif :: Parser m => m Exp
 ifelif = eif
     <$> branch "if"
     <*> many (branch "elif")
@@ -116,7 +164,7 @@ ifelif = eif
   where
     branch k = (,) <$> block k term <*> document
 
-cases :: Parse m => m Exp
+cases :: Parser m => m Exp
 cases = ecase
     <$> block "case" term
     <*> many
@@ -125,26 +173,32 @@ cases = ecase
     <*> else'
     <*  exit "endcase"
 
-loop :: Parse m => m Exp
+loop :: Parser m => m Exp
 loop = do
-    d <- position
-    uncurry (ELoop d)
-        <$> block "for"
-            ((,) <$> identifier
-                 <*> (keyword "in" *> variable))
-        <*> document
+    d      <- position
+    (i, v) <- block "for"
+        ((,) <$> identifier
+             <*> (keyword "in" *> variable))
+    eempty d v
+        <$> (ELoop d i v <$> document)
         <*> else'
         <*  exit "endfor"
 
-include :: Parse m => m Exp
+include :: Parser m => m Exp
 include = do
     d <- position
-    block "include" $ do
+    block "include" (incl d)
+  where
+    incl d = do
         k <- stringLiteral
         includes %= Map.insertWith (<>) k (d:|[])
-        EIncl d k <$> optional (keyword "with" *> term)
+        elet d (EIncl d k) <$> scope
 
-binding :: Parse m => m Exp
+    scope = optional $
+        (,) <$> (keyword "with" *> identifier)
+            <*> (symbol  "="    *> term)
+
+binding :: Parser m => m Exp
 binding = do
     d <- position
     uncurry (ELet d)
@@ -154,13 +208,33 @@ binding = do
         <*> document
         <*  exit "endlet"
 
-else' :: Parse m => m (Maybe Exp)
+raw :: Parser m => m Exp
+raw = ELit
+   <$> position
+   <*> (start *> pack (manyTill anyChar (lookAhead end)) <* end)
+  where
+    start = block "raw" (pure ())
+    end   = exit "endraw"
+
+-- FIXME: this is due to the whitespace sensitive nature of the parser making
+-- it difficult to do what most applicative parsers do by skipping comments
+-- as part of the whitespace.
+comment :: Parser m => m Exp
+comment = ELit
+    <$> position
+    <*> pure (LText mempty)
+    <*  (try (triml (trimr go)) <|> go)
+  where
+    go = (commentStyle <$> commentl <*> commentr) >>=
+        buildSomeSpaceParser (fail "whitespace significant")
+
+else' :: Parser m => m (Maybe Exp)
 else' = optional (block "else" (pure ()) *> document)
 
-exit :: Parse m => String -> m ()
+exit :: Parser m => String -> m ()
 exit k = block k (pure ())
 
-term :: Parse m => m Exp
+term :: Parser m => m Exp
 term = buildExpressionParser table expr
   where
     table =
@@ -188,38 +262,35 @@ term = buildExpressionParser table expr
 
     expr = parens term <|> apply EVar variable <|> apply ELit literal
 
-pattern :: Parse m => m Pat
+pattern :: Parser m => m Pat
 pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
 
-literal :: Parse m => m Lit
+literal :: Parser m => m Lit
 literal = LBool <$> boolean <|> LNum <$> number <|> LText <$> stringLiteral
 
-number :: Parse m => m Scientific
+number :: Parser m => m Scientific
 number = either fromIntegral fromFloatDigits <$> integerOrDouble
 
-boolean :: Parse m => m Bool
+boolean :: Parser m => m Bool
 boolean = symbol "true " *> return True
       <|> symbol "false" *> return False
 
-operator :: Parse m => Text -> m Delta
+operator :: Parser m => Text -> m Delta
 operator n = position <* reserveText operatorStyle n
 
-keyword :: Parse m => String -> m Delta
+keyword :: Parser m => String -> m Delta
 keyword k = position <* try (reserve keywordStyle k)
 
-variable :: Parse m => m Var
+variable :: Parser m => m Var
 variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 
-identifier :: Parse m => m Id
+identifier :: Parser m => m Id
 identifier = ident variableStyle
 
-rstrip :: Parse m => m a -> m a
-rstrip p = try (p <* spaces <* newline)
-
-spaces :: Parse m => m ()
+spaces :: Parser m => m ()
 spaces = skipMany (oneOf "\t ")
 
-apply :: Parse m => (Delta -> a -> b) -> m a -> m b
+apply :: Parser m => (Delta -> a -> b) -> m a -> m b
 apply f p = f <$> position <*> p
 
 manyTill1 :: Alternative m => m a -> m b -> m [a]
@@ -230,25 +301,38 @@ manyEndBy1 p end = go
   where
     go = (:[]) <$> end <|> (:) <$> p <*> go
 
-renderStart, renderEnd :: Parse m => m String
-renderStart = delimiter (delimRender._1) >>= symbol
-renderEnd   = delimiter (delimRender._2) >>= string
+pack :: Functor f => f String -> f Lit
+pack = fmap (LText . Text.pack)
 
--- commentStart, commentEnd :: Parse m => m String
--- commentStart = insensitive (delimComment._1)
--- commentEnd   = delimiter   (delimComment._2) >>= string
-
-blockStart, blockEnd :: Parse m => m String
-blockStart = insensitive (delimBlock._1)
-blockEnd   = delimiter   (delimBlock._2) >>= string
-
-insensitive :: Parse m => Getter Syntax String -> m String
-insensitive l = do
-    d <- delimiter l
+triml :: Parser m => m a -> m a
+triml p = do
     c <- column <$> position
     if c == 0
-        then spaces *> symbol d
-        else symbol d
+        then spaces *> p
+        else fail "left whitespace removal failed"
 
-delimiter :: MonadState Env m => Getter Syntax a -> m a
-delimiter l = gets (view (syntax.l))
+trimr :: Parser m => m a -> m a
+trimr p = p <* spaces <* newline
+
+pragmak :: Parser m => String -> m ()
+pragmak = reserve pragmaStyle
+
+pragmal, pragmar :: Parser m => m String
+pragmal = left  delimPragma >>= symbol
+pragmar = right delimPragma >>= string
+
+commentl, commentr :: MonadState Env m => m String
+commentl = left  delimComment
+commentr = right delimComment
+
+inlinel, inliner :: Parser m => m String
+inlinel = left  delimInline >>= symbol
+inliner = right delimInline >>= string
+
+blockl, blockr :: Parser m => m String
+blockl = left  delimBlock >>= symbol
+blockr = right delimBlock >>= string
+
+left, right :: MonadState s m => Getter s Delim -> m String
+left  d = gets (fst . view d)
+right d = gets (snd . view d)

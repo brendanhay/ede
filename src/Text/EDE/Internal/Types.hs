@@ -102,12 +102,13 @@ throwError fmt = Failure . pretty . LText.unpack . format fmt
 type Delim = (String, String)
 
 data Syntax = Syntax
-    { _delimRender  :: Delim
-    , _delimComment :: Delim
-    , _delimBlock   :: Delim
+    { _delimPragma  :: !Delim
+    , _delimInline  :: !Delim
+    , _delimComment :: !Delim
+    , _delimBlock   :: !Delim
     }
 
-makeLenses ''Syntax
+makeClassy ''Syntax
 
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Syntax -> Text -> Delta -> m (Result Template)
@@ -150,20 +151,20 @@ data Exp
     | EApp  !Delta !Exp  !Exp
     | ELet  !Delta !Id   !Exp  !Exp
     | ECase !Delta !Exp  [Alt]
-    | ELoop !Delta !Id   !Var  !Exp (Maybe Exp)
-    | EIncl !Delta !Text (Maybe Exp)
+    | ELoop !Delta !Id   !Var  !Exp
+    | EIncl !Delta !Text
       deriving (Eq, Show)
 
 instance HasDelta Exp where
     delta = \case
-        ELit  d _       -> d
-        EVar  d _       -> d
-        EFun  d _       -> d
-        EApp  d _ _     -> d
-        ELet  d _ _ _   -> d
-        ECase d _ _     -> d
-        ELoop d _ _ _ _ -> d
-        EIncl d _ _     -> d
+        ELit  d _     -> d
+        EVar  d _     -> d
+        EFun  d _     -> d
+        EApp  d _ _   -> d
+        ELet  d _ _ _ -> d
+        ECase d _ _   -> d
+        ELoop d _ _ _ -> d
+        EIncl d _     -> d
 
 var :: Id -> Var
 var = Var . (:| [])
@@ -176,6 +177,11 @@ eapp d (e:es) = foldl' (EApp d) e es
 efun :: Delta -> Id -> Exp -> Exp
 efun d = EApp d . EFun d
 
+elet :: Delta -> Exp -> Maybe (Id, Exp) -> Exp
+elet d e = \case
+    Nothing     -> e
+    Just (i, b) -> ELet d i b e
+
 ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
 ecase p ws f = ECase (delta p) p (ws ++ maybe [] ((:[]) . wild) f)
 
@@ -183,6 +189,11 @@ eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
 eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
   where
     c (p, w) e = ECase (delta p) p [true w, false e]
+
+eempty :: Delta -> Var -> Exp -> Maybe Exp -> Exp
+eempty d v e = maybe e (eif (p, e) [] . Just)
+  where
+    p = efun d "!" (efun d "empty" (EVar d v))
 
 wild, true, false :: Exp -> Alt
 wild  = (PWild,)

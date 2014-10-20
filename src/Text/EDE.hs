@@ -15,7 +15,7 @@
 -- | A (mostly logicless) textual templating language with similar syntax to
 -- <https://github.com/Shopify/liquid Liquid> or <http://jinja.pocoo.org/docs/ Jinja2>.
 --
--- (ED-E is a character from Fallout New Vegas, pronounced iː-diː-iː, or Eddie.)
+-- (ED-E is a character from Fallout New Vegas, pronounced 'Eddie'.)
 module Text.EDE
     (
     -- * How to use this library
@@ -29,6 +29,7 @@ module Text.EDE
     , parse
     , parseIO
     , parseFile
+    , parseFileWith
     , parseWith
 
     -- ** Includes
@@ -59,10 +60,6 @@ module Text.EDE
     , result
     , success
     , failure
-
-    , defaultSyntax
-    , alternateSyntax
-
     -- * Input
     -- $input
     , fromValue
@@ -73,16 +70,18 @@ module Text.EDE
     , version
 
     -- * Syntax
+    , Delim
     , Syntax
-    , delimRender
+    , delimPragma
+    , delimInline
     , delimComment
     , delimBlock
 
-    -- ** Comments
-    -- $comments
+    , defaultSyntax
+    , alternateSyntax
 
-    -- ** Raw
-    -- $raw
+    -- ** Pragmas
+    -- $pragmas
 
     -- ** Variables
     -- $variables
@@ -101,6 +100,15 @@ module Text.EDE
 
     -- ** Filters
     -- $filters
+
+    -- ** Raw
+    -- $raw
+
+    -- ** Comments
+    -- $comments
+
+    -- ** Let Expressions
+    -- $let
     ) where
 
 import           Control.Monad
@@ -129,11 +137,18 @@ import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
--- | EDE Version.
+-- FIXME: add pragmas to control syntax
+-- FIXME: detect include/import loops
+-- FIXME: {%- tags to deliberately strip/trim whitespace
+-- FIXME: ... {% include %} inline adds a trailing newline
+-- FIXME: streaming io
+-- FIXME: add benchmarks
+-- FIXME: add capture
+-- FIXME: numerous 'try' calls were added during development, these should now be reduced.
+
+-- | ED-E Version.
 version :: Version
 version = Paths.version
-
--- FIXME: detect include/import loops
 
 -- | Parse Lazy 'LText.Text' into a compiled 'Template'.
 --
@@ -162,8 +177,14 @@ parseIO p = parseWith defaultSyntax (includeFile p) "Text.EDE.parse"
 -- target (unless absolute paths are used).
 parseFile :: FilePath -- ^ Path to the template to load and parse.
           -> IO (Result Template)
-parseFile p = loadFile p >>= result failure
-    (parseWith defaultSyntax (includeFile (takeDirectory p)) (Text.pack p))
+parseFile = parseFileWith defaultSyntax
+
+-- | /See:/ 'parseFile'.
+parseFileWith :: Syntax   -- ^ Delimiters and parsing options.
+              -> FilePath -- ^ Path to the template to load and parse.
+              -> IO (Result Template)
+parseFileWith s p = loadFile p >>= result failure
+    (parseWith s (includeFile (takeDirectory p)) (Text.pack p))
 
 -- | Parse a 'Template' from a Strict 'ByteString' using a custom function for
 -- resolving @include@ expressions.
@@ -176,7 +197,7 @@ parseFile p = loadFile p >>= result failure
 --
 -- 'parseFile' for example, is defined as: 'parseWith' 'includeFile'.
 parseWith :: Monad m
-          => Syntax    -- ^ Delimiters and parsing options.
+          => Syntax     -- ^ Delimiters and parsing options.
           -> Resolver m -- ^ Function to resolve includes.
           -> Text       -- ^ Strict 'Text' name.
           -> ByteString -- ^ Strict 'ByteString' template definition.
@@ -237,20 +258,20 @@ render = renderWith defaultFilters
 
 -- | Render an 'Object' using the supplied 'Template'.
 renderWith :: HashMap Text Binding -- ^ Filters to make available in the environment.
-           -> Template            -- ^ Parsed 'Template' to render.
-           -> Object              -- ^ Bindings to make available in the environment.
+           -> Template             -- ^ Parsed 'Template' to render.
+           -> Object               -- ^ Bindings to make available in the environment.
            -> Result LText.Text
 renderWith fs (Template _ u ts) = fmap toLazyText . Eval.render ts fs u
 
--- | See: 'parse'
+-- | /See:/ 'parse'
 eitherParse :: ByteString -> Either String Template
 eitherParse = eitherResult . parse
 
--- | See: 'parseFile'
+-- | /See:/ 'parseFile'
 eitherParseFile :: FilePath -> IO (Either String Template)
 eitherParseFile = fmap eitherResult . parseFile
 
--- | See: 'parseWith'
+-- | /See:/ 'parseWith'
 eitherParseWith :: (Functor m, Monad m)
                 => Syntax
                 -> Resolver m
@@ -259,13 +280,13 @@ eitherParseWith :: (Functor m, Monad m)
                 -> m (Either String Template)
 eitherParseWith o f n = fmap eitherResult . parseWith o f n
 
--- | See: 'render'
+-- | /See:/ 'render'
 eitherRender :: Template
              -> Object
              -> Either String LText.Text
 eitherRender t = eitherResult . render t
 
--- | See: 'renderWith'
+-- | /See:/ 'renderWith'
 eitherRenderWith :: HashMap Text Binding
                  -> Template
                  -> Object
@@ -313,7 +334,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- >         , "list" .= [5..10]
 -- >         ]
 --
--- Please see the <#syntax syntax> section for more information about available
+-- Please see the syntax section for more information about available
 -- statements and expressions.
 
 -- $parsing_and_rendering
@@ -363,28 +384,35 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- >>> render (fromPairs [ "foo" .= "value", "bar" .= 1 ]) :: Template -> Result Text
 
--- $comments #syntax#
+-- #syntax#
 --
--- Comments are ignored by the parser and omitted from the rendered output.
+-- $pragmas
 --
--- > {# singleline comment #}
+-- Syntax can be modified either via the arguments to 'parseWith' or alternatively
+-- by specifying the delimiters via an @EDE_SYNTAX@ pragma.
 --
--- > {#
--- >    multiline
--- >    comment
--- > #}
+-- /Note:/ The pragmas must start on line1. Subsequently encountered
+-- pragmas are parsed as textual template contents.
 --
-
--- $raw
+-- For example:
 --
--- You can disable template processing for blocks of text using the @raw@ section:
+-- > {! EDE_SYNTAX pragma=("{*", "*}") inline=("#@", "@#") comment=("<#", "#>") block=("$$", "$$") !}
+-- > {* EDE_SYNTAX block=("#[", "]#")  *}
+-- > ...
 --
--- > {% raw %}
--- > Some {{{ handlebars }}} or {{ mustache }} or {{ jinja2 }} output tags etc.
--- > {% endraw %}
+-- Would result in the following syntax:
 --
--- This can be used to avoid parsing expressions which would otherwise be considered
--- valid @ED-E@ syntax.
+-- * Pragmas: @{* ... *}@
+--
+-- * Inline: @\#\@ ... \@\#@
+--
+-- * Comment: @\<\# comment \#>@
+--
+-- * Block: @\#[ block ]\#@
+--
+-- /Note:/ @EDE_SYNTAX@ pragmas only take effect for the current template, not
+-- child includes. If you want to override the syntax for all templates use 'parseWith'
+-- and custom 'Syntax' settings.
 
 -- $variables
 --
@@ -405,14 +433,19 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- A conditional is introduced and completed with the section syntax:
 --
--- > {% if var %}
+-- > {% if <expr1> %}
+-- >    ... consequent expressions
+-- > {% elif <expr2> %}
+-- >    ... consequent expressions
+-- > {% elif <expr3> %}
 -- >    ... consequent expressions
 -- > {% else %}
 -- >    ... alternate expressions
 -- > {% endif %}
 --
--- The value of @{{ var }}@ determines the branch that is rendered by the template with
--- the else branch being optional.
+-- The boolean result of the @expr@ determines the branch that is rendered by
+-- the template with multiple (or none) elif branches supported, and the
+-- else branch being optional.
 --
 -- In the case of a literal it conforms directly to the supported boolean or relation logical
 -- operators from Haskell.
@@ -430,7 +463,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * @Equal@: '=='
 --
--- * @Not Equal@: '/='
+-- * @Not Equal@: @!=@ (/See:/ '/=')
 --
 -- * @Greater@: '>'
 --
@@ -440,7 +473,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- * @Less Or Equal@: '<='
 --
--- * @Negation@: '!'
+-- * @Negation@: @!@ (/See:/ 'not')
+--
+-- /See:/ "Text.EDE.Filters"
 
 -- $case
 --
@@ -454,6 +489,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- > {% else %}
 -- >    .. alternate expressions
 -- > {% endcase %}
+--
+-- Patterns take the form of @variables@, @literals@, or the wild-card
+-- '@_@' pattern (which matches anything).
 
 -- $loops
 --
@@ -519,19 +557,19 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- They can be used to abstract out common snippets and idioms into partials.
 --
 -- If 'parseFile' or the 'includeFile' resolver is used, templates will be loaded
--- from 'FilePath's, for example:
+-- using 'FilePath's. (This is the default.)
+--
+-- For example:
 --
 -- > {% include "/var/tmp/partial.ede" %}
 --
 -- Loads @partial.ede@ from the file system.
 --
--- By default, the current environment is made available to the included template,
--- but this can be overriden by specifying a specific binding to make available:
+-- The current environment is made directly available to the included template.
+-- Additional bindings can be created (/See:/ @let@) which will be additionally
+-- available only within the include under a specific identifier:
 --
--- > {% include "/var/tmp/partial.ede" with value %}
---
--- Will ensure only the key @value@ (and descendents) is available in the
--- partial's environment.
+-- > {% include "/var/tmp/partial.ede" with some_number = 123 %}
 --
 -- Includes can also be resolved using pure 'Resolver's such as 'includeMap',
 -- which will treat the @include@ expression's identifier as a 'HashMap' key:
@@ -545,34 +583,44 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- Filters are typed functions which can be applied to variables and literals.
 -- An example of rendering a lower cased boolean would be:
 --
--- > {{ True | show | lower }}
+-- > {{ true | show | lower }}
 --
 -- The input is on the LHS and chained filters (delimited by '|') are on the RHS,
 -- with filters being applied left associatively.
 --
--- Available filters:
+-- /See:/ "Text.EDE.Filters"
+
+-- $raw
 --
--- * @show :: a -> Text@: Convert a value to 'Text' using its 'Show' instance.
+-- You can disable template processing for blocks of text using the @raw@ section:
 --
--- * @lower :: Text -> Text@: Lower case a textual value.
+-- > {% raw %}
+-- > Some {{{ handlebars }}} or {{ mustache }} or {{ jinja2 }} output tags etc.
+-- > {% endraw %}
 --
--- * @upper :: Text -> Text@: Upper case a textual value.
+-- This can be used to avoid parsing expressions which would otherwise be
+-- considered valid @ED-E@ syntax.
+
+-- $comments
 --
--- * @lowerFirst :: Text -> Text@: Lower case the first character of a textual value.
+-- Comments are ignored by the parser and omitted from the rendered output.
 --
--- * @upperFirst :: Text -> Text@: Upper case the first character of a textual value.
+-- > {# singleline comment #}
 --
--- * @titleize :: Text -> Text@: -
+-- > {#
+-- >    multiline
+-- >    comment
+-- > #}
 --
--- * @pascalize :: Text -> Text@: -
+
+-- $let
 --
--- * @camelize :: Text -> Text@: -
+-- You can also bind an identifier to values which will be available within
+-- the following expression scope.
 --
--- * @underscore :: Text -> Text@: -
+-- For example:
 --
--- * @hyphenate :: Text -> Text@: -
---
--- * @listLength :: Array -> Integer@: Get the length of an 'Array'.
---
--- * @mapLength :: Object -> Integer@: Get the length of an 'Object'.
---
+-- > {% let var = false %}
+-- > ...
+-- > {{ var }}
+-- > ...

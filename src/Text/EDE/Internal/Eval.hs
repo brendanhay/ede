@@ -24,7 +24,6 @@ import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
 import           Data.List                         (sortBy)
 import qualified Data.List.NonEmpty                as NonEmpty
-import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
 import           Data.Scientific                   (base10Exponent)
@@ -39,13 +38,9 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           Text.EDE.Internal.HOAS
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen      (Pretty(..))
 import           Text.Trifecta.Delta
 
--- FIXME: look at adding a whnf step to reduce everything before storing as a template
--- (optimisation passes, case reducation etc.)
--- maybe Exp -> Binding (aka Val) is the first step, without substituting from
--- env/filters
+-- FIXME: add pretty printer formatted error messages
 
 data Env = Env
     { _templates :: HashMap Text Exp
@@ -62,12 +57,9 @@ render :: HashMap Text Exp
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
   where
-    nf (BVal v) = build d v
-    nf _        = lift (Failure err)
-
-    err = "unable to evaluate partially applied template to normal form."
-
-    d = delta e
+    nf (BVal v) = build (delta e) v
+    nf _        = lift $ Failure
+        "unable to evaluate partially applied template to normal form."
 
 eval :: Exp -> Context Binding
 eval (ELit _ l) = return (quote l)
@@ -81,7 +73,7 @@ eval (EFun d i) = do
 eval (EApp d a b) = do
     x <- eval a
     y <- eval b
-    qapplyend d x y
+    binding d x y
 
 eval (ELet _ k rhs bdy) = do
     q <- eval rhs
@@ -106,7 +98,7 @@ eval (ECase d p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
-eval (ELoop d k v bdy ma) = variable v >>= go >>= loop k bdy ma
+eval (ELoop d i v bdy) = variable v >>= go >>= loop i bdy
   where
     go (Object o) = return (Col (Map.size o) (hmap o))
     go (Array  a) = return (Col (Vector.length a) (vec a))
@@ -120,33 +112,12 @@ eval (ELoop d k v bdy ma) = variable v >>= go >>= loop k bdy ma
     vec :: Vector Value -> Vector (Maybe Text, Value)
     vec = Vector.map (Nothing,)
 
-eval (EIncl d k mu) = do
+eval (EIncl d i) = do
     ts <- asks _templates
-    t  <- maybe
-        (throwError' d "template {} is not in scope: {}"
-            [k, Text.intercalate "," $ Map.keys ts])
-        return
-        (Map.lookup k ts)
-    s  <- maybe (return global) local' mu
-    bind s (eval t)
-  where
-    -- Use the global environment.
-    global o = fromPairs ["scope" .= o]
-
-    -- Ignore the global environment (const)
-    -- and set to the specified expression.
-    local' u = do
-        x <- case u of
-            ELit _ l -> return (enc l)
-            EVar _ v -> variable v
-            _        ->
-                throwError' d "unexpected template scope {}"
-                    [show (delta u)]
-        return . const $ fromPairs ["scope" .= x]
-
-    enc (LBool b) = toJSON b
-    enc (LNum  n) = toJSON n
-    enc (LText t) = toJSON t
+    case Map.lookup i ts of
+        Just e  -> eval e
+        Nothing -> throwError' d "template {} is not in scope: [{}]"
+            [i, Text.intercalate "," $ Map.keys ts]
 
 bind :: (Object -> Object) -> Context a -> Context a
 bind f = withReaderT (\x -> x { _values = f (_values x) })
@@ -186,26 +157,24 @@ predicate x = do
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
 
-loop :: Text -> Exp -> Maybe Exp -> Collection -> Context Binding
-loop _ a b (Col 0 _)  = eval (fromMaybe (ELit (delta a) (LText mempty)) b)
-loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+loop :: Text -> Exp -> Collection -> Context Binding
+loop i a (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
   where
     iter (n, p) x = do
         shadowed n
-        q <- bind (Map.insert k (context n x)) (eval a)
-        r <- qapplyend (delta a) p q
+        q <- bind (Map.insert i (context n x)) (eval a)
+        r <- binding (delta a) p q
         return (n + 1, r)
 
     shadowed n = do
         m <- asks _values
         maybe (return ())
               (\x -> throwError' (delta a) "binding {} shadows existing variable {} :: {}, {}"
-                  [Text.unpack k, show x, typeOf x, show n])
-              (Map.lookup k m)
+                  [Text.unpack i, show x, typeOf x, show n])
+              (Map.lookup i m)
 
-    context n (mk, v) = object
-        [ "key"        .= mk -- FIXME: ensure null keys don't exist
-        , "value"      .= v
+    context n (k, v) = object $
+        [ "value"      .= v
         , "length"     .= l
         , "index"      .= n
         , "index0"     .= (n - 1)
@@ -215,10 +184,13 @@ loop k a _ (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
         , "last"       .= (n == l)
         , "odd"        .= (n `mod` 2 == 1)
         , "even"       .= (n `mod` 2 == 0)
-        ]
+        ] ++ key k
 
-qapplyend :: Delta -> Binding -> Binding -> Context Binding
-qapplyend d x y =
+    key (Just k) = ["key" .= k]
+    key Nothing  = []
+
+binding :: Delta -> Binding -> Binding -> Context Binding
+binding d x y =
     case (x, y) of
         (BVal l, BVal r) -> quote <$> liftM2 (<>) (build d l) (build d r)
         _                -> lift (qapply x y)
@@ -234,5 +206,6 @@ build _ (Number n)
 build d x =
     throwError' d "unable to render literal {}\n{}" [typeOf x, show x]
 
+-- FIXME: Add delta information to the thrown error document.
 throwError' :: Params ps => Delta -> Format -> ps -> Context a
 throwError' _ f = lift . throwError f

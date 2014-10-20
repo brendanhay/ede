@@ -1,11 +1,11 @@
 SHELL         := /usr/bin/env bash
 CABAL_SANDBOX ?= $(CURDIR)/.cabal-sandbox
-FLAGS         := --enable-tests --enable-benchmarks
+FLAGS         := --enable-tests --enable-benchmarks -fbuild-executable
 NAME          := ede
 VERSION       := $(shell sed -n 's/^version: *\(.*\)$$/\1/p' $(NAME).cabal)
 BUILD_NUMBER  ?= 0
 DEB           := dist/$(NAME)_$(VERSION)+$(BUILD_NUMBER)_amd64.deb
-BIN           := dist/release/$(NAME)
+BIN           := dist/image/bin/ed-e
 
 .PHONY: test doc
 
@@ -13,7 +13,7 @@ build: dist/setup-config
 	cabal build $(addprefix -,$(findstring j,$(MAKEFLAGS)))
 
 all:
-	make clean; make install && make build
+	make clean; make dist
 
 dist/setup-config: install
 	cabal configure $(FLAGS) --bindir=bin --libdir=lib
@@ -41,7 +41,7 @@ dist: $(DEB)
 	cabal sdist
 
 $(BIN): build
-	cabal copy --destdir=dist/release && upx $@
+	cabal copy --destdir=dist/image && upx $@
 
 %.deb: $(BIN)
 	makedeb --name=$(NAME) \

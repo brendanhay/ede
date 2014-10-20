@@ -20,16 +20,42 @@ import           Text.EDE.Internal.Types
 import           Text.Parser.Token.Style
 import           Text.Trifecta
 
+-- | The default ED-E syntax.
+--
+-- Delimiters:
+--
+-- * Pragma: @{! ... !}@
+--
+-- * Inline: @{{ ... }}@
+--
+-- * Comments: @{# ... #}@
+--
+-- * Blocks: @{% ... %}@
+--
 defaultSyntax :: Syntax
 defaultSyntax = Syntax
-    { _delimRender  = ("{{", "}}")
+    { _delimPragma  = ("{!", "!}")
+    , _delimInline  = ("{{", "}}")
     , _delimComment = ("{#", "#}")
     , _delimBlock   = ("{%", "%}")
     }
 
+-- | An alternate syntax (based on Play/Scala templates) designed to
+-- be used when the default is potentially ambiguous due to another encountered
+-- smarty based syntax.
+--
+-- Delimiters:
+--
+-- * Inline: @\<\@ ... \@>@
+--
+-- * Comments: @\@* ... *\@@
+--
+-- * Blocks: @\@( ... )\@@
+--
 alternateSyntax :: Syntax
 alternateSyntax = Syntax
-    { _delimRender  = ("<@", "@>")
+    { _delimPragma  = ("@!", "!@")
+    , _delimInline  = ("<@", "@>")
     , _delimComment = ("@*", "*@")
     , _delimBlock   = ("@(", ")@")
     }
@@ -44,7 +70,9 @@ variableStyle :: TokenParsing m => IdentifierStyle m
 variableStyle = keywordStyle & styleName .~ "variable"
 
 keywordStyle :: TokenParsing m => IdentifierStyle m
-keywordStyle = haskellIdents & styleReserved .~ keywordSet & styleName .~ "keyword"
+keywordStyle = haskellIdents
+    & styleReserved .~ keywordSet
+    & styleName     .~ "keyword"
 
 keywordSet :: HashSet String
 keywordSet = Set.fromList
@@ -66,4 +94,17 @@ keywordSet = Set.fromList
     , "."
     , "true"
     , "false"
+    ]
+
+pragmaStyle :: TokenParsing m => IdentifierStyle m
+pragmaStyle = haskellIdents
+    & styleReserved .~ pragmaSet
+    & styleName     .~ "pragma field"
+
+pragmaSet :: HashSet String
+pragmaSet = Set.fromList
+    [ "pragma"
+    , "inline"
+    , "comment"
+    , "block"
     ]

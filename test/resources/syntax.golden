@@ -1,0 +1,8 @@
+{! EDE_SYNTAX inline=("{{", "}}") !}
+
+  12
+    {{ var }}
+
+  {% for nothing in var %}
+    {{ var }}
+  {% endfor %}
