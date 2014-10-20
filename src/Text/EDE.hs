@@ -582,6 +582,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- Will render each item with its (1-based) loop index as a prefix, separated
 -- by a blank newline, without a trailing at the end of the document.
+--
+-- Valid loop targets are 'Object's, 'Array's, and 'String's, with only 'Object's
+-- having a an available {{ <var>.key }} in scope.
 
 -- $includes
 --
