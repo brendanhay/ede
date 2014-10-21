@@ -117,33 +117,31 @@ import Text.EDE.Internal.HOAS
 
 -- $textual
 --
--- * @takeWord@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.takeWord'  @:: Text -> Text@
 --
--- * @dropWord@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.dropWord'  @:: Text -> Text@
 --
--- * @lowerHead@ @:: Text -> Text@
+-- * 'Data.Text.Manipulate.lowerHead' @:: Text -> Text@
 --
--- * @upperHead@ @:: Text -> Text@
+-- * 'Data.Text.Manipulate.upperHead' @:: Text -> Text@
 --
--- * @toTitle@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toTitle'   @:: Text -> Text@
 --
--- * @toCamel@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toCamel'   @:: Text -> Text@
 --
--- * @toPascal@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toPascal'  @:: Text -> Text@
 --
--- * @toSnake@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toSnake'   @:: Text -> Text@
 --
--- * @toSpinal@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toSpinal'  @:: Text -> Text@
 --
--- * @toTrain@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toTrain'   @:: Text -> Text@
 --
--- * @toLower@   @:: Text -> Text@
+-- * 'Data.Text.toLower'              @:: Text -> Text@
 --
--- * @toUpper@   @:: Text -> Text@
+-- * 'Data.Text.toUpper'              @:: Text -> Text@
 --
--- * @toOrdinal@ @:: Number -> Text@
---
--- /See:/ <http://hackage.haskell.org/package/text-manipulate text-manipulate>
+-- * 'Data.Text.Manipulate.toOrdinal' @:: Number -> Text@
 
 -- $collection
 --
