@@ -61,7 +61,7 @@ import Text.EDE.Internal.HOAS
 
 -- $prelude
 --
--- The default filters available to a template is documented by the following categories.
+-- The default filters available to a template are documented by the subsequent categories.
 --
 -- These filters cannot be overriden and attempting to supply your own filters to
 -- 'Text.EDE.renderWith' will cause the similarly named filters to disappear when
