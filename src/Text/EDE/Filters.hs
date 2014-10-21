@@ -145,9 +145,9 @@ import Text.EDE.Internal.HOAS
 
 -- $collection
 --
--- * @length@ @:: Collection -> Number@ (/See/: Text:'Data.Text.length', Vector:'Data.Vector.length', HashMap:'Data.HashMap.Strict.size')
+-- * @length@ @:: Collection -> Number@ (/See/: Text.'Data.Text.length', Vector.'Data.Vector.length', HashMap.'Data.HashMap.Strict.size')
 --
--- * @empty@  @:: Collection -> Bool@ (/See/: Text:'Data.Text.null', Vector:'Data.Vector.null', HashMap:'Data.HashMap.Strict.null')
+-- * @empty@  @:: Collection -> Bool@ (/See/: Text:'Data.Text.null', Vector.'Data.Vector.null', HashMap.'Data.HashMap.Strict.null')
 
 -- $polymorphic
 --
