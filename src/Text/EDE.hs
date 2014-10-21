@@ -130,7 +130,7 @@ import qualified Paths_ede                    as Paths
 import           System.Directory
 import           System.FilePath
 import qualified Text.EDE.Internal.Eval       as Eval
-import           Text.EDE.Internal.Filters    (Binding)
+import           Text.EDE.Internal.HOAS       (Binding)
 import qualified Text.EDE.Internal.Parser     as Parser
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types

@@ -14,53 +14,7 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Filters
-    (
-    -- * Prelude
-      defaultFilters
-
-    -- ** Boolean
-    -- $boolean
-
-    -- ** Equality
-    -- $equality
-
-    -- ** Relational
-    -- $relational
-
-    -- ** Numeric
-    -- $numeric
-
-    -- ** Fractional
-    -- $fractional
-
-    -- ** Textual
-    -- $textual
-
-    -- ** Collection
-    -- $collection
-
-    -- ** Polymorphic
-    -- $polymorphic
-
-    -- * Constructing filters
-    , Binding (..)
-
-    -- ** Classes
-    , Quote   (..)
-    , Unquote (..)
-
-    -- ** Restricted quoters
-    , qapply
-    , qpoly2
-    , qnum1
-    , qnum2
-    , qcol1
-
-    -- ** Errors
-    , unexpected
-    , typeOf
-    ) where
+module Text.EDE.Internal.Filters where
 
 import           Data.Aeson              (Value, encode)
 import           Data.HashMap.Strict     (HashMap)
