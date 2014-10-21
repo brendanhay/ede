@@ -19,6 +19,8 @@ module Text.EDE.Internal.Filters where
 import           Data.Aeson              (Value, encode)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
+import           Data.List               (sort)
+import           Data.Maybe
 import           Data.Scientific         (Scientific)
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
@@ -31,175 +33,88 @@ import           Text.EDE.Internal.HOAS
 default (Integer)
 
 defaultFilters :: HashMap Text Binding
-defaultFilters = Map.unions
-    [ boolean
-    , equality
-    , relational
-    , numeric
-    , fractional
-    , textual
-    , collection
-    , polymorphic
-    ]
+defaultFilters = Map.fromList
+    -- boolean
+    [ "!"            @: not
+    , "&&"           @: (&&)
+    , "||"           @: (||)
 
--- $boolean
---
--- * @!@  @:: Bool -> Bool@ (/See:/ 'not')
---
--- * '&&' @:: Bool -> Bool -> Bool@
---
--- * '||' @:: Bool -> Bool -> Bool@
+    -- equality
+    , "=="           @: qpoly2 (==)
+    , "!="           @: qpoly2 (/=)
 
-boolean :: HashMap Text Binding
-boolean = Map.fromList
-    [ "!"  @: quote not
-    , "&&" @: quote (&&)
-    , "||" @: quote (||)
-    ]
+    -- relational
+    , ">"            @: qnum2 (>)
+    , ">="           @: qnum2 (>=)
+    , "<="           @: qnum2 (<=)
+    , "<"            @: qnum2 (<)
 
--- $equality
---
--- * '==' @:: a -> a -> Bool@
---
--- * @!=@ @:: a -> a -> Bool@ (/See/: '/=')
+    -- numeric
+    , "+"            @: qnum2 (+)
+    , "-"            @: qnum2 (-)
+    , "*"            @: qnum2 (*)
+    , "abs"          @: qnum1 abs
+    , "signum"       @: qnum1 signum
+    , "negate"       @: qnum1 negate
 
-equality :: HashMap Text Binding
-equality = Map.fromList
-    [ "==" @: qpoly2 (==)
-    , "!=" @: qpoly2 (/=)
-    ]
+    -- fractional
+    , "truncate"     @: qnum1 (fromIntegral . truncate)
+    , "round"        @: qnum1 (fromIntegral . round)
+    , "ceiling"      @: qnum1 (fromIntegral . ceiling)
+    , "floor"        @: qnum1 (fromIntegral . floor)
 
--- $relational
---
--- * '>'  @:: a -> a -> Bool@
---
--- * '>=' @:: a -> a -> Bool@
---
--- * '<=' @:: a -> a -> Bool@
---
--- * '<=' @:: a -> a -> Bool@
+    -- text
+    , "lowerHead"    @: lowerHead
+    , "upperHead"    @: upperHead
+    , "toTitle"      @: toTitle
+    , "toCamel"      @: toCamel
+    , "toPascal"     @: toPascal
+    , "toSnake"      @: toSnake
+    , "toSpinal"     @: toSpinal
+    , "toTrain"      @: toTrain
+    , "toUpper"      @: Text.toUpper
+    , "toLower"      @: Text.toLower
+    , "toOrdinal"    @: (toOrdinal :: Integer -> Text)
 
-relational :: HashMap Text Binding
-relational = Map.fromList
-    [ ">"  @: qnum2 (>)
-    , ">=" @: qnum2 (>=)
-    , "<=" @: qnum2 (<=)
-    , "<"  @: qnum2 (<)
-    ]
+    , "takeWord"     @: takeWord
+    , "dropWord"     @: dropWord
+    , "splitWords"   @: splitWords
+    , "strip"        @: Text.strip
+    , "stripPrefix"  @: (\p t -> fromMaybe t (p `Text.stripPrefix` t))
+    , "stripSuffix"  @: (\s t -> fromMaybe t (s `Text.stripSuffix` t))
+    , "stripStart"   @: Text.stripStart
+    , "stripEnd"     @: Text.stripEnd
+    , "replace"      @: Text.replace
+    , "remove"       @: (\t -> Text.replace t "")
 
--- $numeric
---
--- * '+'      @:: Number -> Number -> Number@
---
--- * '-'      @:: Number -> Number -> Number@
---
--- * '*'      @:: Number -> Number -> Number@
---
--- * 'abs'    @:: Number -> Number@
---
--- * 'signum' @:: Number -> Number@
---
--- * 'negate' @:: Number -> Number@
+    , "indentLines"  @: indentLines
+    , "prependLines" @: prependLines
+    , "justifyLeft"  @: (\n -> Text.justifyLeft  n ' ')
+    , "justifyRight" @: (\n -> Text.justifyRight n ' ')
+    , "center"       @: (\n -> Text.center       n ' ')
 
-numeric :: HashMap Text Binding
-numeric = Map.fromList
-    [ "+"      @: qnum2 (+)
-    , "-"      @: qnum2 (-)
-    , "*"      @: qnum2 (*)
-    , "abs"    @: qnum1 abs
-    , "signum" @: qnum1 signum
-    , "negate" @: qnum1 negate
-    ]
+    -- sequences
+    , "length"       @: qcol1 Text.length Map.size Vector.length
+    , "empty"        @: qcol1 Text.null   Map.null Vector.null
 
--- $fractional
---
--- * 'truncate' @:: Number -> Number@
---
--- * 'round'    @:: Number -> Number@
---
--- * 'ceiling'  @:: Number -> Number@
---
--- * 'floor'    @:: Number -> Number@
+    -- , "sort"         @: qcol1 (Text.pack . sort . Text.unpack) id (Vector.fromList . sort . Vector.toList)
+    , "reverse"      @: qcol1 Text.reverse id Vector.reverse
 
-fractional :: HashMap Text Binding
-fractional = Map.fromList
-    [ "truncate" @: qnum1 (fromIntegral . truncate)
-    , "round"    @: qnum1 (fromIntegral . round)
-    , "ceiling"  @: qnum1 (fromIntegral . ceiling)
-    , "floor"    @: qnum1 (fromIntegral . floor)
-    ]
+    -- , "head"         @: undefined
+    -- , "tail"         @: undefined
+    -- , "init"         @: undefined
+    -- , "last"         @: undefined
 
--- $textual
---
--- * @takeWord@  @:: Text -> Text@
---
--- * @dropWord@  @:: Text -> Text@
---
--- * @lowerHead@ @:: Text -> Text@
---
--- * @upperHead@ @:: Text -> Text@
---
--- * @toTitle@   @:: Text -> Text@
---
--- * @toCamel@   @:: Text -> Text@
---
--- * @toPascal@  @:: Text -> Text@
---
--- * @toSnake@   @:: Text -> Text@
---
--- * @toSpinal@  @:: Text -> Text@
---
--- * @toTrain@   @:: Text -> Text@
---
--- * @toLower@   @:: Text -> Text@
---
--- * @toUpper@   @:: Text -> Text@
---
--- * @toOrdinal@ @:: Number -> Text@
---
--- /See:/ <http://hackage.haskell.org/package/text-manipulate text-manipulate>
+    -- , "map"          @: undefined
+    -- , "filter"       @: undefined
+    -- , "zip"          @: undefined
+    -- , "join"         @: undefined
 
-textual :: HashMap Text Binding
-textual = Map.fromList
-    [ "takeWord"  @: quote takeWord
-    , "dropWord"  @: quote dropWord
-    , "lowerHead" @: quote lowerHead
-    , "upperHead" @: quote upperHead
-    , "toTitle"   @: quote toTitle
-    , "toCamel"   @: quote toCamel
-    , "toPascal"  @: quote toPascal
-    , "toSnake"   @: quote toSnake
-    , "toSpinal"  @: quote toSpinal
-    , "toTrain"   @: quote toTrain
-    , "toUpper"   @: quote Text.toUpper
-    , "toLower"   @: quote Text.toLower
-    , "toOrdinal" @: (toOrdinal . truncate :: Scientific -> Text)
-    ]
-
--- $collection
---
--- * @length@ @:: Collection -> Number@ (/See/: 'Data.Text.length', 'Data.Vector.length', 'Data.HashMap.Strict.size')
---
--- * @empty@  @:: Collection -> Bool@ (/See/: 'Data.Text.null', 'Data.Vector.null', 'Data.HashMap.Strict.null')
-
-collection :: HashMap Text Binding
-collection = Map.fromList
-    [ "length" @: qcol1 Text.length Map.size Vector.length
-    , "empty"  @: qcol1 Text.null   Map.null Vector.null
-    -- , ("join",  quote
-    ]
-
--- $polymorphic
---
--- * 'show' @:: a -> Text@
-
-polymorphic :: HashMap Text Binding
-polymorphic = Map.fromList
-    [ "show" @: quote value
+    -- polymorphic
+    , "show"         @: (LText.decodeUtf8 . encode :: Value -> LText.Text)
+    -- , "default"      @: undefined
+    -- , "defined"      @: undefined
     ]
 
 (@:) :: Quote a => Text -> a -> (Text, Binding)
 k @: q = (k, quote q)
-
-value :: Value -> LText.Text
-value = LText.decodeUtf8 . encode

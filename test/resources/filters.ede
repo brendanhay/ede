@@ -17,23 +17,10 @@ Boolean Operands:
 {{ bool || false }}
 {{ false || bool }}
 
-Polymorphic Show:
-{{ single | show }}
-{{ bool | show }}
-{{ number | show }}
-{{ alpha | show }}
-{{ numeric | show }}
-{{ object | show }}
-
 Eq:
 Ord:
 Num:
 RealFrac:
-
-Existence:
-{{ single | defined }}
-{{ nonexistent | defined }}
-{{ nonexistent | default(true) }}
 
 Text Casing:
 {{ single | lowerHead }}
@@ -42,12 +29,13 @@ Text Casing:
 {{ single | toUpper }}
 {{ single | toTitle }}
 {{ single | toCamel }}
-{{ single | tpPascal }}
+{{ single | toPascal }}
 {{ single | toSnake }}
 {{ single | toSpinal }}
 {{ single | toTrain }}
-{{ single | lower | upperHead }}
-{% if single | lowerCase == "lorem ipsum" %}
+{{ number | toOrdinal }}
+{{ single | toLower | upperHead }}
+{% if (single | toLower) == "lorem ipsum" %}
 single | lower == "lorem ipsum"
 {% endif %}
 
@@ -55,7 +43,7 @@ Text Substitution:
 {{ single | takeWord }}
 {{ single | dropWord }}
 {{ single | dropUpper }}
-{{ single | camelCase | dropLower }}
+{{ single | toCamel| dropLower }}
 {{ single | stripPrefix("Lorem ") }}
 {{ single | stripSuffix("Phrase") }}
 {{ single | stripStart }}
@@ -89,13 +77,27 @@ Sequence Subdivision:
 {{ single | splitWords | last }}
 
 Sequence Sorting:
-{{ single | sort | show }}
-{{ alpha | reverse | sort | show }}
-{{ object | sort | show }}
+{{ single | reverse }}
+{# {{ single | sort | show }} #}
+{# {{ alpha | reverse | sort | show }} #}
+{# {{ object | sort | show }} #}
 
 Sequence Transformations:
-{{ alpha | zip(numeric) }}
-[{{ alpha | join(", ") }}]
-({{ numeric | map(toOrdinal) | join(", ") }})
-{{ numeric | map(toOrdinal) }}
-{{ numeric | filter(>= 3) }}
+{# {{ alpha | zip(numeric) }} #}
+{# [{{ alpha | join(", ") }}] #}
+{# ({{ numeric | map(toOrdinal) | join(", ") }}) #}
+{# {{ numeric | map(toOrdinal) }} #}
+{# {{ numeric | filter(>= 3) }} #}
+
+Polymorphic Show:
+{{ single | show }}
+{{ bool | show }}
+{{ number | show }}
+{{ alpha | show }}
+{{ numeric | show }}
+{{ object | show }}
+
+Polymorphic Existence:
+{# {{ single | defined }} #}
+{# {{ nonexistent | defined }} #}
+{# {{ nonexistent | default(true) }} #}

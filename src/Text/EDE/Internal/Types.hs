@@ -172,6 +172,9 @@ eapp d (e:es) = foldl' (EApp d) e es
 efun :: Delta -> Id -> Exp -> Exp
 efun d = EApp d . EFun d
 
+efilter :: Exp -> (Delta, Id, [Exp]) -> Exp
+efilter e (d, i, ps) = eapp d (EFun d i : e : ps)
+
 elet :: Delta -> Exp -> Maybe (Id, Exp) -> Exp
 elet d e = \case
     Nothing     -> e

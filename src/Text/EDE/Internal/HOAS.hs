@@ -1,8 +1,11 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE ExtendedDefaultRules       #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TupleSections              #-}
+
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- Module      : Text.EDE.Internal.HOAS
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
@@ -30,6 +33,8 @@ import qualified Data.Text.Lazy          as LText
 import           Data.Text.Lazy.Builder
 import qualified Data.Vector             as Vector
 import           Text.EDE.Internal.Types
+
+default (Double, Integer)
 
 -- | A HOAS representation of (possibly partially applied) values
 -- in the environment.
@@ -80,7 +85,11 @@ qnum2 = quote
 
 -- | Quote a comprehensive set of unary functions to create a binding
 -- that supports all collection types.
-qcol1 :: Quote a => (Text -> a) -> (Object -> a) -> (Array -> a) -> Binding
+qcol1 :: (Quote a, Quote b, Quote c)
+      => (Text   -> a)
+      -> (Object -> b)
+      -> (Array  -> c)
+      -> Binding
 qcol1 f g h = BLam $ \case
     BVal (String t) -> pure . quote $ f t
     BVal (Object o) -> pure . quote $ g o
@@ -101,6 +110,9 @@ instance Quote Value where
 
 instance Quote Text where
     quote = BVal . String
+
+instance Quote [Text] where
+    quote = BVal . toJSON
 
 instance Quote LText.Text where
     quote = quote . LText.toStrict
@@ -150,11 +162,21 @@ instance Unquote Bool where
         Bool b -> pure b
         v      -> unexpected (typeOf v) "Bool"
 
+instance Unquote Int where
+    unquote = unquote >=>
+        maybe (unexpected "Number" "Int") pure . toBoundedInteger
+
+instance Unquote Integer where
+    unquote = unquote >=>
+        either (const (unexpected "Number" "Integral")) pure . floatingOrInteger
+
+instance Unquote Double where
+    unquote = fmap toRealFloat . unquote
+
 instance Unquote Scientific where
-    unquote = \case
-        BVal (Number n) -> pure n
-        BVal v          -> unexpected (typeOf v) "Number"
-        _               -> unexpected typeFun "Number"
+    unquote = unquote >=> \case
+        Number n -> pure n
+        v        -> unexpected (typeOf v) "Number"
 
 instance Unquote Collection where
     unquote q = text    <$> unquote q

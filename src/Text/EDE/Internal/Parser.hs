@@ -22,7 +22,7 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
-import           Control.Lens               hiding (both, noneOf)
+import           Control.Lens               hiding (both, noneOf, op)
 import           Control.Monad.State.Strict
 import           Data.Aeson.Types           (Array, Object, Value(..))
 import           Data.Bifunctor
@@ -236,8 +236,14 @@ else' = optional (block "else" (pure ()) *> document)
 exit :: Parser m => String -> m ()
 exit k = block k (pure ())
 
+pattern :: Parser m => m Pat
+pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
+
 term :: Parser m => m Exp
-term = buildExpressionParser table expr
+term = chainl1' term0 (try filter') (symbol "|" *> pure efilter) <|> term0
+
+term0 :: Parser m => m Exp
+term0 = buildExpressionParser table expr
   where
     table =
         [ [prefix "!"]
@@ -246,7 +252,6 @@ term = buildExpressionParser table expr
         , [infix' "==", infix' "!=", infix' ">", infix' ">=", infix' "<", infix' "<="]
         , [infix' "&&"]
         , [infix' "||"]
-        , [filter' "|"]
         ]
 
     prefix n = Prefix (efun <$> operator n <*> pure n)
@@ -256,16 +261,13 @@ term = buildExpressionParser table expr
         return $ \l r ->
             EApp d (efun d n l) r) AssocLeft
 
-    filter' n = Infix (do
-        d <- operator n
-        i <- try (lookAhead identifier)
-        return $ \l _ ->
-            efun d i l) AssocLeft
-
     expr = parens term <|> apply EVar variable <|> apply ELit literal
 
-pattern :: Parser m => m Pat
-pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
+filter' :: Parser m => m (Delta, Id, [Exp])
+filter' = (,,)
+    <$> position
+    <*> identifier
+    <*> (parens (commaSep1 term) <|> pure [])
 
 collection :: Parser m => m Exp
 collection = EVar <$> position <*> variable <|> ELit <$> position <*> col
@@ -303,13 +305,13 @@ operator n = position <* reserveText operatorStyle n
 keyword :: Parser m => String -> m Delta
 keyword k = position <* try (reserve keywordStyle k)
 
-variable :: Parser m => m Var
+variable :: (Monad m, TokenParsing m) => m Var
 variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 
-identifier :: Parser m => m Id
+identifier :: (Monad m, TokenParsing m) => m Id
 identifier = ident variableStyle
 
-spaces :: Parser m => m ()
+spaces :: (Monad m, TokenParsing m) => m ()
 spaces = skipMany (oneOf "\t ")
 
 apply :: Parser m => (Delta -> a -> b) -> m a -> m b
@@ -322,6 +324,12 @@ manyEndBy1 :: Alternative m => m a -> m a -> m [a]
 manyEndBy1 p end = go
   where
     go = (:[]) <$> end <|> (:) <$> p <*> go
+
+chainl1' :: Alternative m => m a -> m b -> m (a -> b -> a) -> m a
+chainl1' l r op = scan
+  where
+    scan = flip id <$> l <*> rst
+    rst  = (\f y g x -> g (f x y)) <$> op <*> r <*> rst <|> pure id
 
 pack :: Functor f => f String -> f Value
 pack = fmap (String . Text.pack)
