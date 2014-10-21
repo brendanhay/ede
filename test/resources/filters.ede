@@ -9,9 +9,13 @@
   "object": {"foo": "x", "bar": "y"}
 }
 ---
-Boolean Negation:
+Boolean Operands:
 {{ !bool }}
 {{ !false }}
+{{ bool && false }}
+{{ true && bool }}
+{{ bool || false }}
+{{ false || bool }}
 
 Polymorphic Show:
 {{ single | show }}
