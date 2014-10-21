@@ -140,6 +140,9 @@ import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
 
+-- FIXME: paramterised filters .. var | indent(2) | join(key) | sort
+-- also need to consider errors for missing parameters.
+
 -- FIXME: detect include/import loops
 -- FIXME: {%- tags to deliberately strip/trim whitespace
 -- FIXME: ... {% include %} inline adds a trailing newline
