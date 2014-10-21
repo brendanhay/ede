@@ -38,9 +38,6 @@ module Text.EDE
     , includeMap
     , includeFile
 
-    -- ** Filters
-    , defaultFilters
-
     -- ** Rendering
     , render
     , renderWith
@@ -132,8 +129,8 @@ import           Data.Version                 (Version)
 import qualified Paths_ede                    as Paths
 import           System.Directory
 import           System.FilePath
-import           Text.EDE.Filters
 import qualified Text.EDE.Internal.Eval       as Eval
+import           Text.EDE.Internal.Filters    (Binding)
 import qualified Text.EDE.Internal.Parser     as Parser
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
@@ -259,7 +256,7 @@ loadFile p = do
 render :: Template -- ^ Parsed 'Template' to render.
        -> Object   -- ^ Bindings to make available in the environment.
        -> Result LText.Text
-render = renderWith defaultFilters
+render = renderWith mempty
 
 -- | Render an 'Object' using the supplied 'Template'.
 renderWith :: HashMap Text Binding -- ^ Filters to make available in the environment.

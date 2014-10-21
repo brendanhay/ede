@@ -31,6 +31,7 @@ import           Data.Text.Format                  (Format)
 import           Data.Text.Format.Params           (Params)
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
+import           Text.EDE.Internal.Filters         (defaultFilters)
 import           Text.EDE.Internal.HOAS
 import           Text.EDE.Internal.Types
 import           Text.Trifecta.Delta
@@ -50,7 +51,7 @@ render :: HashMap Text Exp
        -> Exp
        -> HashMap Text Value
        -> Result Builder
-render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
+render ts fs e o = runReaderT (eval e >>= nf) (Env ts (defaultFilters <> fs) o)
   where
     nf (BVal v) = build (delta e) v
     nf _        = lift $ Failure
