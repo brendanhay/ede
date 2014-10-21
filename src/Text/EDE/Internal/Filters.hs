@@ -17,6 +17,7 @@
 module Text.EDE.Internal.Filters where
 
 import           Data.Aeson              (Value, encode)
+import qualified Data.Char               as Char
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
 import           Data.List               (sort)
@@ -76,6 +77,8 @@ defaultFilters = Map.fromList
     , "toLower"      @: Text.toLower
     , "toOrdinal"    @: (toOrdinal :: Integer -> Text)
 
+    , "dropLower"    @: (Text.dropWhile (not . Char.isUpper))
+    , "dropUpper"    @: (Text.dropWhile (not . Char.isLower))
     , "takeWord"     @: takeWord
     , "dropWord"     @: dropWord
     , "splitWords"   @: splitWords
@@ -86,6 +89,9 @@ defaultFilters = Map.fromList
     , "stripEnd"     @: Text.stripEnd
     , "replace"      @: Text.replace
     , "remove"       @: (\t -> Text.replace t "")
+
+-- truncate
+-- Return a truncated copy of the string. The length is specified with the first parameter which defaults to 255. If the second parameter is true the filter will cut the text at length. Otherwise it will discard the last word. If the text was in fact truncated it will append an ellipsis sign ("..."). If you want a different ellipsis sign than "..." you can specify it using the third parameter.
 
     , "indentLines"  @: indentLines
     , "prependLines" @: prependLines
