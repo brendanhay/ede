@@ -1,3 +1,4 @@
+{-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE ExtendedDefaultRules       #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
@@ -20,36 +21,35 @@
 module Text.EDE.Internal.HOAS where
 
 import           Control.Applicative
-import           Control.Comonad
-import           Control.Comonad.Cofree
 import           Control.Monad
-import           Data.Aeson              hiding (Result(..))
+import           Data.Aeson                   hiding (Result(..))
 import           Data.Bifunctor
-import qualified Data.HashMap.Strict     as Map
-import           Data.List               (sortBy)
-import           Data.Ord                (comparing)
+import qualified Data.HashMap.Strict          as Map
+import           Data.List                    (sortBy)
+import           Data.Ord                     (comparing)
 import           Data.Scientific
-import           Data.Text               (Text)
-import qualified Data.Text               as Text
-import qualified Data.Text.Lazy          as LText
+import           Data.Text                    (Text)
+import qualified Data.Text                    as Text
+import qualified Data.Text.Lazy               as LText
 import           Data.Text.Lazy.Builder
-import qualified Data.Vector             as Vector
+import qualified Data.Vector                  as Vector
 import           Text.EDE.Internal.Types
+import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), (<+>))
 import           Text.Trifecta.Delta
 
 default (Double, Integer)
 
 -- | A HOAS representation of (possibly partially applied) values
 -- in the environment.
-data Binding
+data Term
     = BVal !Value
-    | BLam (Binding -> Result Binding)
+    | BLam !Id (Int -> Term -> Result Term)
 
-instance Show Binding where
+instance Show Term where
     show (BVal v) = show v
     show _        = "<function>"
 
-instance Eq Binding where
+instance Eq Term where
     BVal a == BVal b = a == b
     _      == _      = False
 
@@ -63,128 +63,76 @@ typeOf = \case
     Array  _ -> "Array"
     String _ -> "String"
 
--- | The default type for partially applied 'Binding's in error messages.
+-- | The default type for partially applied 'Term's in error messages.
 typeFun :: String
 typeFun = "Function"
 
--- | Attempt to apply two 'Binding's.
-qapply :: Binding -> Binding -> Result Binding
-qapply a b = case (a, b) of
-    (BLam f, x) -> f x
+-- | Attempt to apply two 'Term'ings.
+qapply :: Delta -> Term -> Term -> Result Term
+qapply d a b = case (a, b) of
+    (BLam k f, x) ->
+        case f 0 x of
+            Failure e -> Failure (pretty d <+> pretty (show k) <+> ": " <+> e)
+            Success y -> return y
     (BVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
         [typeOf x, typeFun, show x]
 
--- | Quote a binary function which takes the most general binding value.
-qpoly2 :: Quote a => (Value -> Value -> a) -> Binding
-qpoly2 = quote
-
--- | Quote an unary numeric function.
-qnum1 :: (Scientific -> Scientific) -> Binding
-qnum1 = quote
-
--- | Quote a binary numeric function.
-qnum2 :: Quote a => (Scientific -> Scientific -> a) -> Binding
-qnum2 = quote
-
--- | Quote a comprehensive set of unary functions to create a binding
--- that supports all collection types.
-qcol1 :: (Quote a, Quote b, Quote c)
-      => (Text   -> a)
-      -> (Object -> b)
-      -> (Array  -> c)
-      -> Binding
-qcol1 f g h = BLam $ \case
-    BVal (String t) -> pure . quote $ f t
-    BVal (Object o) -> pure . quote $ g o
-    BVal (Array  v) -> pure . quote $ h v
-    BVal y          -> err (typeOf y)
-    _               -> err typeFun
-  where
-    err = throwError "expected a String, Object, or Array, but got {}" . (:[])
-
-class Quote a where
-    quote :: a -> Binding
-
-instance Quote Binding where
-    quote = id
-
-instance Quote Value where
-    quote = BVal
-
-instance Quote Text where
-    quote = BVal . String
-
-instance Quote [Text] where
-    quote = BVal . toJSON
-
-instance Quote LText.Text where
-    quote = quote . LText.toStrict
-
-instance Quote Builder where
-    quote = quote . toLazyText
-
-instance Quote Bool where
-    quote = BVal . Bool
-
-instance Quote Int where
-    quote = BVal . Number . fromIntegral
-
-instance Quote Integer where
-    quote = BVal . Number . fromInteger
-
-instance Quote Double where
-    quote = BVal . Number . fromFloatDigits
-
-instance Quote Scientific where
-    quote = BVal . Number
-
-instance Quote Object where
-    quote = BVal . Object
-
-instance Quote Array where
-    quote = BVal . Array
-
 class Unquote a where
-    unquote :: Binding -> Result a
+    unquote :: Id -> Int -> Term -> Result a
 
 instance Unquote Value where
-    unquote = \case
+    unquote k n = \case
         BVal v -> pure v
-        _      -> unexpected typeFun "Literal"
+        _      -> unexpected k n typeFun "Literal"
 
 instance Unquote Text where
-    unquote = unquote >=> \case
+    unquote k n = unquote k n >=> \case
         String t -> pure t
-        v        -> unexpected (typeOf v) "String"
+        v        -> unexpected k n (typeOf v) "String"
 
 instance Unquote LText.Text where
-    unquote = fmap LText.fromStrict . unquote
+    unquote k n = fmap LText.fromStrict . unquote k n
 
 instance Unquote Bool where
-    unquote = unquote >=> \case
+    unquote k n = unquote k n >=> \case
         Bool b -> pure b
-        v      -> unexpected (typeOf v) "Bool"
+        v      -> unexpected k n (typeOf v) "Bool"
 
 instance Unquote Int where
-    unquote = unquote >=>
-        maybe (unexpected "Number" "Int") pure . toBoundedInteger
+    unquote k n = unquote k n >=>
+        maybe (unexpected k n "Number" "Int") pure
+            . toBoundedInteger
 
 instance Unquote Integer where
-    unquote = unquote >=>
-        either (const (unexpected "Number" "Integral")) pure . floatingOrInteger
+    unquote k n = unquote k n >=>
+        either (const (unexpected k n "Number" "Integral")) pure
+            . floatingOrInteger
 
 instance Unquote Double where
-    unquote = fmap toRealFloat . unquote
+    unquote k n = fmap toRealFloat . unquote k n
 
 instance Unquote Scientific where
-    unquote = unquote >=> \case
-        Number n -> pure n
-        v        -> unexpected (typeOf v) "Number"
+    unquote k n = unquote k n >=> \case
+        Number d -> pure d
+        v        -> unexpected k n (typeOf v) "Number"
+
+instance Unquote Object where
+    unquote k n = \case
+        BVal (Object o) -> pure o
+        BVal v          -> unexpected k n (typeOf v) "Object"
+        _               -> unexpected k n typeFun "Object"
+
+instance Unquote Array where
+    unquote k n = \case
+        BVal (Array a) -> pure a
+        BVal v         -> unexpected k n (typeOf v) "Array"
+        _              -> unexpected k n typeFun "Array"
 
 instance Unquote Collection where
-    unquote q = text    <$> unquote q
-            <|> hashMap <$> unquote q
-            <|> vector  <$> unquote q
+    unquote k n q =
+            text    <$> unquote k n q
+        <|> hashMap <$> unquote k n q
+        <|> vector  <$> unquote k n q
       where
         text t = Col (Text.length t)
             . map (\c -> (Nothing, String (Text.singleton c)))
@@ -197,20 +145,35 @@ instance Unquote Collection where
 
         vector v = Col (Vector.length v) (Vector.map (Nothing,) v)
 
-instance Unquote Object where
-    unquote = \case
-        BVal (Object o) -> pure o
-        BVal v          -> unexpected (typeOf v) "Object"
-        _               -> unexpected typeFun "Object"
+unexpected :: Id -> Int -> String -> String -> Result b
+unexpected k n x y = throwError "unable to coerce {}:{}:{} -> {}" [show k, show n, x, y]
 
-instance Unquote Array where
-    unquote = \case
-        BVal (Array a) -> pure a
-        BVal v         -> unexpected (typeOf v) "Array"
-        _              -> unexpected typeFun "Array"
+qprim :: (ToJSON a, Quote a) => a -> Term
+qprim = quote "Value"
+
+class Quote a where
+    quote :: Id -> a -> Term
+
+    default quote :: ToJSON a => Id -> a -> Term
+    quote = const (BVal . toJSON)
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
-    quote f = BLam (fmap (quote . f) . unquote)
+    quote k f = BLam k (\n x -> (quote k . f <$> unquote k (succ n) x))
 
-unexpected :: String -> String -> Result b
-unexpected x y = throwError "unable to coerce {} -> {}" [x, y]
+instance Quote Term where
+    quote = const id
+
+instance Quote Value
+instance Quote Text
+instance Quote [Text]
+instance Quote LText.Text
+instance Quote Bool
+instance Quote Int
+instance Quote Integer
+instance Quote Double
+instance Quote Scientific
+instance Quote Object
+instance Quote Array
+
+instance Quote Builder where
+    quote k = quote k . toLazyText

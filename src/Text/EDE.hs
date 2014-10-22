@@ -130,15 +130,12 @@ import qualified Paths_ede                    as Paths
 import           System.Directory
 import           System.FilePath
 import qualified Text.EDE.Internal.Eval       as Eval
-import           Text.EDE.Internal.HOAS       (Binding)
+import           Text.EDE.Internal.HOAS       (Term)
 import qualified Text.EDE.Internal.Parser     as Parser
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
-
--- FIXME: paramterised filters .. var | indent(2) | join(key) | sort
--- also need to consider errors for missing parameters.
 
 -- FIXME: detect include/import loops
 -- FIXME: {%- tags to deliberately strip/trim whitespace
@@ -147,6 +144,10 @@ import           Text.Trifecta.Delta
 -- FIXME: add benchmarks
 -- FIXME: add capture
 -- FIXME: numerous 'try' calls were added during development, these should now be reduced.
+-- FIXME: add pretty printer formatted error messages to the evaluator
+
+-- FIXME: would like to use PHOAS in-place of Term if it can be annotated
+-- in a similar fashion such as comonad/cofree.
 
 -- | ED-E Version.
 version :: Version
@@ -224,8 +225,8 @@ parseWith o f n = result failure resolve . Parser.runParser o n
 -- key into the supplied 'HashMap'.
 -- If the 'identifier' doesn't exist in the 'HashMap', an 'Error' is returned.
 includeMap :: Monad m
-           => HashMap Text Template -- ^ A 'HashMap' of named 'Template's.
-           -> Resolver m            -- ^ Resolver for 'parseWith'.
+           => HashMap Id Template -- ^ A 'HashMap' of named 'Template's.
+           -> Resolver m          -- ^ Resolver for 'parseWith'.
 includeMap ts _ k _
     | Just v <- Map.lookup k ts = success v
     | otherwise = failure ("unable to resolve " <> string (Text.unpack k))
@@ -259,9 +260,9 @@ render :: Template -- ^ Parsed 'Template' to render.
 render = renderWith mempty
 
 -- | Render an 'Object' using the supplied 'Template'.
-renderWith :: HashMap Text Binding -- ^ Filters to make available in the environment.
-           -> Template             -- ^ Parsed 'Template' to render.
-           -> Object               -- ^ Bindings to make available in the environment.
+renderWith :: HashMap Id Term -- ^ Filters to make available in the environment.
+           -> Template        -- ^ Parsed 'Template' to render.
+           -> Object          -- ^ Bindings to make available in the environment.
            -> Result LText.Text
 renderWith fs (Template _ u ts) = fmap toLazyText . Eval.render ts fs u
 
@@ -289,7 +290,7 @@ eitherRender :: Template
 eitherRender t = eitherResult . render t
 
 -- | /See:/ 'renderWith'
-eitherRenderWith :: HashMap Text Binding
+eitherRenderWith :: HashMap Id Term
                  -> Template
                  -> Object
                  -> Either String LText.Text

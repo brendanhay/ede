@@ -39,13 +39,14 @@ module Text.EDE.Filters
     -- $polymorphic
 
     -- * Constructing filters
-      Binding (..)
+      Term    (..)
 
     -- ** Classes
     , Quote   (..)
     , Unquote (..)
 
     -- ** Restricted quoters
+    , (@:)
     , qapply
     , qpoly2
     , qnum1
@@ -58,6 +59,7 @@ module Text.EDE.Filters
     ) where
 
 import Text.EDE.Internal.HOAS
+import Text.EDE.Internal.Filters
 
 -- $prelude
 --

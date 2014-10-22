@@ -28,10 +28,12 @@ import           Data.Aeson.Types             hiding (Result(..))
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty(..))
+import qualified Data.List.NonEmpty           as NonEmpty
 import           Data.Maybe
 import           Data.Monoid                  hiding ((<>))
 import           Data.Semigroup
 import           Data.Text                    (Text)
+import qualified Data.Text                    as Text
 import           Data.Text.Format             (Format, format)
 import           Data.Text.Format.Params      (Params)
 import qualified Data.Text.Lazy               as LText
@@ -112,7 +114,7 @@ data Syntax = Syntax
 makeClassy ''Syntax
 
 -- | A function to resolve the target of an @include@ expression.
-type Resolver m = Syntax -> Text -> Delta -> m (Result Template)
+type Resolver m = Syntax -> Id -> Delta -> m (Result Template)
 
 instance Applicative m => Semigroup (Resolver m) where
     (f <> g) o k d = liftA2 (<|>) (f o k d) (g o k d) -- Haha!
@@ -121,14 +123,17 @@ instance Applicative m => Semigroup (Resolver m) where
 -- | A parsed and compiled template.
 data Template = Template
     { _tmplName :: !Text
-    , _tmplExp  :: !(Cofree Exp Delta)
-    , _tmplIncl :: HashMap Text (Cofree Exp Delta)
+    , _tmplExp  :: !(Exp Delta)
+    , _tmplIncl :: HashMap Id (Exp Delta)
     } deriving (Eq)
 
 type Id = Text
 
 newtype Var = Var (NonEmpty Id)
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show Var where
+    show (Var is) = Text.unpack . Text.intercalate "." $ NonEmpty.toList is
 
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
@@ -141,7 +146,7 @@ data Pat
 
 type Alt a = (Pat, a)
 
-data Exp a
+data ExpF a
     = ELit  !Value
     | EVar  !Var
     | EFun  !Id
@@ -152,9 +157,9 @@ data Exp a
     | EIncl !Text
       deriving (Eq, Show, Functor)
 
-type AExp = Cofree Exp
+type Exp = Cofree ExpF
 
-instance HasDelta (AExp Delta) where
+instance HasDelta (Exp Delta) where
     delta = extract
 
 newtype Mu f = Mu (f (Mu f))
@@ -164,49 +169,49 @@ cofree x = go
   where
     go (Mu f) = x :< fmap go f
 
-forget :: Functor f => Cofree f a -> Mu f
-forget = Mu . fmap forget . unwrap
+-- forget :: Functor f => Cofree f a -> Mu f
+-- forget = Mu . fmap forget . unwrap
 
 var :: Id -> Var
 var = Var . (:| [])
 
-eapp :: a -> [AExp a] -> AExp a
+eapp :: a -> [Exp a] -> Exp a
 eapp x []     = cofree x blank
 eapp _ [e]    = e
 eapp _ (e:es) = foldl' (\x y -> extract x :< EApp x y) e es
 
-efun :: Id -> AExp a -> AExp a
+efun :: Id -> Exp a -> Exp a
 efun i e = let x = extract e in x :< EApp (x :< EFun i) e
 
-efilter :: AExp a -> (Id, [AExp a]) -> AExp a
+efilter :: Exp a -> (Id, [Exp a]) -> Exp a
 efilter e (i, ps) = let x = extract e in eapp x ((x :< EFun i) : e : ps)
 
-elet :: Maybe (Id, AExp a) -> AExp a -> AExp a
+elet :: Maybe (Id, Exp a) -> Exp a -> Exp a
 elet m e = maybe e (\(i, b) -> extract b :< ELet i b e) m
 
-ecase :: AExp a
-      -> [Alt (AExp a)]
-      -> Maybe (AExp a)
-      -> AExp a
+ecase :: Exp a
+      -> [Alt (Exp a)]
+      -> Maybe (Exp a)
+      -> Exp a
 ecase p ws f = extract p :< ECase p (ws ++ maybe [] ((:[]) . wild) f)
 
-eif :: (AExp a, AExp a)
-    -> [(AExp a, AExp a)]
-    -> Maybe (AExp a)
-    -> AExp a
+eif :: (Exp a, Exp a)
+    -> [(Exp a, Exp a)]
+    -> Maybe (Exp a)
+    -> Exp a
 eif t ts f = foldr' c (fromMaybe (extract (fst t) `cofree` blank) f) (t:ts)
   where
     c (p, w) e = extract p :< ECase p [true w, false e]
 
-eempty :: AExp a -> AExp a -> Maybe (AExp a) -> AExp a
+eempty :: Exp a -> Exp a -> Maybe (Exp a) -> Exp a
 eempty v e = maybe e (eif (efun "!" (efun "empty" v), e) [] . Just)
 
-true, false, wild :: AExp a -> Alt (AExp a)
+true, false, wild :: Exp a -> Alt (Exp a)
 true  = (PLit (Bool True),)
 false = (PLit (Bool False),)
 wild  = (PWild,)
 
-blank :: Mu Exp
+blank :: Mu ExpF
 blank = Mu (ELit (String mempty))
 
 -- | Unwrap a 'Value' to an 'Object' safely.
