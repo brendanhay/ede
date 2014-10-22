@@ -26,7 +26,6 @@ import           Data.List.NonEmpty                (NonEmpty(..))
 import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Monoid
 import           Data.Scientific                   (base10Exponent)
-import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
 import           Data.Text.Format                  (Format)
