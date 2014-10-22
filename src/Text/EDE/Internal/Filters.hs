@@ -44,28 +44,28 @@ defaultFilters = Map.fromList
     , "||"             @: (||)
 
     -- equality
-    , "=="           `qpoly2` (==)
-    , "!="           `qpoly2` (/=)
+    , "=="            `qpoly2` (==)
+    , "!="            `qpoly2` (/=)
 
     -- relational
-    , ">"            `qnum2` (>)
-    , ">="           `qnum2` (>=)
-    , "<="           `qnum2` (<=)
-    , "<"            `qnum2` (<)
+    , ">"             `qnum2` (>)
+    , ">="            `qnum2` (>=)
+    , "<="            `qnum2` (<=)
+    , "<"             `qnum2` (<)
 
     -- numeric
-    , "+"            `qnum2` (+)
-    , "-"            `qnum2` (-)
-    , "*"            `qnum2` (*)
-    , "abs"          `qnum1` abs
-    , "signum"       `qnum1` signum
-    , "negate"       `qnum1` negate
+    , "+"             `qnum2` (+)
+    , "-"             `qnum2` (-)
+    , "*"             `qnum2` (*)
+    , "abs"           `qnum1` abs
+    , "signum"        `qnum1` signum
+    , "negate"        `qnum1` negate
 
     -- fractional
-    , "truncate"     `qnum1` (fromIntegral . truncate)
-    , "round"        `qnum1` (fromIntegral . round)
-    , "ceiling"      `qnum1` (fromIntegral . ceiling)
-    , "floor"        `qnum1` (fromIntegral . floor)
+    , "truncate"      `qnum1` (fromIntegral . truncate)
+    , "round"         `qnum1` (fromIntegral . round)
+    , "ceiling"       `qnum1` (fromIntegral . ceiling)
+    , "floor"         `qnum1` (fromIntegral . floor)
 
     -- text
     , "lowerHead"      @: lowerHead
