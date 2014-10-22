@@ -1,9 +1,3 @@
-{-# LANGUAGE ExtendedDefaultRules       #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE OverloadedStrings          #-}
-
-{-# OPTIONS_GHC -fno-warn-type-defaults #-}
-
 -- Module      : Text.EDE.Filters
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -14,17 +8,11 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
--- | A default set of prelude-like filters and the means to construct your own.
---
--- Please be aware that some of the 'defaultFilters' are assumed to be present
--- (for example during loop unrolling and assignment of else branches via 'empty').
---
--- It's recommended you supplement the default filters rather than replacing them
--- completely. (But hey, it's your call!)
+-- | The means to construct your own filters.
 module Text.EDE.Filters
     (
     -- * Prelude
-      defaultFilters
+    -- $prelude
 
     -- ** Boolean
     -- $boolean
@@ -51,13 +39,14 @@ module Text.EDE.Filters
     -- $polymorphic
 
     -- * Constructing filters
-    , Binding (..)
+      Term    (..)
 
     -- ** Classes
     , Quote   (..)
     , Unquote (..)
 
     -- ** Restricted quoters
+    , (@:)
     , qapply
     , qpoly2
     , qnum1
@@ -69,31 +58,16 @@ module Text.EDE.Filters
     , typeOf
     ) where
 
-import           Data.Aeson              (Value, encode)
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as Map
-import           Data.Scientific         (Scientific)
-import           Data.Text               (Text)
-import qualified Data.Text               as Text
-import qualified Data.Text.Lazy          as LText
-import qualified Data.Text.Lazy.Encoding as LText
-import           Data.Text.Manipulate
-import qualified Data.Vector             as Vector
-import           Text.EDE.Internal.HOAS
+import Text.EDE.Internal.HOAS
+import Text.EDE.Internal.Filters
 
-default (Integer)
-
-defaultFilters :: HashMap Text Binding
-defaultFilters = Map.unions
-    [ boolean
-    , equality
-    , relational
-    , numeric
-    , fractional
-    , textual
-    , collection
-    , polymorphic
-    ]
+-- $prelude
+--
+-- The default filters available to a template are documented by the subsequent categories.
+--
+-- These filters cannot be overriden and attempting to supply your own filters to
+-- 'Text.EDE.renderWith' will cause the similarly named filters to disappear when
+-- they are merged with the prelude during evaluation. (/See:/ 'Data.HashMap.Strict.union')
 
 -- $boolean
 --
@@ -103,24 +77,11 @@ defaultFilters = Map.unions
 --
 -- * '||' @:: Bool -> Bool -> Bool@
 
-boolean :: HashMap Text Binding
-boolean = Map.fromList
-    [ "!"  @: quote not
-    , "&&" @: quote (&&)
-    , "||" @: quote (||)
-    ]
-
 -- $equality
 --
 -- * '==' @:: a -> a -> Bool@
 --
 -- * @!=@ @:: a -> a -> Bool@ (/See/: '/=')
-
-equality :: HashMap Text Binding
-equality = Map.fromList
-    [ "==" @: qpoly2 (==)
-    , "!=" @: qpoly2 (/=)
-    ]
 
 -- $relational
 --
@@ -131,14 +92,6 @@ equality = Map.fromList
 -- * '<=' @:: a -> a -> Bool@
 --
 -- * '<=' @:: a -> a -> Bool@
-
-relational :: HashMap Text Binding
-relational = Map.fromList
-    [ ">"  @: qnum2 (>)
-    , ">=" @: qnum2 (>=)
-    , "<=" @: qnum2 (<=)
-    , "<"  @: qnum2 (<)
-    ]
 
 -- $numeric
 --
@@ -154,16 +107,6 @@ relational = Map.fromList
 --
 -- * 'negate' @:: Number -> Number@
 
-numeric :: HashMap Text Binding
-numeric = Map.fromList
-    [ "+"      @: qnum2 (+)
-    , "-"      @: qnum2 (-)
-    , "*"      @: qnum2 (*)
-    , "abs"    @: qnum1 abs
-    , "signum" @: qnum1 signum
-    , "negate" @: qnum1 negate
-    ]
-
 -- $fractional
 --
 -- * 'truncate' @:: Number -> Number@
@@ -174,85 +117,40 @@ numeric = Map.fromList
 --
 -- * 'floor'    @:: Number -> Number@
 
-fractional :: HashMap Text Binding
-fractional = Map.fromList
-    [ "truncate" @: qnum1 (fromIntegral . truncate)
-    , "round"    @: qnum1 (fromIntegral . round)
-    , "ceiling"  @: qnum1 (fromIntegral . ceiling)
-    , "floor"    @: qnum1 (fromIntegral . floor)
-    ]
-
 -- $textual
 --
--- * @takeWord@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.takeWord'  @:: Text -> Text@
 --
--- * @dropWord@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.dropWord'  @:: Text -> Text@
 --
--- * @lowerHead@ @:: Text -> Text@
+-- * 'Data.Text.Manipulate.lowerHead' @:: Text -> Text@
 --
--- * @upperHead@ @:: Text -> Text@
+-- * 'Data.Text.Manipulate.upperHead' @:: Text -> Text@
 --
--- * @toTitle@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toTitle'   @:: Text -> Text@
 --
--- * @toCamel@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toCamel'   @:: Text -> Text@
 --
--- * @toPascal@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toPascal'  @:: Text -> Text@
 --
--- * @toSnake@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toSnake'   @:: Text -> Text@
 --
--- * @toSpinal@  @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toSpinal'  @:: Text -> Text@
 --
--- * @toTrain@   @:: Text -> Text@
+-- * 'Data.Text.Manipulate.toTrain'   @:: Text -> Text@
 --
--- * @toLower@   @:: Text -> Text@
+-- * 'Data.Text.toLower'              @:: Text -> Text@
 --
--- * @toUpper@   @:: Text -> Text@
+-- * 'Data.Text.toUpper'              @:: Text -> Text@
 --
--- * @toOrdinal@ @:: Number -> Text@
---
--- /See:/ <http://hackage.haskell.org/package/text-manipulate text-manipulate>
-
-textual :: HashMap Text Binding
-textual = Map.fromList
-    [ "takeWord"  @: quote takeWord
-    , "dropWord"  @: quote dropWord
-    , "lowerHead" @: quote lowerHead
-    , "upperHead" @: quote upperHead
-    , "toTitle"   @: quote toTitle
-    , "toCamel"   @: quote toCamel
-    , "toPascal"  @: quote toPascal
-    , "toSnake"   @: quote toSnake
-    , "toSpinal"  @: quote toSpinal
-    , "toTrain"   @: quote toTrain
-    , "toUpper"   @: quote Text.toUpper
-    , "toLower"   @: quote Text.toLower
-    , "toOrdinal" @: (toOrdinal . truncate :: Scientific -> Text)
-    ]
+-- * 'Data.Text.Manipulate.toOrdinal' @:: Number -> Text@
 
 -- $collection
 --
--- * @length@ @:: Collection -> Number@ (/See/: 'Data.Text.length', 'Data.Vector.length', 'Data.HashMap.Strict.size')
+-- * @length@ @:: Collection -> Number@ (/See/: Text.'Data.Text.length', Vector.'Data.Vector.length', HashMap.'Data.HashMap.Strict.size')
 --
--- * @empty@  @:: Collection -> Bool@ (/See/: 'Data.Text.null', 'Data.Vector.null', 'Data.HashMap.Strict.null')
-
-collection :: HashMap Text Binding
-collection = Map.fromList
-    [ "length" @: qcol1 Text.length Map.size Vector.length
-    , "empty"  @: qcol1 Text.null   Map.null Vector.null
-    -- , ("join",  quote
-    ]
+-- * @empty@  @:: Collection -> Bool@ (/See/: Text:'Data.Text.null', Vector.'Data.Vector.null', HashMap.'Data.HashMap.Strict.null')
 
 -- $polymorphic
 --
 -- * 'show' @:: a -> Text@
-
-polymorphic :: HashMap Text Binding
-polymorphic = Map.fromList
-    [ "show" @: quote value
-    ]
-
-(@:) :: Quote a => Text -> a -> (Text, Binding)
-k @: q = (k, quote q)
-
-value :: Value -> LText.Text
-value = LText.decodeUtf8 . encode

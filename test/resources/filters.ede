@@ -1,47 +1,103 @@
 {
-  "text": "Lorem Ipsum",
+  "single": "Lorem ipsum-Phrase",
+  "whitespace": "  A Word  ",
+  "multi": "Navzdory všeobecnému\npřesvědčení\nLorem Ipsum není\nnáhodný text.",
   "bool": true,
   "number": 1.0,
-  "list": ["a", "b", "c", "d", "e"],
-  "object": {"key": "value"}
+  "alpha": ["a", "b", "c", "d", "e"],
+  "numeric": [1, 2, 3, 4, 5],
+  "object": {"foo": "x", "bar": "y"}
 }
 ---
-Bool:
+Boolean Operands:
 {{ !bool }}
 {{ !false }}
+{{ bool && false }}
+{{ true && bool }}
+{{ bool || false }}
+{{ false || bool }}
 
 Eq:
-
 Ord:
-
 Num:
-
 RealFrac:
 
-Text:
-{{ text | toLower }}
-{{ text | toUpper }}
-{{ text | lowerHead }}
-{{ text | toLower | upperHead }}
-{% if text | toLower == "lorem ipsum" %}
-text | lower == "lorem ipsum"
+Text Casing:
+{{ single | lowerHead }}
+{{ single | upperHead }}
+{{ single | toLower }}
+{{ single | toUpper }}
+{{ single | toTitle }}
+{{ single | toCamel }}
+{{ single | toPascal }}
+{{ single | toSnake }}
+{{ single | toSpinal }}
+{{ single | toTrain }}
+{{ number | toOrdinal }}
+{{ single | toLower | upperHead }}
+{% if (single | toLower) == "lorem ipsum" %}
+single | lower == "lorem ipsum"
 {% endif %}
 
-Sequences:
+Text Substitution:
+{{ single | takeWord }}
+{{ single | dropWord }}
+{{ single | dropUpper }}
+{{ single | toCamel| dropLower }}
+{{ single | stripPrefix("Lorem ") }}
+{{ single | stripSuffix("Phrase") }}
+{{ single | stripStart }}
+{{ single | stripEnd }}
+{{ single | replace("ipsum-", "Hi! ") }}
+{{ single | remove("Phrase") }}
+
+Text Indentation:
+{{ multi | indentLines(5) }}
+{{ multi | prependLines("...") }}
+{{ single | justifyLeft(2, "<-") }}
+{{ single | justifyRight(2, "<-") }}
+{{ single | center(6, "-") }}
+
+Sequence Length:
 {{ "" | length }}
 {{ "123" | length }}
 {{ list | length }}
 {{ object | length }}
 {{ "" | empty }}
 {{ "supercalifragilistic" | empty }}
-{{ list | empty }}
+{{ alpha | empty }}
+{{ numeric | empty }}
 {{ object | empty }}
 
-Collections:
+Sequence Subdivision:
+{{ object | head | show }}
+{{ numeric | init | show }}
+{{ alpha | tail | show }}
+{{ alpha | last }}
+{{ single | splitWords | last }}
 
-Poly:
-{{ text | show }}
+Sequence Sorting:
+{{ single | reverse }}
+{# {{ single | sort | show }} #}
+{# {{ alpha | reverse | sort | show }} #}
+{# {{ object | sort | show }} #}
+
+Sequence Transformations:
+{# {{ alpha | zip(numeric) }} #}
+{# [{{ alpha | join(", ") }}] #}
+{# ({{ numeric | map(toOrdinal) | join(", ") }}) #}
+{# {{ numeric | map(toOrdinal) }} #}
+{# {{ numeric | filter(>= 3) }} #}
+
+Polymorphic Show:
+{{ single | show }}
 {{ bool | show }}
 {{ number | show }}
-{{ list | show }}
+{{ alpha | show }}
+{{ numeric | show }}
 {{ object | show }}
+
+Polymorphic Existence:
+{# {{ single | defined }} #}
+{# {{ nonexistent | defined }} #}
+{# {{ nonexistent | default(true) }} #}

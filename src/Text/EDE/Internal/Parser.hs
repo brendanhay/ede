@@ -22,7 +22,9 @@
 module Text.EDE.Internal.Parser where
 
 import           Control.Applicative
-import           Control.Lens               hiding (both, noneOf)
+import           Control.Comonad            (extract)
+import           Control.Comonad.Cofree
+import           Control.Lens               hiding (both, noneOf, op)
 import           Control.Monad.State.Strict
 import           Data.Aeson.Types           (Array, Object, Value(..))
 import           Data.Bifunctor
@@ -99,7 +101,7 @@ instance Errable (StateT Env EDE) where
 runParser :: Syntax
           -> Text
           -> ByteString
-          -> Result (Exp, HashMap Text (NonEmpty Delta))
+          -> Result (Exp Delta, HashMap Text (NonEmpty Delta))
 runParser o n = res . parseByteString (runEDE run) pos
   where
     run = runStateT (pragma *> document <* eof) (Env o mempty)
@@ -122,14 +124,14 @@ pragma = void . many $ do
          <|> pragmak "comment" *> pure delimComment
          <|> pragmak "block"   *> pure delimBlock
 
-document :: Parser m => m Exp
+document :: Parser m => m (Exp Delta)
 document = eapp <$> position <*> many (statement <|> inline <|> fragment)
 
-inline :: Parser m => m Exp
+inline :: Parser m => m (Exp Delta)
 inline = between inlinel inliner term
 
-fragment :: Parser m => m Exp
-fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1)
+fragment :: Parser m => m (Exp Delta)
+fragment = ann (ELit <$> pack (notFollowedBy end0 >> try line0 <|> line1))
   where
     line0 = manyTill1 (noneOf "\n") (try (lookAhead end0) <|> eof)
     line1 = manyEndBy1 anyChar newline
@@ -137,7 +139,7 @@ fragment = ELit <$> position <*> pack (notFollowedBy end0 >> try line0 <|> line1
     end0 = void (inlinel <|> blockl <|> try end1)
     end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockr))
 
-statement :: Parser m => m Exp
+statement :: Parser m => m (Exp Delta)
 statement = choice
     [ ifelif
     , cases
@@ -157,7 +159,7 @@ multiLine s = between (try (triml blockl *> s)) (trimr blockr)
 singleLine :: Parser m => m b -> m a -> m a
 singleLine s = between (try (blockl *> s)) blockr
 
-ifelif :: Parser m => m Exp
+ifelif :: Parser m => m (Exp Delta)
 ifelif = eif
     <$> branch "if"
     <*> many (branch "elif")
@@ -166,7 +168,7 @@ ifelif = eif
   where
     branch k = (,) <$> block k term <*> document
 
-cases :: Parser m => m Exp
+cases :: Parser m => m (Exp Delta)
 cases = ecase
     <$> block "case" term
     <*> many
@@ -175,69 +177,65 @@ cases = ecase
     <*> else'
     <*  exit "endcase"
 
-loop :: Parser m => m Exp
+loop :: Parser m => m (Exp Delta)
 loop = do
-    d      <- position
     (i, v) <- block "for"
         ((,) <$> identifier
              <*> (keyword "in" *> collection))
-    eempty d v
-        <$> (ELoop d i v <$> document)
-        <*> else'
+    d      <- document
+    eempty v (extract v :< ELoop i v d)
+        <$> else'
         <*  exit "endfor"
 
-include :: Parser m => m Exp
-include = do
+include :: Parser m => m (Exp Delta)
+include = block "include" $ do
     d <- position
-    block "include" (incl d)
+    k <- stringLiteral
+    includes %= Map.insertWith (<>) k (d:|[])
+    elet <$> scope <*> pure (d :< EIncl k)
   where
-    incl d = do
-        k <- stringLiteral
-        includes %= Map.insertWith (<>) k (d:|[])
-        elet d (EIncl d k) <$> scope
-
     scope = optional $
         (,) <$> (keyword "with" *> identifier)
             <*> (symbol  "="    *> term)
 
-binding :: Parser m => m Exp
-binding = do
-    d <- position
-    uncurry (ELet d)
-        <$> block "let"
-            ((,) <$> identifier
-                 <*> (symbol "=" *> term))
-        <*> document
-        <*  exit "endlet"
+binding :: Parser m => m (Exp Delta)
+binding = elet . Just
+    <$> block "let"
+        ((,) <$> identifier
+             <*> (symbol "=" *> term))
+    <*> document
+    <*  exit "endlet"
 
-raw :: Parser m => m Exp
-raw = ELit
-   <$> position
-   <*> (start *> pack (manyTill anyChar (lookAhead end)) <* end)
+raw :: Parser m => m (Exp Delta)
+raw = ann (ELit <$> body)
   where
+    body  = start *> pack (manyTill anyChar (lookAhead end)) <* end
     start = block "raw" (pure ())
     end   = exit "endraw"
 
 -- FIXME: this is due to the whitespace sensitive nature of the parser making
 -- it difficult to do what most applicative parsers do by skipping comments
 -- as part of the whitespace.
-comment :: Parser m => m Exp
-comment = ELit
-    <$> position
-    <*> pure (String mempty)
-    <*  (try (triml (trimr go)) <|> go)
+comment :: Parser m => m (Exp Delta)
+comment = ann (ELit <$> pure (String mempty) <* (try (triml (trimr go)) <|> go))
   where
     go = (commentStyle <$> commentl <*> commentr) >>=
         buildSomeSpaceParser (fail "whitespace significant")
 
-else' :: Parser m => m (Maybe Exp)
+else' :: Parser m => m (Maybe (Exp Delta))
 else' = optional (block "else" (pure ()) *> document)
 
 exit :: Parser m => String -> m ()
 exit k = block k (pure ())
 
-term :: Parser m => m Exp
-term = buildExpressionParser table expr
+pattern :: Parser m => m Pat
+pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
+
+term :: Parser m => m (Exp Delta)
+term = chainl1' term0 (try filter') (symbol "|" *> pure efilter) <|> term0
+
+term0 :: Parser m => m (Exp Delta)
+term0 = buildExpressionParser table expr
   where
     table =
         [ [prefix "!"]
@@ -246,29 +244,24 @@ term = buildExpressionParser table expr
         , [infix' "==", infix' "!=", infix' ">", infix' ">=", infix' "<", infix' "<="]
         , [infix' "&&"]
         , [infix' "||"]
-        , [filter' "|"]
         ]
 
-    prefix n = Prefix (efun <$> operator n <*> pure n)
+    prefix n = Prefix (efun <$ operator n <*> pure n)
 
     infix' n = Infix (do
         d <- operator n
         return $ \l r ->
-            EApp d (efun d n l) r) AssocLeft
+            d :< EApp (efun n l) r) AssocLeft
 
-    filter' n = Infix (do
-        d <- operator n
-        i <- try (lookAhead identifier)
-        return $ \l _ ->
-            efun d i l) AssocLeft
+    expr = parens term
+       <|> ann (EVar <$> variable)
+       <|> ann (ELit <$> literal)
 
-    expr = parens term <|> apply EVar variable <|> apply ELit literal
+filter' :: Parser m => m (Id, [Exp Delta])
+filter' = (,) <$> identifier <*> (parens (commaSep1 term) <|> pure [])
 
-pattern :: Parser m => m Pat
-pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
-
-collection :: Parser m => m Exp
-collection = EVar <$> position <*> variable <|> ELit <$> position <*> col
+collection :: Parser m => m (Exp Delta)
+collection = ann (EVar <$> variable <|> ELit <$> col)
   where
     col = Object <$> object
       <|> Array  <$> array
@@ -303,17 +296,14 @@ operator n = position <* reserveText operatorStyle n
 keyword :: Parser m => String -> m Delta
 keyword k = position <* try (reserve keywordStyle k)
 
-variable :: Parser m => m Var
+variable :: (Monad m, TokenParsing m) => m Var
 variable = Var <$> (NonEmpty.fromList <$> sepBy1 identifier (char '.'))
 
-identifier :: Parser m => m Id
+identifier :: (Monad m, TokenParsing m) => m Id
 identifier = ident variableStyle
 
-spaces :: Parser m => m ()
+spaces :: (Monad m, TokenParsing m) => m ()
 spaces = skipMany (oneOf "\t ")
-
-apply :: Parser m => (Delta -> a -> b) -> m a -> m b
-apply f p = f <$> position <*> p
 
 manyTill1 :: Alternative m => m a -> m b -> m [a]
 manyTill1 p end = (:) <$> p <*> manyTill p end
@@ -322,6 +312,15 @@ manyEndBy1 :: Alternative m => m a -> m a -> m [a]
 manyEndBy1 p end = go
   where
     go = (:[]) <$> end <|> (:) <$> p <*> go
+
+chainl1' :: Alternative m => m a -> m b -> m (a -> b -> a) -> m a
+chainl1' l r op = scan
+  where
+    scan = flip id <$> l <*> rst
+    rst  = (\f y g x -> g (f x y)) <$> op <*> r <*> rst <|> pure id
+
+ann :: (DeltaParsing m, Functor f) => m (f (Mu f)) -> m (Cofree f Delta)
+ann p = cofree <$> position <*> (Mu <$> p)
 
 pack :: Functor f => f String -> f Value
 pack = fmap (String . Text.pack)

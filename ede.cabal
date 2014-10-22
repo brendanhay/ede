@@ -57,6 +57,7 @@ library
 
     other-modules:
         Text.EDE.Internal.Eval
+      , Text.EDE.Internal.Filters
       , Text.EDE.Internal.HOAS
       , Text.EDE.Internal.Parser
       , Text.EDE.Internal.Syntax
@@ -72,11 +73,14 @@ library
       , base                 >= 4.6   && < 5
       , bifunctors           >= 4
       , bytestring           >= 0.9
+      , comonad
       , directory            >= 1.2
       , filepath             >= 1.2
+      , free
       , lens                 >= 4.0
       , mtl                  >= 2.2
       , parsers              >= 0.12.1.1
+      , profunctors
       , scientific           >= 0.3.1
       , semigroups           >= 0.15
       , text                 >= 1.2   && < 1.3
