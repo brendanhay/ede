@@ -87,11 +87,20 @@ eval (d :< ECase p ws) = go ws
 
     cond e as y@(TVal Bool{}) = do
         x <- predicate p
-        if x == y then eval e else go as
+        if x `eq` y
+            then eval e
+            else go as
+
     cond e as y@TVal{} = do
         x <- eval p
-        if x == y then eval e else go as
+        if x `eq` y
+            then eval e
+            else go as
+
     cond _ as _  = go as
+
+    eq (TVal a) (TVal b) = a == b
+    eq _        _        = False
 
 eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
   where

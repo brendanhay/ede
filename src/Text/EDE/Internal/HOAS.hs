@@ -26,6 +26,7 @@ import           Data.Aeson                   hiding (Result(..))
 import           Data.Bifunctor
 import qualified Data.HashMap.Strict          as Map
 import           Data.List                    (sortBy)
+import           Data.Monoid
 import           Data.Ord                     (comparing)
 import           Data.Scientific
 import           Data.Text                    (Text)
@@ -49,9 +50,9 @@ instance Show Term where
     show (TVal v)   = show v
     show (TLam k _) = Text.unpack ("<function:" <> k <> ">")
 
-instance Eq Term where
-    TVal a == TVal b = a == b
-    _      == _      = False
+-- instance Eq Term where
+--     TVal a == TVal b = a == b
+--     _      == _      = False
 
 -- | Retrieve a consistent type from a 'Value' to use in error messages.
 typeOf :: Value -> String
@@ -67,7 +68,7 @@ typeOf = \case
 typeFun :: String
 typeFun = "Function"
 
--- | Attempt to apply two 'Term'ings.
+-- | Fully apply two 'Term's.
 qapply :: Delta -> Term -> Term -> Result Term
 qapply d a b = case (a, b) of
     (TLam k f, x) ->
