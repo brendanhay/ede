@@ -147,12 +147,12 @@ qcol1 :: (Quote a, Quote b, Quote c)
       -> (Object -> b)
       -> (Array  -> c)
       -> (Id, Term)
-qcol1 k f g h = (k,) . BLam k $ \n x ->
+qcol1 k f g h = (k,) . TLam k $ \n x ->
     case x of
-        BVal (String t) -> pure . quote k $ f t
-        BVal (Object o) -> pure . quote k $ g o
-        BVal (Array  v) -> pure . quote k $ h v
-        BVal y          -> err (typeOf y)
+        TVal (String t) -> pure . quote k $ f t
+        TVal (Object o) -> pure . quote k $ g o
+        TVal (Array  v) -> pure . quote k $ h v
+        TVal y          -> err (typeOf y)
         _               -> err typeFun
   where
     err = throwError "expected a String, Object, or Array, but got {}" . (:[])

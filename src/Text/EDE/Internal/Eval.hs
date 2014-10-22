@@ -53,7 +53,7 @@ render :: HashMap Id (Exp Delta)
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts (defaultFilters <> fs) o)
   where
-    nf (BVal v) = build (delta e) v
+    nf (TVal v) = build (delta e) v
     nf _        = lift $ Failure
         "unable to evaluate partially applied template to normal form."
 
@@ -86,10 +86,10 @@ eval (d :< ECase p ws) = go ws
             PVar v -> eval (d :< EVar v) >>= cond e as
             PLit l -> eval (d :< ELit l) >>= cond e as
 
-    cond e as y@(BVal Bool{}) = do
+    cond e as y@(TVal Bool{}) = do
         x <- predicate p
         if x == y then eval e else go as
-    cond e as y@BVal{} = do
+    cond e as y@TVal{} = do
         x <- eval p
         if x == y then eval e else go as
     cond _ as _  = go as
@@ -162,9 +162,9 @@ predicate x = do
     r <- runReaderT (eval x) <$> ask
     lift $ case r of
         Success q
-            | BVal Bool{} <- q -> Success q
+            | TVal Bool{} <- q -> Success q
         Success q
-            | BVal Null   <- q -> Success (qprim False)
+            | TVal Null   <- q -> Success (qprim False)
         Success _              -> Success (qprim True)
         Failure _
             | _ :< EVar{} <- x -> Success (qprim False)
@@ -173,7 +173,7 @@ predicate x = do
 binding :: Delta -> Term -> Term -> Context Term
 binding d x y =
     case (x, y) of
-        (BVal l, BVal r) -> quote "<>" <$> liftM2 (<>) (build d l) (build d r)
+        (TVal l, TVal r) -> quote "<>" <$> liftM2 (<>) (build d l) (build d r)
         _                -> lift (qapply d x y)
 
 build :: Delta -> Value -> Context Builder

@@ -42,15 +42,15 @@ default (Double, Integer)
 -- | A HOAS representation of (possibly partially applied) values
 -- in the environment.
 data Term
-    = BVal !Value
-    | BLam !Id (Int -> Term -> Result Term)
+    = TVal !Value
+    | TLam !Id (Int -> Term -> Result Term)
 
 instance Show Term where
-    show (BVal v) = show v
+    show (TVal v) = show v
     show _        = "<function>"
 
 instance Eq Term where
-    BVal a == BVal b = a == b
+    TVal a == TVal b = a == b
     _      == _      = False
 
 -- | Retrieve a consistent type from a 'Value' to use in error messages.
@@ -70,11 +70,11 @@ typeFun = "Function"
 -- | Attempt to apply two 'Term'ings.
 qapply :: Delta -> Term -> Term -> Result Term
 qapply d a b = case (a, b) of
-    (BLam k f, x) ->
+    (TLam k f, x) ->
         case f 0 x of
             Failure e -> Failure (pretty d <+> pretty (show k) <+> ": " <+> e)
             Success y -> return y
-    (BVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
+    (TVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
         [typeOf x, typeFun, show x]
 
 class Unquote a where
@@ -82,7 +82,7 @@ class Unquote a where
 
 instance Unquote Value where
     unquote k n = \case
-        BVal v -> pure v
+        TVal v -> pure v
         _      -> unexpected k n typeFun "Literal"
 
 instance Unquote Text where
@@ -118,14 +118,14 @@ instance Unquote Scientific where
 
 instance Unquote Object where
     unquote k n = \case
-        BVal (Object o) -> pure o
-        BVal v          -> unexpected k n (typeOf v) "Object"
+        TVal (Object o) -> pure o
+        TVal v          -> unexpected k n (typeOf v) "Object"
         _               -> unexpected k n typeFun "Object"
 
 instance Unquote Array where
     unquote k n = \case
-        BVal (Array a) -> pure a
-        BVal v         -> unexpected k n (typeOf v) "Array"
+        TVal (Array a) -> pure a
+        TVal v         -> unexpected k n (typeOf v) "Array"
         _              -> unexpected k n typeFun "Array"
 
 instance Unquote Collection where
@@ -155,10 +155,10 @@ class Quote a where
     quote :: Id -> a -> Term
 
     default quote :: ToJSON a => Id -> a -> Term
-    quote = const (BVal . toJSON)
+    quote = const (TVal . toJSON)
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
-    quote k f = BLam k (\n x -> (quote k . f <$> unquote k (succ n) x))
+    quote k f = TLam k (\n x -> (quote k . f <$> unquote k (succ n) x))
 
 instance Quote Term where
     quote = const id
