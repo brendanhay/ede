@@ -23,6 +23,7 @@ import qualified Data.Char               as Char
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as Map
 import           Data.Maybe
+import           Data.Monoid
 import           Data.Scientific         (Scientific)
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
@@ -38,9 +39,9 @@ default (Integer)
 defaultFilters :: HashMap Text Term
 defaultFilters = Map.fromList
     -- boolean
-    [ "!"             @: not
-    , "&&"            @: (&&)
-    , "||"            @: (||)
+    [ "!"              @: not
+    , "&&"             @: (&&)
+    , "||"             @: (||)
 
     -- equality
     , "=="           `qpoly2` (==)
@@ -67,46 +68,46 @@ defaultFilters = Map.fromList
     , "floor"        `qnum1` (fromIntegral . floor)
 
     -- text
-    , "lowerHead"     @: lowerHead
-    , "upperHead"     @: upperHead
-    , "toTitle"       @: toTitle
-    , "toCamel"       @: toCamel
-    , "toPascal"      @: toPascal
-    , "toSnake"       @: toSnake
-    , "toSpinal"      @: toSpinal
-    , "toTrain"       @: toTrain
-    , "toUpper"       @: Text.toUpper
-    , "toLower"       @: Text.toLower
-    , "toOrdinal"     @: (toOrdinal :: Integer -> Text)
+    , "lowerHead"      @: lowerHead
+    , "upperHead"      @: upperHead
+    , "toTitle"        @: toTitle
+    , "toCamel"        @: toCamel
+    , "toPascal"       @: toPascal
+    , "toSnake"        @: toSnake
+    , "toSpinal"       @: toSpinal
+    , "toTrain"        @: toTrain
+    , "toUpper"        @: Text.toUpper
+    , "toLower"        @: Text.toLower
+    , "toOrdinal"      @: (toOrdinal :: Integer -> Text)
 
-    , "dropLower"     @: (Text.dropWhile (not . Char.isUpper))
-    , "dropUpper"     @: (Text.dropWhile (not . Char.isLower))
-    , "takeWord"      @: takeWord
-    , "dropWord"      @: dropWord
-    , "splitWords"    @: splitWords
-    , "strip"         @: Text.strip
-    , "stripPrefix"   @: (\p t -> fromMaybe t (p `Text.stripPrefix` t))
-    , "stripSuffix"   @: (\s t -> fromMaybe t (s `Text.stripSuffix` t))
-    , "stripStart"    @: Text.stripStart
-    , "stripEnd"      @: Text.stripEnd
-    , "replace"       @: Text.replace
-    , "remove"        @: (\t -> Text.replace t "")
+    , "dropLower"      @: (Text.dropWhile (not . Char.isUpper))
+    , "dropUpper"      @: (Text.dropWhile (not . Char.isLower))
+    , "takeWord"       @: takeWord
+    , "dropWord"       @: dropWord
+    , "splitWords"     @: splitWords
+    , "strip"          @: Text.strip
+    , "stripPrefix"    @: (\p t -> fromMaybe t (p `Text.stripPrefix` t))
+    , "stripSuffix"    @: (\s t -> fromMaybe t (s `Text.stripSuffix` t))
+    , "stripStart"     @: Text.stripStart
+    , "stripEnd"       @: Text.stripEnd
+    , "replace"        @: Text.replace
+    , "remove"         @: (\t -> Text.replace t "")
 
--- truncate
--- Return a truncated copy of the string. The length is specified with the first parameter which defaults to 255. If the second parameter is true the filter will cut the text at length. Otherwise it will discard the last word. If the text was in fact truncated it will append an ellipsis sign ("..."). If you want a different ellipsis sign than "..." you can specify it using the third parameter.
+    , "toEllipsis"     @: toEllipsis
+    , "toEllipsisWith" @: toEllipsisWith
 
-    , "indentLines"   @: indentLines
-    , "prependLines"  @: prependLines
-    , "justifyLeft"   @: (\n -> Text.justifyLeft  n ' ')
-    , "justifyRight"  @: (\n -> Text.justifyRight n ' ')
-    , "center"        @: (\n -> Text.center       n ' ')
+    , "indentLines"    @: indentLines
+    , "prependLines"   @: prependLines
+    , "justifyLeft"    @: (\n -> Text.justifyLeft  n ' ')
+    , "justifyRight"   @: (\n -> Text.justifyRight n ' ')
+    , "center"         @: (\n -> Text.center       n ' ')
 
     -- sequences
-    , qcol1 "length"  Text.length Map.size Vector.length
-    , qcol1 "empty"   Text.null   Map.null Vector.null
+    , qcol1 "length"   Text.length Map.size Vector.length
+    , qcol1 "empty"    Text.null   Map.null Vector.null
 
     -- , "sort"       @: qcol1 (Text.pack . sort . Text.unpack) id (Vector.fromList . sort . Vector.toList)
-    , qcol1 "reverse" Text.reverse id Vector.reverse
+    , qcol1 "reverse"  Text.reverse id Vector.reverse
 
     -- , "head"       @: undefined
     -- , "tail"       @: undefined
@@ -119,7 +120,7 @@ defaultFilters = Map.fromList
     -- , "join"       @: undefined
 
     -- polymorphic
-    , "show"          @: (LText.decodeUtf8 . encode :: Value -> LText.Text)
+    , "show"           @: (LText.decodeUtf8 . encode :: Value -> LText.Text)
     -- , "default"      @: undefined
     -- , "defined"      @: undefined
     ]
