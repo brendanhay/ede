@@ -21,13 +21,15 @@
 module Text.EDE.Internal.Types where
 
 import           Control.Applicative
+import           Control.Comonad
+import           Control.Comonad.Cofree
 import           Control.Lens
 import           Data.Aeson.Types             hiding (Result(..))
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty(..))
-import           Data.Monoid                  hiding ((<>))
 import           Data.Maybe
+import           Data.Monoid                  hiding ((<>))
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import           Data.Text.Format             (Format, format)
@@ -119,8 +121,8 @@ instance Applicative m => Semigroup (Resolver m) where
 -- | A parsed and compiled template.
 data Template = Template
     { _tmplName :: !Text
-    , _tmplExp  :: !Exp
-    , _tmplIncl :: HashMap Text Exp
+    , _tmplExp  :: !(Cofree Exp Delta)
+    , _tmplIncl :: HashMap Text (Cofree Exp Delta)
     } deriving (Eq)
 
 type Id = Text
@@ -137,67 +139,73 @@ data Pat
     | PLit !Value
       deriving (Eq, Show)
 
-type Alt = (Pat, Exp)
+type Alt a = (Pat, a)
 
-data Exp
-    = ELit  !Delta !Value
-    | EVar  !Delta !Var
-    | EFun  !Delta !Id
-    | EApp  !Delta !Exp  !Exp
-    | ELet  !Delta !Id   !Exp  !Exp
-    | ECase !Delta !Exp  [Alt]
-    | ELoop !Delta !Id   !Exp  !Exp
-    | EIncl !Delta !Text
-      deriving (Eq, Show)
+data Exp a
+    = ELit  !Value
+    | EVar  !Var
+    | EFun  !Id
+    | EApp  !a  !a
+    | ELet  !Id !a !a
+    | ECase !a  [Alt a]
+    | ELoop !Id !a !a
+    | EIncl !Text
+      deriving (Eq, Show, Functor)
 
-instance HasDelta Exp where
-    delta = \case
-        ELit  d _     -> d
-        EVar  d _     -> d
-        EFun  d _     -> d
-        EApp  d _ _   -> d
-        ELet  d _ _ _ -> d
-        ECase d _ _   -> d
-        ELoop d _ _ _ -> d
-        EIncl d _     -> d
+instance HasDelta (Cofree Exp Delta) where
+    delta = extract
+
+newtype Mu f = Mu (f (Mu f))
+
+cofree :: Functor f => a -> Mu f -> Cofree f a
+cofree x = go
+  where
+    go (Mu f) = x :< fmap go f
+
+forget :: Functor f => Cofree f a -> Mu f
+forget = Mu . fmap forget . unwrap
 
 var :: Id -> Var
 var = Var . (:| [])
 
-eapp :: Delta -> [Exp] -> Exp
-eapp d []     = ELit d (String mempty)
+eapp :: a -> [Cofree Exp a] -> Cofree Exp a
+eapp x []     = cofree x blank
 eapp _ [e]    = e
-eapp d (e:es) = foldl' (EApp d) e es
+eapp _ (e:es) = foldl' (\x y -> extract x :< EApp x y) e es
 
-efun :: Delta -> Id -> Exp -> Exp
-efun d = EApp d . EFun d
+efun :: Id -> Cofree Exp a -> Cofree Exp a
+efun i e = let x = extract e in x :< EApp (x :< EFun i) e
 
-efilter :: Exp -> (Delta, Id, [Exp]) -> Exp
-efilter e (d, i, ps) = eapp d (EFun d i : e : ps)
+efilter :: Cofree Exp a -> (Id, [Cofree Exp a]) -> Cofree Exp a
+efilter e (i, ps) = let x = extract e in eapp x ((x :< EFun i) : e : ps)
 
-elet :: Delta -> Exp -> Maybe (Id, Exp) -> Exp
-elet d e = \case
-    Nothing     -> e
-    Just (i, b) -> ELet d i b e
+elet :: Maybe (Id, Cofree Exp a) -> Cofree Exp a -> Cofree Exp a
+elet m e = maybe e (\(i, b) -> extract b :< ELet i b e) m
 
-ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
-ecase p ws f = ECase (delta p) p (ws ++ maybe [] ((:[]) . wild) f)
+ecase :: Cofree Exp a
+      -> [Alt (Cofree Exp a)]
+      -> Maybe (Cofree Exp a)
+      -> Cofree Exp a
+ecase p ws f = extract p :< ECase p (ws ++ maybe [] ((:[]) . wild) f)
 
-eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
-eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
+eif :: (Cofree Exp a, Cofree Exp a)
+    -> [(Cofree Exp a, Cofree Exp a)]
+    -> Maybe (Cofree Exp a)
+    -> Cofree Exp a
+eif t ts f = foldr' c (fromMaybe (extract (fst t) `cofree` blank) f) (t:ts)
   where
-    c (p, w) e = ECase (delta p) p [true w, false e]
+    c (p, w) e = extract p :< ECase p [true w, false e]
 
-eempty :: Delta -> Exp -> Exp -> Maybe Exp -> Exp
-eempty d v e = maybe e (eif (efun d "!" (efun d "empty" v), e) [] . Just)
+eempty :: Cofree Exp a -> Cofree Exp a -> Maybe (Cofree Exp a) -> Cofree Exp a
+eempty v e = maybe e (eif (efun "!" (efun "empty" v), e) [] . Just)
 
-wild, true, false :: Exp -> Alt
-wild  = (PWild,)
+true, false, wild :: Cofree Exp a -> Alt (Cofree Exp a)
 true  = (PLit (Bool True),)
 false = (PLit (Bool False),)
+wild  = (PWild,)
 
-bld :: Delta -> Exp
-bld = (`ELit` String mempty)
+blank :: Mu Exp
+blank = Mu (ELit (String mempty))
 
 -- | Unwrap a 'Value' to an 'Object' safely.
 --
