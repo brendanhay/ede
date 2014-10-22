@@ -15,6 +15,7 @@
 module Text.EDE.Internal.Eval where
 
 import           Control.Applicative
+import           Control.Comonad.Cofree
 import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Aeson                        hiding (Result(..))
@@ -39,16 +40,16 @@ import           Text.Trifecta.Delta
 -- FIXME: add pretty printer formatted error messages
 
 data Env = Env
-    { _templates :: HashMap Text Exp
+    { _templates :: HashMap Text (AExp Delta)
     , _quoted    :: HashMap Text Binding
     , _values    :: HashMap Text Value
     }
 
 type Context = ReaderT Env Result
 
-render :: HashMap Text Exp
+render :: HashMap Text (AExp Delta)
        -> HashMap Text Binding
-       -> Exp
+       -> AExp Delta
        -> HashMap Text Value
        -> Result Builder
 render ts fs e o = runReaderT (eval e >>= nf) (Env ts (defaultFilters <> fs) o)
@@ -57,34 +58,34 @@ render ts fs e o = runReaderT (eval e >>= nf) (Env ts (defaultFilters <> fs) o)
     nf _        = lift $ Failure
         "unable to evaluate partially applied template to normal form."
 
-eval :: Exp -> Context Binding
-eval (ELit _ l) = return (quote l)
-eval (EVar _ v) = quote <$> variable v
-eval (EFun d i) = do
+eval :: AExp Delta -> Context Binding
+eval (_ :< ELit l) = return (quote l)
+eval (_ :< EVar v) = quote <$> variable v
+eval (d :< EFun i) = do
     q <- Map.lookup i <$> asks _quoted
     maybe (throwError' d "binding {} doesn't exist." [i])
           return
           q
 
-eval (EApp d a b) = do
+eval (d :< EApp a b) = do
     x <- eval a
     y <- eval b
     binding d x y
 
-eval (ELet _ k rhs bdy) = do
+eval (_ :< ELet k rhs bdy) = do
     q <- eval rhs
     v <- lift (unquote q)
     bind (Map.insert k v) (eval bdy)
 
 -- FIXME: We have to recompute c everytime due to the predicate ..
-eval (ECase d p ws) = go ws
+eval (d :< ECase p ws) = go ws
   where
     go []          = return (quote (String mempty))
     go ((a, e):as) =
         case a of
             PWild  -> eval e
-            PVar v -> eval (EVar d v) >>= cond e as
-            PLit l -> eval (ELit d l) >>= cond e as
+            PVar v -> eval (d :< EVar v) >>= cond e as
+            PLit l -> eval (d :< ELit l) >>= cond e as
 
     cond e as y@(BVal Bool{}) = do
         x <- predicate p
@@ -94,7 +95,7 @@ eval (ECase d p ws) = go ws
         if x == y then eval e else go as
     cond _ as _  = go as
 
-eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop
+eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote >>= loop
   where
     d = delta bdy
 
@@ -130,7 +131,7 @@ eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop
         key (Just k) = ["key" .= k]
         key Nothing  = []
 
-eval (EIncl d i) = do
+eval (d :< EIncl i) = do
     ts <- asks _templates
     case Map.lookup i ts of
         Just e  -> eval e
@@ -159,7 +160,7 @@ variable (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
         fmt = Text.unpack . Text.intercalate "."
 
 -- | A variable can be tested for truthiness, but a non-whnf expr cannot.
-predicate :: Exp -> Context Binding
+predicate :: AExp Delta -> Context Binding
 predicate x = do
     r <- runReaderT (eval x) <$> ask
     lift $ case r of
@@ -169,7 +170,7 @@ predicate x = do
             | BVal Null   <- q -> Success (quote False)
         Success _              -> Success (quote True)
         Failure _
-            | EVar{}      <- x -> Success (quote False)
+            | _ :< EVar{} <- x -> Success (quote False)
         Failure e              -> Failure e
 
 binding :: Delta -> Binding -> Binding -> Context Binding

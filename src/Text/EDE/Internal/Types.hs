@@ -152,7 +152,9 @@ data Exp a
     | EIncl !Text
       deriving (Eq, Show, Functor)
 
-instance HasDelta (Cofree Exp Delta) where
+type AExp = Cofree Exp
+
+instance HasDelta (AExp Delta) where
     delta = extract
 
 newtype Mu f = Mu (f (Mu f))
@@ -168,38 +170,38 @@ forget = Mu . fmap forget . unwrap
 var :: Id -> Var
 var = Var . (:| [])
 
-eapp :: a -> [Cofree Exp a] -> Cofree Exp a
+eapp :: a -> [AExp a] -> AExp a
 eapp x []     = cofree x blank
 eapp _ [e]    = e
 eapp _ (e:es) = foldl' (\x y -> extract x :< EApp x y) e es
 
-efun :: Id -> Cofree Exp a -> Cofree Exp a
+efun :: Id -> AExp a -> AExp a
 efun i e = let x = extract e in x :< EApp (x :< EFun i) e
 
-efilter :: Cofree Exp a -> (Id, [Cofree Exp a]) -> Cofree Exp a
+efilter :: AExp a -> (Id, [AExp a]) -> AExp a
 efilter e (i, ps) = let x = extract e in eapp x ((x :< EFun i) : e : ps)
 
-elet :: Maybe (Id, Cofree Exp a) -> Cofree Exp a -> Cofree Exp a
+elet :: Maybe (Id, AExp a) -> AExp a -> AExp a
 elet m e = maybe e (\(i, b) -> extract b :< ELet i b e) m
 
-ecase :: Cofree Exp a
-      -> [Alt (Cofree Exp a)]
-      -> Maybe (Cofree Exp a)
-      -> Cofree Exp a
+ecase :: AExp a
+      -> [Alt (AExp a)]
+      -> Maybe (AExp a)
+      -> AExp a
 ecase p ws f = extract p :< ECase p (ws ++ maybe [] ((:[]) . wild) f)
 
-eif :: (Cofree Exp a, Cofree Exp a)
-    -> [(Cofree Exp a, Cofree Exp a)]
-    -> Maybe (Cofree Exp a)
-    -> Cofree Exp a
+eif :: (AExp a, AExp a)
+    -> [(AExp a, AExp a)]
+    -> Maybe (AExp a)
+    -> AExp a
 eif t ts f = foldr' c (fromMaybe (extract (fst t) `cofree` blank) f) (t:ts)
   where
     c (p, w) e = extract p :< ECase p [true w, false e]
 
-eempty :: Cofree Exp a -> Cofree Exp a -> Maybe (Cofree Exp a) -> Cofree Exp a
+eempty :: AExp a -> AExp a -> Maybe (AExp a) -> AExp a
 eempty v e = maybe e (eif (efun "!" (efun "empty" v), e) [] . Just)
 
-true, false, wild :: Cofree Exp a -> Alt (Cofree Exp a)
+true, false, wild :: AExp a -> Alt (AExp a)
 true  = (PLit (Bool True),)
 false = (PLit (Bool False),)
 wild  = (PWild,)

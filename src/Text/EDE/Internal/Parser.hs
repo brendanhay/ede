@@ -101,7 +101,7 @@ instance Errable (StateT Env EDE) where
 runParser :: Syntax
           -> Text
           -> ByteString
-          -> Result (Cofree Exp Delta, HashMap Text (NonEmpty Delta))
+          -> Result (AExp Delta, HashMap Text (NonEmpty Delta))
 runParser o n = res . parseByteString (runEDE run) pos
   where
     run = runStateT (pragma *> document <* eof) (Env o mempty)
@@ -124,13 +124,13 @@ pragma = void . many $ do
          <|> pragmak "comment" *> pure delimComment
          <|> pragmak "block"   *> pure delimBlock
 
-document :: Parser m => m (Cofree Exp Delta)
+document :: Parser m => m (AExp Delta)
 document = eapp <$> position <*> many (statement <|> inline <|> fragment)
 
-inline :: Parser m => m (Cofree Exp Delta)
+inline :: Parser m => m (AExp Delta)
 inline = between inlinel inliner term
 
-fragment :: Parser m => m (Cofree Exp Delta)
+fragment :: Parser m => m (AExp Delta)
 fragment = ann (ELit <$> pack (notFollowedBy end0 >> try line0 <|> line1))
   where
     line0 = manyTill1 (noneOf "\n") (try (lookAhead end0) <|> eof)
@@ -139,7 +139,7 @@ fragment = ann (ELit <$> pack (notFollowedBy end0 >> try line0 <|> line1))
     end0 = void (inlinel <|> blockl <|> try end1)
     end1 = multiLine (pure ()) (manyTill1 anyChar (lookAhead blockr))
 
-statement :: Parser m => m (Cofree Exp Delta)
+statement :: Parser m => m (AExp Delta)
 statement = choice
     [ ifelif
     , cases
@@ -159,7 +159,7 @@ multiLine s = between (try (triml blockl *> s)) (trimr blockr)
 singleLine :: Parser m => m b -> m a -> m a
 singleLine s = between (try (blockl *> s)) blockr
 
-ifelif :: Parser m => m (Cofree Exp Delta)
+ifelif :: Parser m => m (AExp Delta)
 ifelif = eif
     <$> branch "if"
     <*> many (branch "elif")
@@ -168,7 +168,7 @@ ifelif = eif
   where
     branch k = (,) <$> block k term <*> document
 
-cases :: Parser m => m (Cofree Exp Delta)
+cases :: Parser m => m (AExp Delta)
 cases = ecase
     <$> block "case" term
     <*> many
@@ -177,7 +177,7 @@ cases = ecase
     <*> else'
     <*  exit "endcase"
 
-loop :: Parser m => m (Cofree Exp Delta)
+loop :: Parser m => m (AExp Delta)
 loop = do
     (i, v) <- block "for"
         ((,) <$> identifier
@@ -187,7 +187,7 @@ loop = do
         <$> else'
         <*  exit "endfor"
 
-include :: Parser m => m (Cofree Exp Delta)
+include :: Parser m => m (AExp Delta)
 include = block "include" $ do
     d <- position
     k <- stringLiteral
@@ -198,7 +198,7 @@ include = block "include" $ do
         (,) <$> (keyword "with" *> identifier)
             <*> (symbol  "="    *> term)
 
-binding :: Parser m => m (Cofree Exp Delta)
+binding :: Parser m => m (AExp Delta)
 binding = elet . Just
     <$> block "let"
         ((,) <$> identifier
@@ -206,7 +206,7 @@ binding = elet . Just
     <*> document
     <*  exit "endlet"
 
-raw :: Parser m => m (Cofree Exp Delta)
+raw :: Parser m => m (AExp Delta)
 raw = ann (ELit <$> body)
   where
     body  = start *> pack (manyTill anyChar (lookAhead end)) <* end
@@ -216,13 +216,13 @@ raw = ann (ELit <$> body)
 -- FIXME: this is due to the whitespace sensitive nature of the parser making
 -- it difficult to do what most applicative parsers do by skipping comments
 -- as part of the whitespace.
-comment :: Parser m => m (Cofree Exp Delta)
+comment :: Parser m => m (AExp Delta)
 comment = ann (ELit <$> pure (String mempty) <* (try (triml (trimr go)) <|> go))
   where
     go = (commentStyle <$> commentl <*> commentr) >>=
         buildSomeSpaceParser (fail "whitespace significant")
 
-else' :: Parser m => m (Maybe (Cofree Exp Delta))
+else' :: Parser m => m (Maybe (AExp Delta))
 else' = optional (block "else" (pure ()) *> document)
 
 exit :: Parser m => String -> m ()
@@ -231,10 +231,10 @@ exit k = block k (pure ())
 pattern :: Parser m => m Pat
 pattern = PWild <$ char '_' <|> PVar <$> variable <|> PLit <$> literal
 
-term :: Parser m => m (Cofree Exp Delta)
+term :: Parser m => m (AExp Delta)
 term = chainl1' term0 (try filter') (symbol "|" *> pure efilter) <|> term0
 
-term0 :: Parser m => m (Cofree Exp Delta)
+term0 :: Parser m => m (AExp Delta)
 term0 = buildExpressionParser table expr
   where
     table =
@@ -257,10 +257,10 @@ term0 = buildExpressionParser table expr
        <|> ann (EVar <$> variable)
        <|> ann (ELit <$> literal)
 
-filter' :: Parser m => m (Id, [Cofree Exp Delta])
+filter' :: Parser m => m (Id, [AExp Delta])
 filter' = (,) <$> identifier <*> (parens (commaSep1 term) <|> pure [])
 
-collection :: Parser m => m (Cofree Exp Delta)
+collection :: Parser m => m (AExp Delta)
 collection = ann (EVar <$> variable <|> ELit <$> col)
   where
     col = Object <$> object
