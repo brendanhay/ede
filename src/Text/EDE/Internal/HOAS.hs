@@ -50,10 +50,6 @@ instance Show Term where
     show (TVal v)   = show v
     show (TLam k _) = Text.unpack ("<function:" <> k <> ">")
 
--- instance Eq Term where
---     TVal a == TVal b = a == b
---     _      == _      = False
-
 -- | Retrieve a consistent type from a 'Value' to use in error messages.
 typeOf :: Value -> String
 typeOf = \case
@@ -77,6 +73,36 @@ qapply d a b = case (a, b) of
             Success y -> return y
     (TVal x, _) -> throwError "unable to apply literal {} -> {}\n{}"
         [typeOf x, typeFun, show x]
+
+qprim :: (ToJSON a, Quote a) => a -> Term
+qprim = quote "Value"
+
+class Quote a where
+    quote :: Id -> a -> Term
+
+    default quote :: ToJSON a => Id -> a -> Term
+    quote = const (TVal . toJSON)
+
+instance (Unquote a, Quote b) => Quote (a -> b) where
+    quote k f = TLam k (\n x -> (quote k . f <$> unquote k (succ n) x))
+
+instance Quote Term where
+    quote = const id
+
+instance Quote Value
+instance Quote Text
+instance Quote [Text]
+instance Quote LText.Text
+instance Quote Bool
+instance Quote Int
+instance Quote Integer
+instance Quote Double
+instance Quote Scientific
+instance Quote Object
+instance Quote Array
+
+instance Quote Builder where
+    quote k = quote k . toLazyText
 
 class Unquote a where
     unquote :: Id -> Int -> Term -> Result a
@@ -148,33 +174,3 @@ instance Unquote Collection where
 
 unexpected :: Id -> Int -> String -> String -> Result b
 unexpected k n x y = throwError "unable to coerce {}:{}:{} -> {}" [show k, show n, x, y]
-
-qprim :: (ToJSON a, Quote a) => a -> Term
-qprim = quote "Value"
-
-class Quote a where
-    quote :: Id -> a -> Term
-
-    default quote :: ToJSON a => Id -> a -> Term
-    quote = const (TVal . toJSON)
-
-instance (Unquote a, Quote b) => Quote (a -> b) where
-    quote k f = TLam k (\n x -> (quote k . f <$> unquote k (succ n) x))
-
-instance Quote Term where
-    quote = const id
-
-instance Quote Value
-instance Quote Text
-instance Quote [Text]
-instance Quote LText.Text
-instance Quote Bool
-instance Quote Int
-instance Quote Integer
-instance Quote Double
-instance Quote Scientific
-instance Quote Object
-instance Quote Array
-
-instance Quote Builder where
-    quote k = quote k . toLazyText
