@@ -73,14 +73,13 @@ library
       , base                 >= 4.6   && < 5
       , bifunctors           >= 4
       , bytestring           >= 0.9
-      , comonad
+      , comonad              >= 4.2
       , directory            >= 1.2
       , filepath             >= 1.2
-      , free
+      , free                 >= 4.8
       , lens                 >= 4.0
       , mtl                  >= 2.2
       , parsers              >= 0.12.1.1
-      , profunctors
       , scientific           >= 0.3.1
       , semigroups           >= 0.15
       , text                 >= 1.2   && < 1.3
