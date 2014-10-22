@@ -46,8 +46,8 @@ data Term
     | TLam !Id (Int -> Term -> Result Term)
 
 instance Show Term where
-    show (TVal v) = show v
-    show _        = "<function>"
+    show (TVal v)   = show v
+    show (TLam k _) = Text.unpack ("<function:" <> k <> ">")
 
 instance Eq Term where
     TVal a == TVal b = a == b
