@@ -1,0 +1,10 @@
+{
+  "short": "short-text",
+  "long": "A slightly longer piece of text that would like to be truncated."
+}
+---
+{{ short | toEllipsis(5) }}
+{{ short | toEllipsisWith(2, "0xb") }}
+{{ long | toEllipsis(20) }}
+{{ long | toEllipsisWith(20, " -") }}
+{{ long | toEllipsis(255) }}

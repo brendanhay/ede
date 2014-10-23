@@ -1,0 +1,12 @@
+{
+  "single": "lorem",
+  "multi": "Navzdory všeobecnému\npřesvědčení\nLorem Ipsum není\nnáhodný text."
+}
+---
+{{ single | justifyLeft(25) }}
+{{ single | justifyRight(15) }}
+{{ single | center(9) }}
+
+{{ multi | indentLines(4) }}
+
+{{ multi | prependLines("...") }}

@@ -1,0 +1,11 @@
+{
+  "single": "Lorem ipsum-Phrase",
+  "alpha": ["a", "b", "c", "d", "e"],
+  "numeric": [1, 2, 3, 4, 5]
+}
+---
+{# {{ alpha | zip(numeric) }} #}
+{# [{{ alpha | join(", ") }}] #}
+{# ({{ numeric | map(toOrdinal) | join(", ") }}) #}
+{# {{ numeric | map(toOrdinal) }} #}
+{# {{ numeric | filter(>= 3) }} #}

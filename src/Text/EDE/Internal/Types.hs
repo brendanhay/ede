@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE LambdaCase        #-}
@@ -21,20 +22,41 @@
 module Text.EDE.Internal.Types where
 
 import           Control.Applicative
+import           Control.Comonad
+import           Control.Comonad.Cofree
 import           Control.Lens
 import           Data.Aeson.Types             hiding (Result(..))
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty(..))
-import           Data.Monoid                  hiding ((<>))
+import qualified Data.List.NonEmpty           as NonEmpty
 import           Data.Maybe
+import           Data.Monoid                  hiding ((<>))
 import           Data.Semigroup
 import           Data.Text                    (Text)
-import           Data.Text.Format             (Format, format)
-import           Data.Text.Format.Params      (Params)
-import qualified Data.Text.Lazy               as LText
-import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc, vsep)
+import qualified Data.Text                    as Text
+import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc)
+import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           Text.Trifecta.Delta
+
+-- | Convenience wrapper for Pretty instances.
+newtype PP a = PP { unPP :: a }
+
+pp :: Pretty (PP a) => a -> Doc
+pp = pretty . PP
+
+instance Pretty (PP Text) where
+    pretty = PP.string . Text.unpack . unPP
+
+instance Pretty (PP Value) where
+    pretty (PP v) =
+        case v of
+            Null     -> "Null"
+            Bool   _ -> "Bool"
+            Number _ -> "Scientific"
+            Object _ -> "Object"
+            Array  _ -> "Array"
+            String _ -> "String"
 
 -- | The result of running parsing or rendering steps.
 data Result a
@@ -57,14 +79,14 @@ instance Applicative Result where
     Success f <*> Success x  = Success (f x)
     Success _ <*> Failure e  = Failure e
     Failure e <*> Success _  = Failure e
-    Failure e <*> Failure e' = Failure (vsep [e, e'])
+    Failure e <*> Failure e' = Failure (PP.vsep [e, e'])
     {-# INLINE (<*>) #-}
 
 instance Alternative Result where
     Success x <|> Success _  = Success x
     Success x <|> Failure _  = Success x
     Failure _ <|> Success x  = Success x
-    Failure e <|> Failure e' = Failure (vsep [e, e'])
+    Failure e <|> Failure e' = Failure (PP.vsep [e, e'])
     {-# INLINE (<|>) #-}
     empty = Failure mempty
     {-# INLINE empty #-}
@@ -95,9 +117,6 @@ success = return . Success
 failure :: Monad m => Doc -> m (Result a)
 failure = return . Failure
 
-throwError :: Params ps => Format -> ps -> Result a
-throwError fmt = Failure . pretty . LText.unpack . format fmt
-
 type Delim = (String, String)
 
 data Syntax = Syntax
@@ -110,7 +129,7 @@ data Syntax = Syntax
 makeClassy ''Syntax
 
 -- | A function to resolve the target of an @include@ expression.
-type Resolver m = Syntax -> Text -> Delta -> m (Result Template)
+type Resolver m = Syntax -> Id -> Delta -> m (Result Template)
 
 instance Applicative m => Semigroup (Resolver m) where
     (f <> g) o k d = liftA2 (<|>) (f o k d) (g o k d) -- Haha!
@@ -119,14 +138,23 @@ instance Applicative m => Semigroup (Resolver m) where
 -- | A parsed and compiled template.
 data Template = Template
     { _tmplName :: !Text
-    , _tmplExp  :: !Exp
-    , _tmplIncl :: HashMap Text Exp
+    , _tmplExp  :: !(Exp Delta)
+    , _tmplIncl :: HashMap Id (Exp Delta)
     } deriving (Eq)
 
 type Id = Text
 
 newtype Var = Var (NonEmpty Id)
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Pretty Var where
+    pretty (Var is) = PP.hcat
+        . PP.punctuate "."
+        . map (PP.bold . pp)
+        $ NonEmpty.toList is
+
+instance Show Var where
+    show = show . pretty
 
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
@@ -137,64 +165,23 @@ data Pat
     | PLit !Value
       deriving (Eq, Show)
 
-type Alt = (Pat, Exp)
+type Alt a = (Pat, a)
 
-data Exp
-    = ELit  !Delta !Value
-    | EVar  !Delta !Var
-    | EFun  !Delta !Id
-    | EApp  !Delta !Exp  !Exp
-    | ELet  !Delta !Id   !Exp  !Exp
-    | ECase !Delta !Exp  [Alt]
-    | ELoop !Delta !Id   !Exp  !Exp
-    | EIncl !Delta !Text
-      deriving (Eq, Show)
+data ExpF a
+    = ELit  !Value
+    | EVar  !Var
+    | EFun  !Id
+    | EApp  !a  !a
+    | ELet  !Id !a !a
+    | ECase !a  [Alt a]
+    | ELoop !Id !a !a
+    | EIncl !Text
+      deriving (Eq, Show, Functor)
 
-instance HasDelta Exp where
-    delta = \case
-        ELit  d _     -> d
-        EVar  d _     -> d
-        EFun  d _     -> d
-        EApp  d _ _   -> d
-        ELet  d _ _ _ -> d
-        ECase d _ _   -> d
-        ELoop d _ _ _ -> d
-        EIncl d _     -> d
+type Exp = Cofree ExpF
 
-var :: Id -> Var
-var = Var . (:| [])
-
-eapp :: Delta -> [Exp] -> Exp
-eapp d []     = ELit d (String mempty)
-eapp _ [e]    = e
-eapp d (e:es) = foldl' (EApp d) e es
-
-efun :: Delta -> Id -> Exp -> Exp
-efun d = EApp d . EFun d
-
-elet :: Delta -> Exp -> Maybe (Id, Exp) -> Exp
-elet d e = \case
-    Nothing     -> e
-    Just (i, b) -> ELet d i b e
-
-ecase :: Exp -> [Alt] -> Maybe Exp -> Exp
-ecase p ws f = ECase (delta p) p (ws ++ maybe [] ((:[]) . wild) f)
-
-eif :: (Exp, Exp) -> [(Exp, Exp)] -> Maybe Exp -> Exp
-eif t@(x, _) ts f = foldr' c (fromMaybe (bld (delta x)) f) (t:ts)
-  where
-    c (p, w) e = ECase (delta p) p [true w, false e]
-
-eempty :: Delta -> Exp -> Exp -> Maybe Exp -> Exp
-eempty d v e = maybe e (eif (efun d "!" (efun d "empty" v), e) [] . Just)
-
-wild, true, false :: Exp -> Alt
-wild  = (PWild,)
-true  = (PLit (Bool True),)
-false = (PLit (Bool False),)
-
-bld :: Delta -> Exp
-bld = (`ELit` String mempty)
+instance HasDelta (Exp Delta) where
+    delta = extract
 
 -- | Unwrap a 'Value' to an 'Object' safely.
 --

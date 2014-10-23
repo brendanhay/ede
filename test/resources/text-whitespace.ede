@@ -1,0 +1,5 @@
+{ "whitespace": "  A Word  " }
+---
+{{ whitespace | strip }}
+{{ whitespace | stripStart }}
+{{ whitespace | stripEnd }}

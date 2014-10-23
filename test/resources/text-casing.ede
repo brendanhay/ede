@@ -1,0 +1,20 @@
+{
+  "single": "Lorem ipsum-Phrase",
+  "number": 1.0
+}
+---
+{{ single | lowerHead }}
+{{ single | upperHead }}
+{{ single | toLower }}
+{{ single | toUpper }}
+{{ single | toTitle }}
+{{ single | toCamel }}
+{{ single | toPascal }}
+{{ single | toSnake }}
+{{ single | toSpinal }}
+{{ single | toTrain }}
+{{ number | toOrdinal }}
+{{ single | toLower | upperHead }}
+{% if (single | toLower) == "lorem ipsum-phrase" %}
+single | lower == "lorem ipsum"
+{% endif %}

@@ -15,90 +15,102 @@
 module Text.EDE.Internal.Eval where
 
 import           Control.Applicative
+import           Control.Comonad.Cofree
 import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Aeson                        hiding (Result(..))
 import           Data.Foldable                     (foldlM)
 import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
+import           Data.List.NonEmpty                (NonEmpty(..))
 import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Monoid
 import           Data.Scientific                   (base10Exponent)
-import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
-import           Data.Text.Format                  (Format)
-import           Data.Text.Format.Params           (Params)
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
-import           Text.EDE.Internal.HOAS
+import           Data.Text.Manipulate              (toOrdinal)
+import           Text.EDE.Internal.Quoting
+import           Text.EDE.Internal.Filters          (stdlib)
 import           Text.EDE.Internal.Types
+import           Text.PrettyPrint.ANSI.Leijen      (Doc, Pretty(..), (<+>))
+import qualified Text.PrettyPrint.ANSI.Leijen      as PP
 import           Text.Trifecta.Delta
 
--- FIXME: add pretty printer formatted error messages
-
 data Env = Env
-    { _templates :: HashMap Text Exp
-    , _quoted    :: HashMap Text Binding
-    , _values    :: HashMap Text Value
+    { _templates :: HashMap Id (Exp Delta)
+    , _quoted    :: HashMap Id Term
+    , _values    :: HashMap Id Value
     }
 
 type Context = ReaderT Env Result
 
-render :: HashMap Text Exp
-       -> HashMap Text Binding
-       -> Exp
-       -> HashMap Text Value
+render :: HashMap Id (Exp Delta)
+       -> HashMap Id Term
+       -> Exp Delta
+       -> HashMap Id Value
        -> Result Builder
-render ts fs e o = runReaderT (eval e >>= nf) (Env ts fs o)
+render ts fs e o = runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) o)
   where
-    nf (BVal v) = build (delta e) v
+    nf (TVal v) = build (delta e) v
     nf _        = lift $ Failure
         "unable to evaluate partially applied template to normal form."
 
-eval :: Exp -> Context Binding
-eval (ELit _ l) = return (quote l)
-eval (EVar _ v) = quote <$> variable v
-eval (EFun d i) = do
+eval :: Exp Delta -> Context Term
+eval (_ :< ELit l) = return (qprim l)
+eval (d :< EVar v) = quote (Text.pack (show v)) 0 <$> variable d v
+eval (d :< EFun i) = do
     q <- Map.lookup i <$> asks _quoted
-    maybe (throwError' d "binding {} doesn't exist." [i])
+    maybe (throwError d $ "filter" <+> PP.bold (pp i) <+> "doesn't exist.")
           return
           q
 
-eval (EApp d a b) = do
+eval (_ :< EApp (_ :< EFun "defined") e) = predicate e
+
+eval (d :< EApp a b) = do
     x <- eval a
     y <- eval b
     binding d x y
 
-eval (ELet _ k rhs bdy) = do
+eval (_ :< ELet k rhs bdy) = do
     q <- eval rhs
-    v <- lift (unquote q)
+    v <- lift (unquote k 0 q)
     bind (Map.insert k v) (eval bdy)
 
 -- FIXME: We have to recompute c everytime due to the predicate ..
-eval (ECase d p ws) = go ws
+eval (d :< ECase p ws) = go ws
   where
-    go []          = return (quote (String mempty))
+    go []          = return (qprim (String mempty))
     go ((a, e):as) =
         case a of
             PWild  -> eval e
-            PVar v -> eval (EVar d v) >>= cond e as
-            PLit l -> eval (ELit d l) >>= cond e as
+            PVar v -> eval (d :< EVar v) >>= cond e as
+            PLit l -> eval (d :< ELit l) >>= cond e as
 
-    cond e as y@(BVal Bool{}) = do
+    cond e as y@(TVal Bool{}) = do
         x <- predicate p
-        if x == y then eval e else go as
-    cond e as y@BVal{} = do
+        if x `eq` y
+            then eval e
+            else go as
+
+    cond e as y@TVal{} = do
         x <- eval p
-        if x == y then eval e else go as
+        if x `eq` y
+            then eval e
+            else go as
+
     cond _ as _  = go as
 
-eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop
+    eq (TVal a) (TVal b) = a == b
+    eq _        _        = False
+
+eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
   where
     d = delta bdy
 
-    loop :: Collection -> Context Binding
-    loop (Col l xs) = snd <$> foldlM iter (1, quote (String mempty)) xs
+    loop :: Collection -> Context Term
+    loop (Col l xs) = snd <$> foldlM iter (1, qprim (String mempty)) xs
       where
         iter (n, p) x = do
             shadowed n
@@ -109,9 +121,17 @@ eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop
         shadowed n = do
             m <- asks _values
             maybe (return ())
-                  (\x -> throwError' d "binding {} shadows variable {} :: {}, {}"
-                      [Text.unpack i, show x, typeOf x, show n])
+                  (shadowedErr n)
                   (Map.lookup i m)
+
+        shadowedErr n x = throwError d $
+                "variable"
+            <+> PP.bold (pp i)
+            <+> "shadows"
+            <+> pp x
+            <+> "in"
+            <+> pp (toOrdinal n)
+            <+> "loop iteration."
 
         context n (k, x) = object $
             [ "value"      .= x
@@ -129,53 +149,58 @@ eval (ELoop _ i v bdy) = eval v >>= lift . unquote >>= loop
         key (Just k) = ["key" .= k]
         key Nothing  = []
 
-eval (EIncl d i) = do
+eval (d :< EIncl i) = do
     ts <- asks _templates
     case Map.lookup i ts of
         Just e  -> eval e
-        Nothing -> throwError' d "template {} is not in scope: [{}]"
-            [i, Text.intercalate "," $ Map.keys ts]
+        Nothing -> throwError d $
+                "template"
+            <+> PP.bold (pp i)
+            <+> "is not in scope:"
+            <+> PP.brackets (pp (Text.intercalate "," $ Map.keys ts))
 
 bind :: (Object -> Object) -> Context a -> Context a
 bind f = withReaderT (\x -> x { _values = f (_values x) })
 
-variable :: Var -> Context Value
-variable (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
+variable :: Delta -> Var -> Context Value
+variable d (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
   where
     go []     _ v = return v
     go (k:ks) r v = do
         m <- nest v
-        maybe (throwError' undefined "binding {} doesn't exist." [fmt (k:r)])
+        maybe (throwError d $ "variable" <+> pretty cur <+> "doesn't exist.")
               (go ks (k:r))
               (Map.lookup k m)
       where
+        cur = Var (k:|r)
+
         nest :: Value -> Context Object
         nest (Object o) = return o
-        nest x          =
-            throwError' undefined "variable {} :: {} doesn't supported nested accessors."
-                [fmt (k:r), typeOf x]
-
-        fmt = Text.unpack . Text.intercalate "."
+        nest x          = throwError d $ "variable"
+            <+> pretty cur
+            <+> "::"
+            <+> pp x
+            <+> "doesn't supported nested accessors."
 
 -- | A variable can be tested for truthiness, but a non-whnf expr cannot.
-predicate :: Exp -> Context Binding
+predicate :: Exp Delta -> Context Term
 predicate x = do
     r <- runReaderT (eval x) <$> ask
     lift $ case r of
         Success q
-            | BVal Bool{} <- q -> Success q
+            | TVal Bool{} <- q -> Success q
         Success q
-            | BVal Null   <- q -> Success (quote False)
-        Success _              -> Success (quote True)
+            | TVal Null   <- q -> Success (qprim False)
+        Success _              -> Success (qprim True)
         Failure _
-            | EVar{}      <- x -> Success (quote False)
+            | _ :< EVar{} <- x -> Success (qprim False)
         Failure e              -> Failure e
 
-binding :: Delta -> Binding -> Binding -> Context Binding
+binding :: Delta -> Term -> Term -> Context Term
 binding d x y =
     case (x, y) of
-        (BVal l, BVal r) -> quote <$> liftM2 (<>) (build d l) (build d r)
-        _                -> lift (qapply x y)
+        (TVal l, TVal r) -> quote "<>" 0 <$> liftM2 (<>) (build d l) (build d r)
+        _                -> lift (qapply d x y)
 
 build :: Delta -> Value -> Context Builder
 build _ Null         = return mempty
@@ -186,8 +211,8 @@ build _ (Number n)
     | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
     | otherwise             = return (scientificBuilder n)
 build d x =
-    throwError' d "unable to render literal {}\n{}" [typeOf x, show x]
+    throwError d ("unable to render literal" <+> pp x)
 
 -- FIXME: Add delta information to the thrown error document.
-throwError' :: Params ps => Delta -> Format -> ps -> Context a
-throwError' _ f = lift . throwError f
+throwError :: Delta -> Doc -> Context a
+throwError d doc = lift . Failure $ pretty d <+> PP.red "error:" <+> doc

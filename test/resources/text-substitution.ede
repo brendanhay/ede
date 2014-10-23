@@ -1,0 +1,11 @@
+{ "single": "Lorem ipsum-Phrase" }
+---
+{{ single | takeWord }}
+{{ single | dropWord }}
+{{ single | dropUpper }}
+{{ single | toCamel| dropLower }}
+{{ single | stripPrefix("Lorem ") }}
+{{ single | stripSuffix("Phrase") }}
+{{ single | replace("ipsum-", "Hi! ") }}
+{{ single | remove(" ipsum-") }}
+{{ single | remove("e") }}
