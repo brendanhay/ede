@@ -14,8 +14,6 @@
 
 module Text.EDE.Internal.Eval where
 
-import Debug.Trace
-
 import           Control.Applicative
 import           Control.Comonad.Cofree
 import           Control.Monad
