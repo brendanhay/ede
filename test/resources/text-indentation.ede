@@ -3,13 +3,10 @@
   "multi": "Navzdory všeobecnému\npřesvědčení\nLorem Ipsum není\nnáhodný text."
 }
 ---
-{{ single | justifyLeft(20, "<-") }}
-{{ single | justifyRight(20, "<-") }}
-{{ single | center(9, "-") }}
-{{ single | stripPrefix("Lore") }}
+{{ single | justifyLeft(25) }}
+{{ single | justifyRight(15) }}
+{{ single | center(9) }}
 
-{{ multi | indentLines(4, false) }}
+{{ multi | indentLines(4) }}
 
 {{ multi | prependLines("...") }}
-
-{{ multi | stripSuffix(" text.") }}
