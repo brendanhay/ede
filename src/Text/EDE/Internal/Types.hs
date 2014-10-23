@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE LambdaCase        #-}
@@ -34,11 +35,28 @@ import           Data.Monoid                  hiding ((<>))
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Data.Text.Format             (Format, format)
-import           Data.Text.Format.Params      (Params)
-import qualified Data.Text.Lazy               as LText
-import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc, vsep)
+import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc)
+import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           Text.Trifecta.Delta
+
+-- | Convenience wrapper for Pretty instances.
+newtype PP a = PP { unPP :: a }
+
+pp :: Pretty (PP a) => a -> Doc
+pp = pretty . PP
+
+instance Pretty (PP Text) where
+    pretty = PP.string . Text.unpack . unPP
+
+instance Pretty (PP Value) where
+    pretty (PP v) =
+        case v of
+            Null     -> "Null"
+            Bool   _ -> "Bool"
+            Number _ -> "Scientific"
+            Object _ -> "Object"
+            Array  _ -> "Array"
+            String _ -> "String"
 
 -- | The result of running parsing or rendering steps.
 data Result a
@@ -61,14 +79,14 @@ instance Applicative Result where
     Success f <*> Success x  = Success (f x)
     Success _ <*> Failure e  = Failure e
     Failure e <*> Success _  = Failure e
-    Failure e <*> Failure e' = Failure (vsep [e, e'])
+    Failure e <*> Failure e' = Failure (PP.vsep [e, e'])
     {-# INLINE (<*>) #-}
 
 instance Alternative Result where
     Success x <|> Success _  = Success x
     Success x <|> Failure _  = Success x
     Failure _ <|> Success x  = Success x
-    Failure e <|> Failure e' = Failure (vsep [e, e'])
+    Failure e <|> Failure e' = Failure (PP.vsep [e, e'])
     {-# INLINE (<|>) #-}
     empty = Failure mempty
     {-# INLINE empty #-}
@@ -98,9 +116,6 @@ success = return . Success
 -- | Convenience for returning an error 'Result'.
 failure :: Monad m => Doc -> m (Result a)
 failure = return . Failure
-
-throwError :: Params ps => Format -> ps -> Result a
-throwError fmt = Failure . pretty . LText.unpack . format fmt
 
 type Delim = (String, String)
 
@@ -132,8 +147,14 @@ type Id = Text
 newtype Var = Var (NonEmpty Id)
     deriving (Eq)
 
+instance Pretty Var where
+    pretty (Var is) = PP.hcat
+        . PP.punctuate "."
+        . map (PP.bold . pp)
+        $ NonEmpty.toList is
+
 instance Show Var where
-    show (Var is) = Text.unpack . Text.intercalate "." $ NonEmpty.toList is
+    show = show . pretty
 
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection
@@ -161,58 +182,6 @@ type Exp = Cofree ExpF
 
 instance HasDelta (Exp Delta) where
     delta = extract
-
-newtype Mu f = Mu (f (Mu f))
-
-cofree :: Functor f => a -> Mu f -> Cofree f a
-cofree x = go
-  where
-    go (Mu f) = x :< fmap go f
-
--- forget :: Functor f => Cofree f a -> Mu f
--- forget = Mu . fmap forget . unwrap
-
-var :: Id -> Var
-var = Var . (:| [])
-
-eapp :: a -> [Exp a] -> Exp a
-eapp x []     = cofree x blank
-eapp _ [e]    = e
-eapp _ (e:es) = foldl' (\x y -> extract x :< EApp x y) e es
-
-efun :: Id -> Exp a -> Exp a
-efun i e = let x = extract e in x :< EApp (x :< EFun i) e
-
-efilter :: Exp a -> (Id, [Exp a]) -> Exp a
-efilter e (i, ps) = let x = extract e in eapp x ((x :< EFun i) : e : ps)
-
-elet :: Maybe (Id, Exp a) -> Exp a -> Exp a
-elet m e = maybe e (\(i, b) -> extract b :< ELet i b e) m
-
-ecase :: Exp a
-      -> [Alt (Exp a)]
-      -> Maybe (Exp a)
-      -> Exp a
-ecase p ws f = extract p :< ECase p (ws ++ maybe [] ((:[]) . wild) f)
-
-eif :: (Exp a, Exp a)
-    -> [(Exp a, Exp a)]
-    -> Maybe (Exp a)
-    -> Exp a
-eif t ts f = foldr' c (fromMaybe (extract (fst t) `cofree` blank) f) (t:ts)
-  where
-    c (p, w) e = extract p :< ECase p [true w, false e]
-
-eempty :: Exp a -> Exp a -> Maybe (Exp a) -> Exp a
-eempty v e = maybe e (eif (efun "!" (efun "empty" v), e) [] . Just)
-
-true, false, wild :: Exp a -> Alt (Exp a)
-true  = (PLit (Bool True),)
-false = (PLit (Bool False),)
-wild  = (PWild,)
-
-blank :: Mu ExpF
-blank = Mu (ELit (String mempty))
 
 -- | Unwrap a 'Value' to an 'Object' safely.
 --

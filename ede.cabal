@@ -56,10 +56,11 @@ library
       , Text.EDE.Filters
 
     other-modules:
-        Text.EDE.Internal.Eval
+        Text.EDE.Internal.AST
+      , Text.EDE.Internal.Eval
       , Text.EDE.Internal.Parser
-      , Text.EDE.Internal.Quoted
-      , Text.EDE.Internal.Stdlib
+      , Text.EDE.Internal.Quoting
+      , Text.EDE.Internal.Filters
       , Text.EDE.Internal.Syntax
       , Text.EDE.Internal.Types
 

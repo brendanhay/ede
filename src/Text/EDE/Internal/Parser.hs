@@ -40,6 +40,7 @@ import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
 import qualified Data.Vector                as Vector
+import           Text.EDE.Internal.AST
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.Parser.Expression

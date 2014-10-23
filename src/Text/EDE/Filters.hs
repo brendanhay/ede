@@ -54,12 +54,12 @@ module Text.EDE.Filters
     , qcol1
 
     -- ** Errors
-    , unexpected
-    , typeOf
+    , typeErr
+    , argumentErr
     ) where
 
-import Text.EDE.Internal.Quoted
-import Text.EDE.Internal.Stdlib
+import Text.EDE.Internal.Quoting
+import Text.EDE.Internal.Filters
 
 -- $prelude
 --

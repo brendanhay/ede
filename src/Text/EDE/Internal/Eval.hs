@@ -28,13 +28,14 @@ import           Data.Monoid
 import           Data.Scientific                   (base10Exponent)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
-import           Data.Text.Format                  (Format)
-import           Data.Text.Format.Params           (Params)
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
-import           Text.EDE.Internal.Quoted
-import           Text.EDE.Internal.Stdlib          (stdlib)
+import           Data.Text.Manipulate              (toOrdinal)
+import           Text.EDE.Internal.Quoting
+import           Text.EDE.Internal.Filters          (stdlib)
 import           Text.EDE.Internal.Types
+import           Text.PrettyPrint.ANSI.Leijen      (Doc, Pretty(..), (<+>))
+import qualified Text.PrettyPrint.ANSI.Leijen      as PP
 import           Text.Trifecta.Delta
 
 data Env = Env
@@ -58,10 +59,10 @@ render ts fs e o = runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) o)
 
 eval :: Exp Delta -> Context Term
 eval (_ :< ELit l) = return (qprim l)
-eval (d :< EVar v) = quote (Text.pack (show v)) <$> variable d v
+eval (d :< EVar v) = quote (Text.pack (show v)) 0 <$> variable d v
 eval (d :< EFun i) = do
     q <- Map.lookup i <$> asks _quoted
-    maybe (throwError' d "binding {} doesn't exist." [i])
+    maybe (throwError d $ "filter" <+> PP.bold (pp i) <+> "doesn't exist.")
           return
           q
 
@@ -118,9 +119,17 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
         shadowed n = do
             m <- asks _values
             maybe (return ())
-                  (\x -> throwError' d "binding {} shadows variable {} :: {}, {}"
-                      [Text.unpack i, show x, typeOf x, show n])
+                  (shadowedErr n)
                   (Map.lookup i m)
+
+        shadowedErr n x = throwError d $
+                "variable"
+            <+> PP.bold (pp i)
+            <+> "shadows"
+            <+> pp x
+            <+> "in"
+            <+> pp (toOrdinal n)
+            <+> "loop iteration."
 
         context n (k, x) = object $
             [ "value"      .= x
@@ -142,8 +151,11 @@ eval (d :< EIncl i) = do
     ts <- asks _templates
     case Map.lookup i ts of
         Just e  -> eval e
-        Nothing -> throwError' d "template {} is not in scope: [{}]"
-            [i, Text.intercalate "," $ Map.keys ts]
+        Nothing -> throwError d $
+                "template"
+            <+> PP.bold (pp i)
+            <+> "is not in scope:"
+            <+> PP.brackets (pp (Text.intercalate "," $ Map.keys ts))
 
 bind :: (Object -> Object) -> Context a -> Context a
 bind f = withReaderT (\x -> x { _values = f (_values x) })
@@ -154,15 +166,19 @@ variable d (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
     go []     _ v = return v
     go (k:ks) r v = do
         m <- nest v
-        maybe (throwError' d "binding {} doesn't exist." [show (Var (k:|r))])
+        maybe (throwError d $ "variable" <+> pretty cur <+> "doesn't exist.")
               (go ks (k:r))
               (Map.lookup k m)
       where
+        cur = Var (k:|r)
+
         nest :: Value -> Context Object
         nest (Object o) = return o
-        nest x          =
-            throwError' d "variable {} :: {} doesn't supported nested accessors."
-                [show (Var (k:|r)), typeOf x]
+        nest x          = throwError d $ "variable"
+            <+> pretty cur
+            <+> "::"
+            <+> pp x
+            <+> "doesn't supported nested accessors."
 
 -- | A variable can be tested for truthiness, but a non-whnf expr cannot.
 predicate :: Exp Delta -> Context Term
@@ -181,7 +197,7 @@ predicate x = do
 binding :: Delta -> Term -> Term -> Context Term
 binding d x y =
     case (x, y) of
-        (TVal l, TVal r) -> quote "<>" <$> liftM2 (<>) (build d l) (build d r)
+        (TVal l, TVal r) -> quote "<>" 0 <$> liftM2 (<>) (build d l) (build d r)
         _                -> lift (qapply d x y)
 
 build :: Delta -> Value -> Context Builder
@@ -193,8 +209,8 @@ build _ (Number n)
     | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
     | otherwise             = return (scientificBuilder n)
 build d x =
-    throwError' d "unable to render literal {}\n{}" [typeOf x, show x]
+    throwError d ("unable to render literal" <+> pp x)
 
 -- FIXME: Add delta information to the thrown error document.
-throwError' :: Params ps => Delta -> Format -> ps -> Context a
-throwError' _ f = lift . throwError f
+throwError :: Delta -> Doc -> Context a
+throwError d doc = lift . Failure $ pretty d <+> PP.red "error:" <+> doc

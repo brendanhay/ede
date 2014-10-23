@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE
@@ -131,7 +130,7 @@ import           System.Directory
 import           System.FilePath
 import qualified Text.EDE.Internal.Eval       as Eval
 import qualified Text.EDE.Internal.Parser     as Parser
-import           Text.EDE.Internal.Quoted     (Term)
+import           Text.EDE.Internal.Quoting     (Term)
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)

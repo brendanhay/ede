@@ -52,7 +52,7 @@ Text Substitution:
 {{ single | remove("Phrase") }}
 
 Text Indentation:
-{{ multi | indentLines(5) }}
+{{ multi | indentLines(1, false) }}
 {{ multi | prependLines("...") }}
 {{ single | justifyLeft(2, "<-") }}
 {{ single | justifyRight(2, "<-") }}
@@ -61,7 +61,8 @@ Text Indentation:
 Sequence Length:
 {{ "" | length }}
 {{ "123" | length }}
-{{ list | length }}
+{{ alpha | length }}
+{{ numeric | length }}
 {{ object | length }}
 {{ "" | empty }}
 {{ "supercalifragilistic" | empty }}
@@ -69,20 +70,21 @@ Sequence Length:
 {{ numeric | empty }}
 {{ object | empty }}
 
-Sequence Subdivision:
-{{ object | head | show }}
+List Subdivision:
+{{ multi | head }}
+{{ alpha | head }}
 {{ numeric | init | show }}
 {{ alpha | tail | show }}
 {{ alpha | last }}
 {{ single | splitWords | last }}
 
-Sequence Sorting:
+List Sorting:
 {{ single | reverse }}
 {# {{ single | sort | show }} #}
 {# {{ alpha | reverse | sort | show }} #}
 {# {{ object | sort | show }} #}
 
-Sequence Transformations:
+List Transformations:
 {# {{ alpha | zip(numeric) }} #}
 {# [{{ alpha | join(", ") }}] #}
 {# ({{ numeric | map(toOrdinal) | join(", ") }}) #}
