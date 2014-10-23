@@ -130,8 +130,8 @@ import qualified Paths_ede                    as Paths
 import           System.Directory
 import           System.FilePath
 import qualified Text.EDE.Internal.Eval       as Eval
-import           Text.EDE.Internal.HOAS       (Term)
 import qualified Text.EDE.Internal.Parser     as Parser
+import           Text.EDE.Internal.Quoted     (Term)
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)

@@ -8,7 +8,7 @@
 
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
--- Module      : Text.EDE.Internal.HOAS
+-- Module      : Text.EDE.Internal.Quoted
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -18,10 +18,11 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.HOAS where
+module Text.EDE.Internal.Quoted where
 
 import           Control.Applicative
 import           Control.Monad
+import qualified Data.Aeson                   as A
 import           Data.Aeson                   hiding (Result(..))
 import           Data.Bifunctor
 import qualified Data.HashMap.Strict          as Map
@@ -33,6 +34,7 @@ import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Lazy               as LText
 import           Data.Text.Lazy.Builder
+import           Data.Text.Manipulate         (toOrdinal)
 import qualified Data.Vector                  as Vector
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), (<+>))
@@ -47,7 +49,7 @@ data Term
     | TLam !Id (Int -> Term -> Result Term)
 
 instance Show Term where
-    show (TVal v)   = show v
+    show (TVal   v) = show v
     show (TLam k _) = Text.unpack ("<function:" <> k <> ">")
 
 -- | Retrieve a consistent type from a 'Value' to use in error messages.
@@ -107,53 +109,35 @@ instance Quote Builder where
 class Unquote a where
     unquote :: Id -> Int -> Term -> Result a
 
-instance Unquote Value where
+    default unquote :: FromJSON a => Id -> Int -> Term -> Result a
     unquote k n = \case
-        TVal v -> pure v
-        _      -> unexpected k n typeFun "Literal"
+        TLam{} -> unexpected k n typeFun "Literal"
+        TVal v ->
+            case fromJSON v of
+                A.Success x -> pure x
+                A.Error   e ->
+                    throwError "type error in {} argument to {}: {}"
+                        [toOrdinal n, k, Text.pack e]
 
-instance Unquote Text where
-    unquote k n = unquote k n >=> \case
-        String t -> pure t
-        v        -> unexpected k n (typeOf v) "String"
-
-instance Unquote LText.Text where
-    unquote k n = fmap LText.fromStrict . unquote k n
-
-instance Unquote Bool where
-    unquote k n = unquote k n >=> \case
-        Bool b -> pure b
-        v      -> unexpected k n (typeOf v) "Bool"
+instance Unquote Value
+instance Unquote Text
+instance Unquote [Text]
+instance Unquote LText.Text
+instance Unquote Bool
+instance Unquote Double
+instance Unquote Scientific
+instance Unquote Object
+instance Unquote Array
 
 instance Unquote Int where
     unquote k n = unquote k n >=>
-        maybe (unexpected k n "Number" "Int") pure
+        maybe (unexpected k n "Double" "Int") pure
             . toBoundedInteger
 
 instance Unquote Integer where
     unquote k n = unquote k n >=>
-        either (const (unexpected k n "Number" "Integral")) pure
+        either (const (unexpected k n "Double" "Integral")) pure
             . floatingOrInteger
-
-instance Unquote Double where
-    unquote k n = fmap toRealFloat . unquote k n
-
-instance Unquote Scientific where
-    unquote k n = unquote k n >=> \case
-        Number d -> pure d
-        v        -> unexpected k n (typeOf v) "Number"
-
-instance Unquote Object where
-    unquote k n = \case
-        TVal (Object o) -> pure o
-        TVal v          -> unexpected k n (typeOf v) "Object"
-        _               -> unexpected k n typeFun "Object"
-
-instance Unquote Array where
-    unquote k n = \case
-        TVal (Array a) -> pure a
-        TVal v         -> unexpected k n (typeOf v) "Array"
-        _              -> unexpected k n typeFun "Array"
 
 instance Unquote Collection where
     unquote k n q =
@@ -173,4 +157,5 @@ instance Unquote Collection where
         vector v = Col (Vector.length v) (Vector.map (Nothing,) v)
 
 unexpected :: Id -> Int -> String -> String -> Result b
-unexpected k n x y = throwError "unable to coerce {}:{}:{} -> {}" [show k, show n, x, y]
+unexpected k n x y = throwError "unable to coerce {}:{}:{} -> {}"
+    [show k, show n, x, y]

@@ -5,7 +5,7 @@
 
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
--- Module      : Text.EDE.Filters
+-- Module      : Text.EDE.Internal.Stdlib
 -- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -15,29 +15,28 @@
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
 
-module Text.EDE.Internal.Filters where
+module Text.EDE.Internal.Stdlib where
 
 import           Control.Applicative
-import           Data.Aeson              (Value(..), Array, Object, encode)
-import qualified Data.Char               as Char
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as Map
+import           Data.Aeson               (Value(..), Array, Object, encode)
+import qualified Data.Char                as Char
+import           Data.HashMap.Strict      (HashMap)
+import qualified Data.HashMap.Strict      as Map
 import           Data.Maybe
-import           Data.Monoid
-import           Data.Scientific         (Scientific)
-import           Data.Text               (Text)
-import qualified Data.Text               as Text
-import qualified Data.Text.Lazy          as LText
-import qualified Data.Text.Lazy.Encoding as LText
+import           Data.Scientific          (Scientific)
+import           Data.Text                (Text)
+import qualified Data.Text                as Text
+import qualified Data.Text.Lazy           as LText
+import qualified Data.Text.Lazy.Encoding  as LText
 import           Data.Text.Manipulate
-import qualified Data.Vector             as Vector
-import           Text.EDE.Internal.HOAS
+import qualified Data.Vector              as Vector
+import           Text.EDE.Internal.Quoted
 import           Text.EDE.Internal.Types
 
 default (Integer)
 
-defaultFilters :: HashMap Text Term
-defaultFilters = Map.fromList
+stdlib :: HashMap Text Term
+stdlib = Map.fromList
     -- boolean
     [ "!"              @: not
     , "&&"             @: (&&)

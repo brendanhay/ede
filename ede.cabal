@@ -57,9 +57,9 @@ library
 
     other-modules:
         Text.EDE.Internal.Eval
-      , Text.EDE.Internal.Filters
-      , Text.EDE.Internal.HOAS
       , Text.EDE.Internal.Parser
+      , Text.EDE.Internal.Quoted
+      , Text.EDE.Internal.Stdlib
       , Text.EDE.Internal.Syntax
       , Text.EDE.Internal.Types
 

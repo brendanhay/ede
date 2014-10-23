@@ -58,8 +58,8 @@ module Text.EDE.Filters
     , typeOf
     ) where
 
-import Text.EDE.Internal.HOAS
-import Text.EDE.Internal.Filters
+import Text.EDE.Internal.Quoted
+import Text.EDE.Internal.Stdlib
 
 -- $prelude
 --
@@ -95,27 +95,27 @@ import Text.EDE.Internal.Filters
 
 -- $numeric
 --
--- * '+'      @:: Number -> Number -> Number@
+-- * '+'      @:: Scientific -> Scientific -> Scientific@
 --
--- * '-'      @:: Number -> Number -> Number@
+-- * '-'      @:: Scientific -> Scientific -> Scientific@
 --
--- * '*'      @:: Number -> Number -> Number@
+-- * '*'      @:: Scientific -> Scientific -> Scientific@
 --
--- * 'abs'    @:: Number -> Number@
+-- * 'abs'    @:: Scientific -> Scientific@
 --
--- * 'signum' @:: Number -> Number@
+-- * 'signum' @:: Scientific -> Scientific@
 --
--- * 'negate' @:: Number -> Number@
+-- * 'negate' @:: Scientific -> Scientific@
 
 -- $fractional
 --
--- * 'truncate' @:: Number -> Number@
+-- * 'truncate' @:: Scientific -> Scientific@
 --
--- * 'round'    @:: Number -> Number@
+-- * 'round'    @:: Scientific -> Scientific@
 --
--- * 'ceiling'  @:: Number -> Number@
+-- * 'ceiling'  @:: Scientific -> Scientific@
 --
--- * 'floor'    @:: Number -> Number@
+-- * 'floor'    @:: Scientific -> Scientific@
 
 -- $textual
 --
@@ -143,11 +143,11 @@ import Text.EDE.Internal.Filters
 --
 -- * 'Data.Text.toUpper'              @:: Text -> Text@
 --
--- * 'Data.Text.Manipulate.toOrdinal' @:: Number -> Text@
+-- * 'Data.Text.Manipulate.toOrdinal' @:: Scientific -> Text@
 
 -- $collection
 --
--- * @length@ @:: Collection -> Number@ (/See/: Text.'Data.Text.length', Vector.'Data.Vector.length', HashMap.'Data.HashMap.Strict.size')
+-- * @length@ @:: Collection -> Scientific@ (/See/: Text.'Data.Text.length', Vector.'Data.Vector.length', HashMap.'Data.HashMap.Strict.size')
 --
 -- * @empty@  @:: Collection -> Bool@ (/See/: Text:'Data.Text.null', Vector.'Data.Vector.null', HashMap.'Data.HashMap.Strict.null')
 
