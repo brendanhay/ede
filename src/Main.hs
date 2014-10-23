@@ -46,8 +46,8 @@ optionParser = Options
          ( short   'd'
         <> long    "data"
         <> metavar "JSON"
-        <> help    ("Bindings to make available in the environment, as JSON. \
-                    \If not given, standard input is read.")
+        <> help    "Bindings to make available in the environment, as JSON. \
+                   \If not given, standard input is read."
          ))
 
     <*> switch
