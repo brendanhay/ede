@@ -1,21 +1,43 @@
-Bool:
+Boolean Operands:
 false
+true
+false
+true
+true
 true
 
 Eq:
-
 Ord:
-
 Num:
-
 RealFrac:
 
-Text:
-lorem ipsum
-LOREM IPSUM
-lorem Ipsum
-Lorem ipsum
-text | lower == "lorem ipsum"
+Text Casing:
+Text Casing:
+lorem ipsum-Phrase
+Lorem ipsum-Phrase
+lorem ipsum-phrase
+LOREM IPSUM-PHRASE
+Lorem Ipsum Phrase
+loremIpsumPhrase
+LoremIpsumPhrase
+lorem_ipsum_phrase
+lorem-ipsum-phrase
+Lorem-Ipsum-Phrase
+1st
+Lorem ipsum-phrase
+single | lower == "lorem ipsum"
+
+Text Substitution:
+Lorem
+ipsum-Phrase
+orem ipsum-Phrase
+IpsumPhrase
+ipsum-Phrase
+Lorem ipsum-
+Lorem ipsum-Phrase
+Lorem ipsum-Phrase
+Hi!
+Phrase
 
 Sequences:
 0

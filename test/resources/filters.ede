@@ -35,7 +35,7 @@ Text Casing:
 {{ single | toTrain }}
 {{ number | toOrdinal }}
 {{ single | toLower | upperHead }}
-{% if (single | toLower) == "lorem ipsum" %}
+{% if (single | toLower) == "lorem ipsum-phrase" %}
 single | lower == "lorem ipsum"
 {% endif %}
 
