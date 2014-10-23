@@ -1,0 +1,5 @@
+{ "map": { "key": 12.31 } }
+---
+{{ var | defined }}
+{{ map.key | defined }}
+{{ map.var | defined }}

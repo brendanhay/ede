@@ -33,7 +33,6 @@ import qualified Data.Text.Lazy.Encoding      as LText
 import           Data.Text.Manipulate
 import qualified Data.Text.Unsafe             as Text
 import qualified Data.Vector                  as Vector
-import           Data.Vector                  (Vector)
 import           Text.EDE.Internal.Quoting
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), (<+>))
@@ -128,32 +127,11 @@ stdlib = Map.fromList
 
     -- polymorphic
     , "show"           @: (LText.decodeUtf8 . encode :: Value -> LText.Text)
-    -- , "default"      @: undefined
-    -- , "defined"      @: undefined
+
+    -- FIXME: existence checks currently hardcoded into the evaluator:
+    -- "default"
+    -- "defined"
     ]
-
-headT, lastT, tailT, initT :: Text -> Value
-headT = text (Text.singleton . Text.unsafeHead)
-lastT = text (Text.singleton . Text.last)
-tailT = text Text.unsafeTail
-initT = text Text.init
-
-headV, lastV, tailV, initV :: Text -> Value
-headV = vec Vector.unsafeHead
-lastV = vec Vector.unsafeLast
-tailV = vec (Array . Vector.unsafeTail)
-initV = vec (Array . Vector.unsafeInit)
-
-text :: (Text -> Text) -> Text -> Value
-text f = String . safe mempty Text.null f
-
-vec :: (Array -> Value) -> Array -> Value
-vec = safe (Array Vector.empty) Vector.null
-
-safe :: b -> (a -> Bool) -> (a -> b) -> a -> b
-safe v f g x
-    | f x       = v
-    | otherwise = g x
 
 (@:) :: Quote a => Id -> a -> (Id, Term)
 k @: q = (k, quote k 0 q)
@@ -197,3 +175,26 @@ qcol1 k f g h = (k,) . TLam $ \case
     TVal (Array  v) -> pure . quote k 0 $ h v
     x               -> Failure $
         "when expecting a String, Object, or Array, encountered" <+> pretty x
+
+headT, lastT, tailT, initT :: Text -> Value
+headT = text (Text.singleton . Text.unsafeHead)
+lastT = text (Text.singleton . Text.last)
+tailT = text Text.unsafeTail
+initT = text Text.init
+
+headV, lastV, tailV, initV :: Array -> Value
+headV = vec Vector.unsafeHead
+lastV = vec Vector.unsafeLast
+tailV = vec (Array . Vector.unsafeTail)
+initV = vec (Array . Vector.unsafeInit)
+
+text :: (Text -> Text) -> Text -> Value
+text f = String . safe mempty Text.null f
+
+vec :: (Array -> Value) -> Array -> Value
+vec = safe (Array Vector.empty) Vector.null
+
+safe :: b -> (a -> Bool) -> (a -> b) -> a -> b
+safe v f g x
+    | f x       = v
+    | otherwise = g x

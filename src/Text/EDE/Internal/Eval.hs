@@ -14,6 +14,8 @@
 
 module Text.EDE.Internal.Eval where
 
+import Debug.Trace
+
 import           Control.Applicative
 import           Control.Comonad.Cofree
 import           Control.Monad
@@ -65,6 +67,8 @@ eval (d :< EFun i) = do
     maybe (throwError d $ "filter" <+> PP.bold (pp i) <+> "doesn't exist.")
           return
           q
+
+eval (_ :< EApp (_ :< EFun "defined") e) = predicate e
 
 eval (d :< EApp a b) = do
     x <- eval a
