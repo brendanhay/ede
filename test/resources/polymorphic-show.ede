@@ -1,0 +1,17 @@
+{
+  "single": "Lorem ipsum-Phrase",
+  "whitespace": "  A Word  ",
+  "bool": true,
+  "number": 1.0,
+  "alpha": ["a", "b", "c", "d", "e"],
+  "numeric": [1, 2, 3, 4, 5],
+  "object": {"foo": "x", "bar": "y"}
+}
+---
+{{ single | show }}
+{{ whitespace | show }}
+{{ bool | show }}
+{{ number | show }}
+{{ alpha | show }}
+{{ numeric | show }}
+{{ object | show }}

@@ -1,0 +1,13 @@
+{
+  "alpha": ["a", "b", "c", "d", "e"],
+  "numeric": [1, 2, 3, 4, 5],
+  "object": {"foo": "x", "bar": "y"},
+  "nothing": []
+}
+---
+{{ "" | empty }}
+{{ "supercalifragilistic" | empty }}
+{{ alpha | empty }}
+{{ numeric | empty }}
+{{ object | empty }}
+{{ nothing | empty }}

@@ -1,0 +1,11 @@
+{
+  "alpha": ["a", "b", "c", "d", "e"],
+  "numeric": [1, 2, 3, 4, 5],
+  "object": {"foo": "x", "bar": "y"}
+}
+---
+{{ "" | length }}
+{{ "123" | length }}
+{{ alpha | length }}
+{{ numeric | length }}
+{{ object | length }}

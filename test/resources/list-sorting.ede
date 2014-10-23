@@ -1,0 +1,9 @@
+{
+  "single": "Lorem ipsum-Phrase",
+  "alpha": ["a", "b", "c", "d", "e"],
+  "numeric": [1, 2, 3, 4, 5]
+}
+---
+{{ single | reverse }}
+{{ alpha | reverse | show }}
+{{ numeric | reverse | show }}

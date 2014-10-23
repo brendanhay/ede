@@ -94,10 +94,10 @@ stdlib = Map.fromList
     , "stripStart"     @: Text.stripStart
     , "stripEnd"       @: Text.stripEnd
     , "replace"        @: flip Text.replace
-    , "remove"         @: flip Text.replace ""
+    , "remove"         @: (\x r -> Text.replace r "" x)
 
-    , "toEllipsis"     @: toEllipsis
-    , "toEllipsisWith" @: flip toEllipsisWith
+    , "toEllipsis"     @: flip toEllipsis
+    , "toEllipsisWith" @: (\x n e -> toEllipsisWith n e x)
 
     , "indentLines"    @: flip indentLines
     , "prependLines"   @: flip prependLines
@@ -113,7 +113,7 @@ stdlib = Map.fromList
     -- lists
     , qlist1 "head"    headT headV
     , qlist1 "last"    lastT lastV
-    , qlist1 "tail"    lastT lastV
+    , qlist1 "tail"    lastT tailV
     , qlist1 "init"    initT initV
 
     -- object

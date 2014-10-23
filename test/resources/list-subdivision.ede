@@ -1,0 +1,13 @@
+{
+  "single": "Lorem ipsum-Phrase",
+  "multi": "Navzdory všeobecnému\npřesvědčení\nLorem Ipsum není\nnáhodný text.",
+  "alpha": ["a", "b", "c", "d", "e"],
+  "numeric": [1, 2, 3, 4, 5]
+}
+---
+{{ multi | head }}
+{{ alpha | head }}
+{{ numeric | init | show }}
+{{ alpha | tail | show }}
+{{ alpha | last }}
+{{ single | splitWords | last }}
