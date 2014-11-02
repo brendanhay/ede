@@ -30,7 +30,6 @@ import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty(..))
 import qualified Data.List.NonEmpty           as NonEmpty
-import           Data.Maybe
 import           Data.Monoid                  hiding ((<>))
 import           Data.Semigroup
 import           Data.Text                    (Text)
@@ -151,6 +150,7 @@ instance Pretty Var where
     pretty (Var is) = PP.hcat
         . PP.punctuate "."
         . map (PP.bold . pp)
+        . reverse
         $ NonEmpty.toList is
 
 instance Show Var where
