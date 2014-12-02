@@ -25,7 +25,7 @@ import qualified Data.HashMap.Strict               as Map
 import           Data.List.NonEmpty                (NonEmpty(..))
 import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Monoid
-import           Data.Scientific                   (isFloating, base10Exponent)
+import           Data.Scientific                   (isFloating)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
 import           Data.Text.Lazy.Builder            (Builder)
