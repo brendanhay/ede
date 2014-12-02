@@ -25,14 +25,14 @@ import qualified Data.HashMap.Strict               as Map
 import           Data.List.NonEmpty                (NonEmpty(..))
 import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Monoid
-import           Data.Scientific                   (base10Exponent)
+import           Data.Scientific                   (isFloating, base10Exponent)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
 import           Data.Text.Lazy.Builder            (Builder)
 import           Data.Text.Lazy.Builder.Scientific
 import           Data.Text.Manipulate              (toOrdinal)
+import           Text.EDE.Internal.Filters         (stdlib)
 import           Text.EDE.Internal.Quoting
-import           Text.EDE.Internal.Filters          (stdlib)
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen      (Doc, Pretty(..), (<+>))
 import qualified Text.PrettyPrint.ANSI.Leijen      as PP
@@ -208,8 +208,8 @@ build _ (String t)   = return (Build.build t)
 build _ (Bool True)  = return "true"
 build _ (Bool False) = return "false"
 build _ (Number n)
-    | base10Exponent n == 0 = return (formatScientificBuilder Fixed (Just 0) n)
-    | otherwise             = return (scientificBuilder n)
+    | isFloating n = return (formatScientificBuilder Fixed Nothing  n)
+    | otherwise    = return (formatScientificBuilder Fixed (Just 0) n)
 build d x =
     throwError d ("unable to render literal" <+> pp x)
 
