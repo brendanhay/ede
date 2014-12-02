@@ -1,0 +1,11 @@
+{
+  "double": 1.0567,
+  "integral": 492,
+  "positive": 10.0,
+  "negative": -0.05
+}
+---
+{{ double }}
+{{ integral }}
+{{ positive }}
+{{ negative }}
