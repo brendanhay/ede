@@ -21,8 +21,7 @@ dist/setup-config: install
 install: cabal.sandbox.config
 	cabal install -j $(FLAGS) \
  --only-dependencies \
- --disable-documentation \
- --disable-library-coverage
+ --disable-documentation
 
 cabal.sandbox.config:
 	cabal sandbox init --sandbox=$(CABAL_SANDBOX)
