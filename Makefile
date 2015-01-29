@@ -1,51 +1,29 @@
-SHELL         := /usr/bin/env bash
-CABAL_SANDBOX ?= $(CURDIR)/.cabal-sandbox
-FLAGS         := --enable-tests --enable-benchmarks -fbuild-executable
-NAME          := ede
-VERSION       := $(shell sed -n 's/^version: *\(.*\)$$/\1/p' $(NAME).cabal)
-BUILD_NUMBER  ?= 0
-DEB           := dist/$(NAME)_$(VERSION)+$(BUILD_NUMBER)_amd64.deb
-BIN           := dist/image/bin/ede
+SHELL := /usr/bin/env bash
 
-.PHONY: test doc
+.PHONY: bench test
 
-build: dist/setup-config
+build:
 	cabal build $(addprefix -,$(findstring j,$(MAKEFLAGS)))
 
-all:
-	make clean; make dist
-
-dist/setup-config: install
-	cabal configure $(FLAGS) --bindir=bin --libdir=lib
-
 install: cabal.sandbox.config
-	cabal install -j $(FLAGS) \
- --only-dependencies \
- --disable-documentation
+	cabal install -j \
+ --disable-documentation \
+ --only-dependencies
 
 cabal.sandbox.config:
-	cabal sandbox init --sandbox=$(CABAL_SANDBOX)
+	cabal sandbox init
 
-clean:
-	-rm -rf bin lib dist cabal.sandbox.config .cabal-sandbox
-	cabal clean
+bench:
+	cabal install --enable-benchmarks && \
+ cabal bench --benchmark-option=-obenchmark.html
 
 test:
-	cabal test
+	cabal install --enable-tests && \
+ cabal test
+
+clean:
+	cabal clean
+	rm -rf cabal.sandbox.config .cabal-sandbox benchmark.html
 
 doc:
 	cabal haddock
-
-dist: $(DEB)
-	cabal sdist
-
-$(BIN): build
-	cabal copy --destdir=dist/image && upx $@
-
-%.deb: $(BIN)
-	makedeb --name=$(NAME) \
- --version=$(VERSION) \
- --debian-dir=deb \
- --build=$(BUILD_NUMBER) \
- --architecture=amd64 \
- --output-dir=dist
