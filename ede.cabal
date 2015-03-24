@@ -38,7 +38,12 @@ description:
 extra-source-files:
     README.md
 
+data-files:
+      test/resources/*.ede
+    , test/resources/*.golden
+
 source-repository head
+
     type:     git
     location: git://github.com/brendanhay/ede.git
 
