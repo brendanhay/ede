@@ -3,7 +3,7 @@
 {-# LANGUAGE TupleSections     #-}
 
 -- Module      : Text.EDE.Internal.Eval
--- Copyright   : (c) 2013-2014 Brendan Hay <brendan.g.hay@gmail.com>
+-- Copyright   : (c) 2013-2015 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
 --               A copy of the MPL can be found in the LICENSE file or
@@ -25,7 +25,7 @@ import qualified Data.HashMap.Strict               as Map
 import           Data.List.NonEmpty                (NonEmpty(..))
 import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Monoid
-import           Data.Scientific                   (isFloating, base10Exponent)
+import           Data.Scientific                   (isFloating)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
 import           Data.Text.Lazy.Builder            (Builder)
