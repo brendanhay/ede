@@ -13,6 +13,7 @@
 module Main (main) where
 
 import           Control.Applicative
+import           Control.Monad
 import qualified Data.Aeson              as Aeson
 import           Data.Bifunctor
 import qualified Data.ByteString         as BS
@@ -21,6 +22,7 @@ import           Data.List               (isSuffixOf)
 import           Data.Maybe
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy.Encoding as LText
+import           Paths_ede
 import           System.Directory
 import           System.IO.Unsafe
 import           Test.Tasty
@@ -31,7 +33,7 @@ main :: IO ()
 main = defaultMain . testGroup "ED-E" $ unsafePerformIO tests
 
 resources :: FilePath
-resources = "test/resources/"
+resources = unsafePerformIO getDataDir
 
 include :: Resolver IO
 include = includeFile resources
