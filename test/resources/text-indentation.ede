@@ -1,6 +1,5 @@
 {
   "single": "lorem",
-  "multi": "Navzdory všeobecnému\npřesvědčení\nLorem Ipsum není\nnáhodný text.",
   "pad": 12
 }
 ---
@@ -9,7 +8,3 @@
 {{ single | center(9) }}
 {{ single | justifyLeft(pad) }}
 {{ single | justifyRight(pad) }}
-
-{{ multi | indentLines(4) }}
-
-{{ multi | prependLines("...") }}
