@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE CPP               #-}
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2015 Brendan Hay <brendan.g.hay@gmail.com>
@@ -30,7 +31,11 @@ import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty(..))
 import qualified Data.List.NonEmpty           as NonEmpty
+#if MIN_VERSION_base(4,8,0)
+import           Data.Monoid                  hiding ((<>), Alt)
+#else
 import           Data.Monoid                  hiding ((<>))
+#endif
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
