@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE CPP               #-}
 
 -- Module      : Text.EDE.Internal.AST
 -- Copyright   : (c) 2013-2015 Brendan Hay <brendan.g.hay@gmail.com>
@@ -20,7 +21,11 @@ import Data.Aeson.Types
 import Data.Foldable
 import Data.List.NonEmpty      (NonEmpty(..))
 import Data.Maybe
-import Data.Monoid
+#if MIN_VERSION_base(4,8,0)
+import           Data.Monoid                  hiding (Alt)
+#else
+import Data.Monoid  
+#endif
 import Text.EDE.Internal.Types
 
 newtype Mu f = Mu (f (Mu f))
