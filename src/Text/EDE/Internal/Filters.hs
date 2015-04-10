@@ -25,7 +25,7 @@ import qualified Data.Char                    as Char
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as Map
 import           Data.Maybe
-import           Data.Monoid                  ((<>))
+import           Data.Monoid                  (mempty)
 import           Data.Scientific              (Scientific)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
