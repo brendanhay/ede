@@ -25,16 +25,15 @@ import           Control.Applicative
 import           Control.Comonad
 import           Control.Comonad.Cofree
 import           Control.Lens
-import           Data.Aeson.Types             hiding (Result(..))
+import           Data.Aeson.Types             hiding (Result (..))
 import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
-import           Data.List.NonEmpty           (NonEmpty(..))
+import           Data.List.NonEmpty           (NonEmpty (..))
 import qualified Data.List.NonEmpty           as NonEmpty
-import           Data.Monoid                  hiding ((<>))
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), Doc)
+import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty (..))
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           Text.Trifecta.Delta
 

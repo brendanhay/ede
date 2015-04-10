@@ -1,8 +1,8 @@
-{-# LANGUAGE ExtendedDefaultRules       #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE ExtendedDefaultRules #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TupleSections        #-}
 
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
@@ -19,12 +19,13 @@
 module Text.EDE.Internal.Filters where
 
 import           Control.Applicative
-import           Data.Aeson                   (Value(..), Array, Object, encode)
+import           Data.Aeson                   (Array, Object, Value (..),
+                                               encode)
 import qualified Data.Char                    as Char
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as Map
 import           Data.Maybe
-import           Data.Monoid
+import           Data.Monoid                  ((<>))
 import           Data.Scientific              (Scientific)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
@@ -35,7 +36,7 @@ import qualified Data.Text.Unsafe             as Text
 import qualified Data.Vector                  as Vector
 import           Text.EDE.Internal.Quoting
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (Pretty(..), (<+>))
+import           Text.PrettyPrint.ANSI.Leijen (Pretty (..), (<+>))
 
 default (Integer)
 
