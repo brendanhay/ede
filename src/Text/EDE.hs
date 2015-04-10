@@ -118,8 +118,9 @@ import qualified Data.ByteString              as BS
 import           Data.Foldable                (foldrM)
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as Map
-import           Data.List.NonEmpty           (NonEmpty(..))
-import           Data.Monoid
+import           Data.List.NonEmpty           (NonEmpty (..))
+import           Data.Monoid                  (mappend)
+import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Lazy               as LText
@@ -130,25 +131,11 @@ import           System.Directory
 import           System.FilePath
 import qualified Text.EDE.Internal.Eval       as Eval
 import qualified Text.EDE.Internal.Parser     as Parser
-import           Text.EDE.Internal.Quoting     (Term)
+import           Text.EDE.Internal.Quoting    (Term)
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
 import           Text.PrettyPrint.ANSI.Leijen (string)
 import           Text.Trifecta.Delta
-
--- FIXME: add documentation for all stdlib filters
-
--- FIXME: detect include/import loops
--- FIXME: {%- tags to deliberately strip/trim whitespace
--- FIXME: ... {% include %} inline adds a trailing newline
--- FIXME: streaming io
--- FIXME: add benchmarks
--- FIXME: add capture
--- FIXME: numerous 'try' calls were added during development, these should now be reduced.
--- FIXME: add pretty printer formatted error messages to the evaluator
-
--- FIXME: would like to use PHOAS in-place of Term if it can be annotated
--- in a similar fashion such as comonad/cofree.
 
 -- | ED-E Version.
 version :: Version

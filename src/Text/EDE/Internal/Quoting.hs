@@ -1,10 +1,10 @@
-{-# LANGUAGE DefaultSignatures          #-}
-{-# LANGUAGE ExtendedDefaultRules       #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE ExtendedDefaultRules #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TupleSections        #-}
 
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
@@ -22,13 +22,13 @@ module Text.EDE.Internal.Quoting where
 
 import           Control.Applicative
 import           Control.Monad
+import           Data.Aeson                   hiding (Result (..))
 import qualified Data.Aeson                   as A
-import           Data.Aeson                   hiding (Result(..))
 import           Data.Bifunctor
 import qualified Data.ByteString.Char8        as BS
 import qualified Data.HashMap.Strict          as Map
 import           Data.List                    (sortBy)
-import           Data.Monoid
+import           Data.Monoid                  (mappend, (<>))
 import           Data.Ord                     (comparing)
 import           Data.Scientific
 import           Data.Text                    (Text)
@@ -39,7 +39,7 @@ import           Data.Text.Lazy.Builder
 import           Data.Text.Manipulate         (toOrdinal)
 import qualified Data.Vector                  as Vector
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty(..), (<+>), (</>))
+import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty (..), (<+>), (</>))
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           Text.Trifecta.Delta
 import           Text.Trifecta.Rendering
