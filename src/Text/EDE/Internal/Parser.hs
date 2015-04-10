@@ -34,6 +34,7 @@ import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import           Data.List.NonEmpty         (NonEmpty(..))
 import qualified Data.List.NonEmpty         as NonEmpty
+import           Data.Monoid                (mempty)
 import           Data.Scientific
 import           Data.Semigroup
 import           Data.Text                  (Text)

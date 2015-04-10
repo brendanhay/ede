@@ -119,7 +119,7 @@ import           Data.Foldable                (foldrM)
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as Map
 import           Data.List.NonEmpty           (NonEmpty (..))
-import           Data.Monoid                  (mappend)
+import           Data.Monoid                  (mappend, mempty)
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
