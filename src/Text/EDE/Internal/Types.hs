@@ -30,6 +30,7 @@ import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty (..))
 import qualified Data.List.NonEmpty           as NonEmpty
+import           Data.Monoid                  (mempty)
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text

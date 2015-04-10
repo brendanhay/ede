@@ -28,9 +28,9 @@ import           Data.Bifunctor
 import qualified Data.ByteString.Char8        as BS
 import qualified Data.HashMap.Strict          as Map
 import           Data.List                    (sortBy)
-import           Data.Monoid                  (mappend, (<>))
 import           Data.Ord                     (comparing)
 import           Data.Scientific
+import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
