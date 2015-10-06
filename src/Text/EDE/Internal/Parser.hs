@@ -24,15 +24,15 @@ module Text.EDE.Internal.Parser where
 import           Control.Applicative
 import           Control.Comonad            (extract)
 import           Control.Comonad.Cofree
-import           Control.Lens               hiding (both, noneOf, op)
+import           Control.Lens               hiding ((:<), both, noneOf, op)
 import           Control.Monad.State.Strict
-import           Data.Aeson.Types           (Array, Object, Value(..))
+import           Data.Aeson.Types           (Array, Object, Value (..))
 import           Data.Bifunctor
 import           Data.ByteString            (ByteString)
 import           Data.Char                  (isSpace)
 import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
-import           Data.List.NonEmpty         (NonEmpty(..))
+import           Data.List.NonEmpty         (NonEmpty (..))
 import qualified Data.List.NonEmpty         as NonEmpty
 import           Data.Monoid                (mempty)
 import           Data.Scientific
@@ -47,8 +47,8 @@ import           Text.EDE.Internal.Types
 import           Text.Parser.Expression
 import           Text.Parser.LookAhead
 import           Text.Parser.Token.Style    (buildSomeSpaceParser)
+import           Text.Trifecta              hiding (Parser, Result (..), spaces)
 import qualified Text.Trifecta              as Tri
-import           Text.Trifecta              hiding (Parser, Result(..), spaces)
 import           Text.Trifecta.Delta
 
 data Env = Env
