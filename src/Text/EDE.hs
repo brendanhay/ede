@@ -289,9 +289,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- A simple example of parsing and rendering 'Text' containing a basic conditional
 -- expression and variable interpolation follows.
 --
--- First the 'Template' is defined:
+-- First the 'Template' is defined and parsed in the 'Result' monad:
 --
--- >>> let tmpl = "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Data.ByteString.ByteString
+-- >>> tmpl <- parse "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Result Template
 --
 -- Then an 'Object' is defined containing the environment which will be
 -- available to the 'Template' during rendering:
@@ -299,9 +299,9 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- >>> let env = fromPairs [ "var" .= "World" ] :: Object
 --
 -- Note: the 'fromPairs' function above is a wrapper over Aeson's 'object'
--- which removes the 'Value' constructor, exposing the delicious 'HashMap' underneath.
+-- which removes the outer 'Object' 'Value' constructor, exposing the underlying 'HashMap'.
 --
--- Finally the environment is applied to the 'Template':
+-- Then, the 'Template' is rendered using the 'Object' environment:
 --
 -- >>> render tmpl env :: Result Text
 -- > Success "Hello, World!"
