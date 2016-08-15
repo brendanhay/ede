@@ -110,7 +110,7 @@ runParser o n = res . parseByteString (runEDE run) pos
     pos = Directed (Text.encodeUtf8 n) 0 0 0 0
 
     res (Tri.Success x) = Success (_includes `second` x)
-    res (Tri.Failure e) = Failure e
+    res (Tri.Failure e) = Failure $ _errDoc e
 
 pragma :: Parser m => m ()
 pragma = void . many $ do
