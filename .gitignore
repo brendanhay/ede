@@ -6,12 +6,15 @@
 *.chs.h
 *.imports
 cabal.sandbox.config
+cabal.config
 
 # Dirs
-tmp
-log
-dist
 .cabal-sandbox
+dist
+vendor
+.vagrant.d
+.stack-work
+bin
 
 # CTAGS
 TAGS
@@ -25,9 +28,13 @@ tags
 .*.sw[a-z]
 *.un~
 *.org
+.projectile
 
 # OSX
 .DS_Store
+
+# Certificates
+*.pem
 
 # Templates
 *.tmpl
