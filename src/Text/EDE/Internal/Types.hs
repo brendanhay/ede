@@ -26,12 +26,10 @@ import           Control.Comonad
 import           Control.Comonad.Cofree
 import           Control.Lens
 import           Data.Aeson.Types             hiding (Result (..))
-import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty (..))
 import qualified Data.List.NonEmpty           as NonEmpty
 import           Data.Monoid                  (mempty)
-import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty (..))
@@ -129,10 +127,6 @@ makeClassy ''Syntax
 
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Syntax -> Id -> Delta -> m (Result Template)
-
-instance Applicative m => Semigroup (Resolver m) where
-    (f <> g) o k d = liftA2 (<|>) (f o k d) (g o k d) -- Haha!
-    {-# INLINE (<>) #-}
 
 -- | A parsed and compiled template.
 data Template = Template

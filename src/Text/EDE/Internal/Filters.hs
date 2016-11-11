@@ -18,7 +18,6 @@
 
 module Text.EDE.Internal.Filters where
 
-import           Control.Applicative
 import           Data.Aeson                   (Array, Object, Value (..),
                                                encode)
 import qualified Data.Char                    as Char

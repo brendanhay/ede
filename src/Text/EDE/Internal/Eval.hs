@@ -14,7 +14,6 @@
 
 module Text.EDE.Internal.Eval where
 
-import           Control.Applicative
 import           Control.Comonad.Cofree
 import           Control.Monad
 import           Control.Monad.Reader
