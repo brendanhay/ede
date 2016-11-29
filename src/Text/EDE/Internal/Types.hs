@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -8,6 +9,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
+
+#if __GLASGOW_HASKELL__ < 710
+{-# LANGUAGE OverlappingInstances #-}
+#endif
 
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2015 Brendan Hay <brendan.g.hay@gmail.com>
@@ -130,7 +135,11 @@ makeClassy ''Syntax
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Syntax -> Id -> Delta -> m (Result Template)
 
-instance Applicative m => Semigroup (Resolver m) where
+instance
+#if __GLASGOW_HASKELL__ >= 710
+  {-# OVERLAPPING #-}
+#endif
+  Applicative m => Semigroup (Resolver m) where
     (f <> g) o k d = liftA2 (<|>) (f o k d) (g o k d) -- Haha!
     {-# INLINE (<>) #-}
 

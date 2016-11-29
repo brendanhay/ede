@@ -34,6 +34,7 @@ module Text.EDE
     -- ** Includes
     -- $resolvers
     , Resolver
+    , Id
     , includeMap
     , includeFile
 
