@@ -471,7 +471,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- In the case of a literal it conforms directly to the supported boolean or relation logical
 -- operators from Haskell.
--- If a variable is singuarly used its existence determines the result of the predicate,
+-- If a variable is singularly used its existence determines the result of the predicate;
 -- the exception to this rule is boolean values which will be substituted into the
 -- expression if they exist in the supplied environment.
 --
