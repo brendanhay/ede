@@ -1,0 +1,9 @@
+resolver: lts-2.22
+
+packages:
+  - .
+
+extra-deps:
+  - trifecta-1.7.1.1
+  - cabal-doctest-1.0.4
+  - fail-4.9.0.0
