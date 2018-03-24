@@ -35,7 +35,6 @@ import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty (..))
 import qualified Data.List.NonEmpty           as NonEmpty
-import qualified Data.List                    as List
 import           Data.Monoid                  (mempty)
 import           Data.Semigroup
 import           Data.Text                    (Text)
@@ -44,6 +43,7 @@ import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty (..))
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           Text.Trifecta.Delta
 #if MIN_VERSION_base(4,9,0)
+import qualified Data.List                    as List
 import qualified Data.Functor.Classes         as FunctorClasses
 #endif
 
