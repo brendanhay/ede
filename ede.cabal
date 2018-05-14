@@ -1,5 +1,5 @@
 name:                  ede
-version:               0.2.8.6
+version:               0.2.8.7
 synopsis:              Templating language with similar syntax and features to Liquid or Jinja2.
 homepage:              http://github.com/brendanhay/ede
 license:               OtherLicense
@@ -75,6 +75,7 @@ library
         , bytestring           >= 0.9
         , comonad              >= 4.2
         , directory            >= 1.2
+        , double-conversion    >= 2.0.2
         , filepath             >= 1.2
         , free                 >= 4.8
         , lens                 >= 4.0

@@ -1,6 +1,9 @@
-compiler:   ghc-8.0.1
-resolver:   nightly-2016-08-11
-flags:      {}
-extra-deps: []
+resolver: lts-11.9
+
+nix:
+  enable: false
+  packages: []
+  add-gc-roots: true
+
 packages:
   - '.'
