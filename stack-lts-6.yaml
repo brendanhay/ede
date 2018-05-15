@@ -1,0 +1,7 @@
+resolver: lts-6.35
+
+packages:
+  - .
+
+extra-deps:
+  - trifecta-1.6

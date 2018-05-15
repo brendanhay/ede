@@ -27,6 +27,31 @@ A set of syntatic/semantic fragments for all supported expressions can be
 found in the [tests](test/resources) or the [documentation](http://brendanhay.github.io/ede/Text-EDE.html#syntax).
 
 
+## Command-line interface
+
+ED-E comes with a simple command-line app.
+
+```
+$ ede --help
+EDE template processor
+
+Usage: ede --template-file ARG --context-json ARG
+
+Available options:
+  -h,--help                Show this help text
+  --template-file ARG      Path of a file containing an EDE template
+  --context-json ARG       Template context as a JSON object
+```
+
+Example usage:
+
+```
+$ echo "Hello, {{name}}." > hello.ede
+$ ede --template-file hello.ede --context-json '{"name": "World"}'
+Hello, World.
+```
+
+
 ## Contribute
 
 For any problems, comments or feedback please create an issue [here on GitHub](github.com/brendanhay/ede/issues).
