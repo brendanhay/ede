@@ -84,7 +84,6 @@ library
         , scientific           >= 0.3.1
         , semigroups           >= 0.15
         , text                 >= 1.2
-        , text-format          >= 0.3
         , text-manipulate      >= 0.1.2
         , trifecta             >= 1.6
         , unordered-containers >= 0.2.3
