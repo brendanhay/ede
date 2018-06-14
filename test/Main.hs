@@ -12,48 +12,42 @@
 
 module Main (main) where
 
-import           Control.Applicative
 import qualified Data.Aeson              as Aeson
 import           Data.Bifunctor
 import qualified Data.ByteString         as BS
 import qualified Data.ByteString.Lazy    as LBS
-import           Data.List               (isSuffixOf)
 import           Data.Maybe
 import qualified Data.Text               as Text
 import qualified Data.Text.Lazy.Encoding as LText
-import           Paths_ede
-import           System.Directory
-import           System.IO.Unsafe
+import           System.FilePath
 import           Test.Tasty
 import           Test.Tasty.Golden
 import           Text.EDE
 
 main :: IO ()
-main = defaultMain . testGroup "ED-E" $ unsafePerformIO tests
+main = prepareTests >>= defaultMain
 
-resources :: FilePath
-resources = unsafePerformIO getDataDir
-
-include :: Resolver IO
-include = includeFile resources
-
-tests :: IO [TestTree]
-tests = files >>= mapM test
+prepareTests :: IO TestTree
+prepareTests = testGroup "ED-E" <$> (files >>= mapM test)
   where
+
+    testsDir = "test" </> "resources"
+
     files :: IO [FilePath]
-    files = map (resources ++) . filter (isSuffixOf ".ede")
-        <$> getDirectoryContents resources
+    files = findByExtension [".ede"] testsDir
+
+    include :: Resolver IO
+    include = includeFile testsDir
 
     test :: FilePath -> IO TestTree
     test f = do
-        (bs, n) <- (,)
-            <$> BS.readFile f
-            <*> pure (takeWhile (/= '.') f)
+
+        bs <- BS.readFile f
 
         let (js, src) = split bs
-            name      = Text.pack (n ++ ".ede")
+            name      = Text.pack f
 
-        return . goldenVsStringDiff n diff (n ++ ".golden") $ do
+        return . goldenVsStringDiff (takeBaseName f) diff (replaceExtension f "golden") $ do
             r <- parseWith defaultSyntax include name src
             result (error  . show)
                    (return . LText.encodeUtf8)

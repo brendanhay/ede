@@ -36,11 +36,12 @@ description:
     implicit type coercion, and unbound variable access are all treated as errors.
 
 extra-source-files:
-    README.md
-
-data-files:
-      test/resources/*.ede
+      README.md
+    , test/resources/*.ede
     , test/resources/*.golden
+    , test/resources/include.child1
+    , test/resources/include.child2
+    , test/resources/include.child3
 
 source-repository head
 
@@ -105,6 +106,7 @@ test-suite golden
         , bytestring
         , directory
         , ede
+        , filepath
         , text
         , tasty
         , tasty-golden
