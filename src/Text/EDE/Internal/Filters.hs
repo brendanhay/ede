@@ -112,6 +112,7 @@ stdlib = Map.fromList
     , qcol1 "reverse"  Text.reverse id Vector.reverse
 
     -- lists
+    , "at"             @: (\x i -> x Vector.! i :: Value)
     , qlist1 "head"    headT headV
     , qlist1 "last"    lastT lastV
     , qlist1 "tail"    lastT tailV

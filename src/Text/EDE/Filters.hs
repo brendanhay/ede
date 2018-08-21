@@ -147,6 +147,8 @@ import Text.EDE.Internal.Filters
 
 -- $collection
 --
+-- * @at@ @:: Collection -> Scientific@ (/See/: Vector.'Data.Vector.!')
+--
 -- * @length@ @:: Collection -> Scientific@ (/See/: Text.'Data.Text.length', Vector.'Data.Vector.length', HashMap.'Data.HashMap.Strict.size')
 --
 -- * @empty@  @:: Collection -> Bool@ (/See/: Text:'Data.Text.null', Vector.'Data.Vector.null', HashMap.'Data.HashMap.Strict.null')
