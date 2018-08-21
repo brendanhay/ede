@@ -71,86 +71,149 @@ import Text.EDE.Internal.Filters
 
 -- $boolean
 --
--- * @!@  @:: Bool -> Bool@ (/See:/ 'not')
+-- [@! :: Bool -> Bool@]
+-- /See:/ 'not'
 --
--- * '&&' @:: Bool -> Bool -> Bool@
+-- [@'&&' :: Bool -> Bool -> Bool@]
 --
--- * '||' @:: Bool -> Bool -> Bool@
+-- [@'||' :: Bool -> Bool -> Bool@]
 
 -- $equality
 --
--- * '==' @:: a -> a -> Bool@
+-- [@'==' :: a -> a -> Bool@]
 --
--- * @!=@ @:: a -> a -> Bool@ (/See/: '/=')
+-- [@!= :: a -> a -> Bool@]
+-- /See/: '/='
 
 -- $relational
 --
--- * '>'  @:: a -> a -> Bool@
+-- [@'>' :: a -> a -> Bool@]
 --
--- * '>=' @:: a -> a -> Bool@
+-- [@'>=' :: a -> a -> Bool@]
 --
--- * '<=' @:: a -> a -> Bool@
+-- [@'<=' :: a -> a -> Bool@]
 --
--- * '<=' @:: a -> a -> Bool@
+-- [@'<' :: a -> a -> Bool@]
 
 -- $numeric
 --
--- * '+'      @:: Scientific -> Scientific -> Scientific@
+-- [@'+' :: Scientific -> Scientific -> Scientific@]
 --
--- * '-'      @:: Scientific -> Scientific -> Scientific@
+-- [@'-' :: Scientific -> Scientific -> Scientific@]
 --
--- * '*'      @:: Scientific -> Scientific -> Scientific@
+-- [@'*' :: Scientific -> Scientific -> Scientific@]
 --
--- * 'abs'    @:: Scientific -> Scientific@
+-- [@'abs' :: Scientific -> Scientific@]
 --
--- * 'signum' @:: Scientific -> Scientific@
+-- [@'negate' :: Scientific -> Scientific@]
 --
--- * 'negate' @:: Scientific -> Scientific@
+-- [@'signum' :: Scientific -> Scientific@]
 
 -- $fractional
 --
--- * 'truncate' @:: Scientific -> Scientific@
+-- [@'ceiling' :: Scientific -> Scientific@]
 --
--- * 'round'    @:: Scientific -> Scientific@
+-- [@'floor' :: Scientific -> Scientific@]
 --
--- * 'ceiling'  @:: Scientific -> Scientific@
+-- [@'round' :: Scientific -> Scientific@]
 --
--- * 'floor'    @:: Scientific -> Scientific@
+-- [@'truncate' :: Scientific -> Scientific@]
 
 -- $textual
 --
--- * 'Data.Text.Manipulate.takeWord'  @:: Text -> Text@
+-- [@dropLower :: Text -> Text@]
+-- Drop preceding lowercase characters.
 --
--- * 'Data.Text.Manipulate.dropWord'  @:: Text -> Text@
+-- [@'dropUpper' :: Text -> Text@]
+-- Drop preceding uppercase characters.
 --
--- * 'Data.Text.Manipulate.lowerHead' @:: Text -> Text@
+-- [@'Data.Text.Manipulate.indentLines' :: Text -> Text@]
 --
--- * 'Data.Text.Manipulate.upperHead' @:: Text -> Text@
+-- [@'Data.Text.Manipulate.prependLines' :: Text -> Text@]
 --
--- * 'Data.Text.Manipulate.toTitle'   @:: Text -> Text@
+-- [@'Data.Text.justifyLeft' :: Text -> Text@]
+-- Using whitespace as fill character.
 --
--- * 'Data.Text.Manipulate.toCamel'   @:: Text -> Text@
+-- [@'Data.Text.justifyRight' :: Text -> Text@]
+-- Using whitespace as fill character.
 --
--- * 'Data.Text.Manipulate.toPascal'  @:: Text -> Text@
+-- [@'Data.Text.center' :: Text -> Text@]
+-- Using whitespace as fill character.
 --
--- * 'Data.Text.Manipulate.toSnake'   @:: Text -> Text@
+-- [@'Data.Text.replace' :: Text -> Text@]
 --
--- * 'Data.Text.Manipulate.toSpinal'  @:: Text -> Text@
+-- [@remove@ @:: Text -> Text@]
+-- Shortcut for: @replace(pattern, "")@
 --
--- * 'Data.Text.Manipulate.toTrain'   @:: Text -> Text@
+-- [@'Data.Text.Manipulate.splitWords' :: Text -> Text@]
 --
--- * 'Data.Text.toLower'              @:: Text -> Text@
+-- [@'Data.Text.strip' :: Text -> Text@]
 --
--- * 'Data.Text.toUpper'              @:: Text -> Text@
+-- [@'Data.Text.stripPrefix' :: Text -> Text@]
 --
--- * 'Data.Text.Manipulate.toOrdinal' @:: Scientific -> Text@
+-- [@'Data.Text.stripSuffix' :: Text -> Text@]
+--
+-- [@'Data.Text.stripStart' :: Text -> Text@]
+--
+-- [@'Data.Text.stripEnd' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.takeWord' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.dropWord' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.lowerHead' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.upperHead' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toCamel' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toEllipsis' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toEllipsisWith' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toPascal' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toSnake' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toSpinal' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toTitle' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toTrain' :: Text -> Text@]
+--
+-- [@'Data.Text.toLower' :: Text -> Text@]
+--
+-- [@'Data.Text.toUpper' :: Text -> Text@]
+--
+-- [@'Data.Text.Manipulate.toOrdinal' :: Scientific -> Text@]
 
 -- $collection
 --
--- * @length@ @:: Collection -> Scientific@ (/See/: Text.'Data.Text.length', Vector.'Data.Vector.length', HashMap.'Data.HashMap.Strict.size')
+-- [@length :: Collection -> Scientific@]
+-- /See/: Text.'Data.Text.length', Vector.'Data.Vector.length', HashMap.'Data.HashMap.Strict.size'
 --
--- * @empty@  @:: Collection -> Bool@ (/See/: Text:'Data.Text.null', Vector.'Data.Vector.null', HashMap.'Data.HashMap.Strict.null')
+-- [@empty :: Collection -> Bool@]
+-- /See/: Text.'Data.Text.null', Vector.'Data.Vector.null', HashMap.'Data.HashMap.Strict.null'
+--
+-- [@reverse :: Collection -> Scientific@]
+-- /See/: Text.'Data.Text.reverse', Vector.'Data.Vector.reverse'
+--
+-- [@head :: Collection -> Scientific@]
+-- /See/: Text.'Data.Text.head', Vector.'Data.Vector.head'
+--
+-- [@last :: Collection -> Scientific@]
+-- /See/: Text.'Data.Text.last', Vector.'Data.Vector.last'
+--
+-- [@tail :: Collection -> Scientific@]
+-- /See/: Text.'Data.Text.tail', Vector.'Data.Vector.tail'
+--
+-- [@init@ @:: Collection -> Scientific@]
+-- /See/: Text.'Data.Text.init', Vector.'Data.Vector.init'
+--
+-- [@'Data.HashMap.Strict.keys' :: Collection -> Scientific@]
+--
+-- [@'Data.HashMap.Strict.elems' :: Collection -> Scientific@]
 
 -- $polymorphic
 --
--- * 'show' @:: a -> Text@
+-- [@'show' :: a -> Text@]
