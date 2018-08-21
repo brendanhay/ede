@@ -23,6 +23,7 @@ import qualified Data.Text               as Text
 import qualified Data.Text.Lazy.Encoding as LText
 import           Paths_ede
 import           System.Directory
+import           System.FilePath         ((</>), (<.>), takeBaseName)
 import           System.IO.Unsafe
 import           Test.Tasty
 import           Test.Tasty.Golden
@@ -41,19 +42,19 @@ tests :: IO [TestTree]
 tests = files >>= mapM test
   where
     files :: IO [FilePath]
-    files = map (resources ++) . filter (isSuffixOf ".ede")
+    files = map (resources </>) . filter (isSuffixOf ".ede")
         <$> getDirectoryContents resources
 
     test :: FilePath -> IO TestTree
     test f = do
         (bs, n) <- (,)
             <$> BS.readFile f
-            <*> pure (takeWhile (/= '.') f)
+            <*> pure (takeBaseName f)
 
         let (js, src) = split bs
-            name      = Text.pack (n ++ ".ede")
+            name      = Text.pack (n <.> "ede")
 
-        return . goldenVsStringDiff n diff (n ++ ".golden") $ do
+        return . goldenVsStringDiff n diff (n <.> "golden") $ do
             r <- parseWith defaultSyntax include name src
             result (error  . show)
                    (return . LText.encodeUtf8)
