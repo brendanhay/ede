@@ -114,7 +114,7 @@ stdlib = Map.fromList
     -- lists
     , qlist1 "head"    headT headV
     , qlist1 "last"    lastT lastV
-    , qlist1 "tail"    lastT tailV
+    , qlist1 "tail"    tailT tailV
     , qlist1 "init"    initT initV
 
     -- object
