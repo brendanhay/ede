@@ -135,7 +135,7 @@ import qualified Text.EDE.Internal.Parser     as Parser
 import           Text.EDE.Internal.Quoting    (Term)
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (string)
+import           Text.PrettyPrint.ANSI.Leijen (Doc, punctuate, string, text)
 import           Text.Trifecta.Delta
 
 -- | ED-E Version.
@@ -228,9 +228,15 @@ includeMap ts _ k _
 -- If the 'identifier' doesn't exist as a valid 'FilePath', an 'Error' is returned.
 includeFile :: FilePath -- ^ Parent directory for relatively pathed includes.
             -> Resolver IO
-includeFile p o k _ = loadFile f >>= result failure (parseWith o inc k)
+includeFile = includeFile' []
+
+includeFile' :: [Id]     -- ^ The stack of already included partials.
+            -> FilePath -- ^ Parent directory for relatively pathed includes.
+            -> Resolver IO
+includeFile' ks _ _ k _ | k `elem` ks = failure ("includeFile: cycle detected: " <> ppCycle (k:ks))
+includeFile' ks p o k _ = loadFile f >>= result failure (parseWith o inc k)
     where
-      inc = includeFile (takeDirectory f)
+      inc = includeFile' (k:ks) (takeDirectory f)
 
       f | Text.null k = Text.unpack k
         | otherwise   = p </> Text.unpack k
@@ -241,6 +247,9 @@ loadFile p = do
     if not e
         then failure ("file " <> string p <> " doesn't exist.")
         else BS.readFile p >>= success
+
+ppCycle :: [Id] -> Doc
+ppCycle = mconcat . punctuate (text " > ") . map (string . Text.unpack) . reverse
 
 -- | Render an 'Object' using the supplied 'Template'.
 render :: Template -- ^ Parsed 'Template' to render.
