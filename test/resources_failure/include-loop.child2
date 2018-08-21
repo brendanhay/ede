@@ -1,0 +1,3 @@
+Before include-loop.child1
+{% include "include-loop.child1" %}
+After include-loop.child1

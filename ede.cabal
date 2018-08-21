@@ -44,6 +44,9 @@ data-files:
     , test/resources/*.child3
     , test/resources/*.ede
     , test/resources/*.golden
+    , test/resources_failure/*.child1
+    , test/resources_failure/*.child2
+    , test/resources_failure/*.ede
 
 source-repository head
 

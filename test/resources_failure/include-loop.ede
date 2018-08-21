@@ -1,0 +1,5 @@
+{ "timeout": 1000000 }
+---
+Before include-loop.child1
+{% include "include-loop.child1" %}
+After include-loop.child1
