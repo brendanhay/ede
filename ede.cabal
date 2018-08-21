@@ -112,3 +112,24 @@ test-suite golden
         , text
         , tasty
         , tasty-golden
+
+test-suite expected_failure
+    default-language:  Haskell2010
+    type:              exitcode-stdio-1.0
+    hs-source-dirs:    test
+    main-is:           ExpectedFailure.hs
+
+    ghc-options:       -Wall -threaded
+
+    build-depends:
+          aeson
+        , base          >= 4.6 && < 5
+        , bytestring
+        , directory
+        , ede
+        , filepath
+        , scientific
+        , text
+        , tasty
+        , tasty-hunit
+        , unordered-containers
