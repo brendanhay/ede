@@ -39,7 +39,10 @@ extra-source-files:
     README.md
 
 data-files:
-      test/resources/*.ede
+      test/resources/*.child1
+    , test/resources/*.child2
+    , test/resources/*.child3
+    , test/resources/*.ede
     , test/resources/*.golden
 
 source-repository head

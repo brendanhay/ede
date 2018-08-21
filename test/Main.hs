@@ -23,7 +23,7 @@ import qualified Data.Text               as Text
 import qualified Data.Text.Lazy.Encoding as LText
 import           Paths_ede
 import           System.Directory
-import           System.FilePath         ((</>), (<.>), takeBaseName)
+import           System.FilePath         ((</>), (<.>), replaceExtension, takeBaseName)
 import           System.IO.Unsafe
 import           Test.Tasty
 import           Test.Tasty.Golden
@@ -33,7 +33,7 @@ main :: IO ()
 main = defaultMain . testGroup "ED-E" $ unsafePerformIO tests
 
 resources :: FilePath
-resources = unsafePerformIO getDataDir
+resources = unsafePerformIO getDataDir </> "test" </> "resources"
 
 include :: Resolver IO
 include = includeFile resources
@@ -47,14 +47,14 @@ tests = files >>= mapM test
 
     test :: FilePath -> IO TestTree
     test f = do
-        (bs, n) <- (,)
-            <$> BS.readFile f
-            <*> pure (takeBaseName f)
+        bs <- BS.readFile f
 
         let (js, src) = split bs
+            n         = takeBaseName f
             name      = Text.pack (n <.> "ede")
+            golden    = replaceExtension f "golden"
 
-        return . goldenVsStringDiff n diff (n <.> "golden") $ do
+        return . goldenVsStringDiff n diff golden $ do
             r <- parseWith defaultSyntax include name src
             result (error  . show)
                    (return . LText.encodeUtf8)
