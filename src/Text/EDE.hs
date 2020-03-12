@@ -135,7 +135,7 @@ import qualified Text.EDE.Internal.Parser     as Parser
 import           Text.EDE.Internal.Quoting    (Term)
 import           Text.EDE.Internal.Syntax
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (string)
+import           Data.Text.Prettyprint.Doc
 import           Text.Trifecta.Delta
 
 -- | ED-E Version.
@@ -218,7 +218,7 @@ includeMap :: Monad m
            -> Resolver m          -- ^ Resolver for 'parseWith'.
 includeMap ts _ k _
     | Just v <- Map.lookup k ts = success v
-    | otherwise = failure ("unable to resolve " <> string (Text.unpack k))
+    | otherwise = failure ("unable to resolve " <> pretty k)
       -- FIXME: utilise deltas in error messages
 
 -- | 'FilePath' resolver for @include@ expressions.
@@ -239,7 +239,7 @@ loadFile :: FilePath -> IO (Result ByteString)
 loadFile p = do
     e <- doesFileExist p
     if not e
-        then failure ("file " <> string p <> " doesn't exist.")
+        then failure ("file " <> pretty p <> " doesn't exist.")
         else BS.readFile p >>= success
 
 -- | Render an 'Object' using the supplied 'Template'.

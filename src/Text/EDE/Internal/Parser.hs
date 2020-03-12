@@ -63,6 +63,7 @@ instance HasSyntax Env where
 
 type Parser m =
     ( Monad m
+    , MonadFail m
     , MonadState Env m
     , TokenParsing m
     , DeltaParsing m
@@ -76,6 +77,7 @@ newtype EDE a = EDE { runEDE :: Tri.Parser a }
         , Applicative
         , Alternative
         , Monad
+        , MonadFail
         , MonadPlus
         , Parsing
         , CharParsing

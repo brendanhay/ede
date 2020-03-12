@@ -39,8 +39,14 @@ import           Data.Monoid                  (mempty)
 import           Data.Semigroup
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty (..))
-import qualified Text.PrettyPrint.ANSI.Leijen as PP
+import           Data.Text.Prettyprint.Doc    (Doc, Pretty (..))
+import qualified Data.Text.Prettyprint.Doc    as PP
+import           Data.Text.Prettyprint.Doc.Render.Terminal
+                                              (AnsiStyle)
+import qualified Data.Text.Prettyprint.Doc.Render.String
+                                              as PP
+import qualified Data.Text.Prettyprint.Doc.Render.Terminal
+                                              as PP
 import           Text.Trifecta.Delta
 #if MIN_VERSION_base(4,9,0)
 import qualified Data.List                    as List
@@ -50,11 +56,11 @@ import qualified Data.Functor.Classes         as FunctorClasses
 -- | Convenience wrapper for Pretty instances.
 newtype PP a = PP { unPP :: a }
 
-pp :: Pretty (PP a) => a -> Doc
+pp :: Pretty (PP a) => a -> Doc AnsiStyle
 pp = pretty . PP
 
 instance Pretty (PP Text) where
-    pretty = PP.string . Text.unpack . unPP
+    pretty = pretty . unPP
 
 instance Pretty (PP Value) where
     pretty (PP v) =
@@ -69,7 +75,7 @@ instance Pretty (PP Value) where
 -- | The result of running parsing or rendering steps.
 data Result a
     = Success a
-    | Failure Doc
+    | Failure (Doc AnsiStyle)
       deriving (Show, Functor, Foldable, Traversable)
 
 makePrisms ''Result
@@ -99,9 +105,11 @@ instance Alternative Result where
     empty = Failure mempty
     {-# INLINE empty #-}
 
+{-
 instance Show a => Pretty (Result a) where
     pretty (Success x) = pretty (show x)
     pretty (Failure e) = pretty e
+-}
 
 -- | Convert a 'Result' to an 'Either' with the 'Left' case holding a
 -- formatted error message, and 'Right' being the successful result over
@@ -110,7 +118,7 @@ eitherResult :: Result a -> Either String a
 eitherResult = result (Left . show) Right
 
 -- | Perform a case analysis on a 'Result'.
-result :: (Doc -> b) -- ^ Function to apply to the 'Failure' case.
+result :: (Doc AnsiStyle -> b) -- ^ Function to apply to the 'Failure' case.
        -> (a -> b)   -- ^ Function to apply to the 'Success' case.
        -> Result a   -- ^ The 'Result' to map over.
        -> b
@@ -122,7 +130,7 @@ success :: Monad m => a -> m (Result a)
 success = return . Success
 
 -- | Convenience for returning an error 'Result'.
-failure :: Monad m => Doc -> m (Result a)
+failure :: Monad m => Doc AnsiStyle -> m (Result a)
 failure = return . Failure
 
 type Delim = (String, String)
@@ -159,15 +167,23 @@ type Id = Text
 newtype Var = Var (NonEmpty Id)
     deriving (Eq)
 
+{-
 instance Pretty Var where
     pretty (Var is) = PP.hcat
         . PP.punctuate "."
-        . map (PP.bold . pp)
+        . map (PP.annotate PP.bold . pp)
         . reverse
         $ NonEmpty.toList is
+-}
 
 instance Show Var where
-    show = show . pretty
+    show = PP.renderString . PP.layoutPretty PP.defaultLayoutOptions . pretty
+      where
+          pretty (Var is) = PP.hcat
+              . PP.punctuate "."
+              . map (PP.annotate PP.bold . pp)
+              . reverse
+              $ NonEmpty.toList is
 
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection

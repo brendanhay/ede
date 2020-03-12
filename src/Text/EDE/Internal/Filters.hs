@@ -36,7 +36,8 @@ import qualified Data.Text.Unsafe             as Text
 import qualified Data.Vector                  as Vector
 import           Text.EDE.Internal.Quoting
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (Pretty (..), (<+>))
+import           Data.Text.Prettyprint.Doc    (Pretty (..), (<+>))
+import qualified Data.Text.Prettyprint.Doc    as PP
 
 default (Integer)
 
@@ -160,7 +161,7 @@ qlist1 k f g = (k,) . TLam $ \case
     TVal (String t) -> pure . quote k 0 $ f t
     TVal (Array  v) -> pure . quote k 0 $ g v
     x               -> Failure $
-        "when expecting a String or Array, encountered" <+> pretty x
+        "when expecting a String or Array, encountered" <+> prettyTerm x
 
 -- | Quote a comprehensive set of unary functions to create a binding
 -- that supports all collection types.
@@ -175,7 +176,7 @@ qcol1 k f g h = (k,) . TLam $ \case
     TVal (Object o) -> pure . quote k 0 $ g o
     TVal (Array  v) -> pure . quote k 0 $ h v
     x               -> Failure $
-        "when expecting a String, Object, or Array, encountered" <+> pretty x
+        "when expecting a String, Object, or Array, encountered" <+> prettyTerm x
 
 headT, lastT, tailT, initT :: Text -> Value
 headT = text (Text.singleton . Text.unsafeHead)
