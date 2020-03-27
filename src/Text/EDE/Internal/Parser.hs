@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
@@ -34,9 +35,10 @@ import           Data.HashMap.Strict        (HashMap)
 import qualified Data.HashMap.Strict        as Map
 import           Data.List.NonEmpty         (NonEmpty (..))
 import qualified Data.List.NonEmpty         as NonEmpty
-import           Data.Monoid                (mempty)
 import           Data.Scientific
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
+#endif
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
@@ -63,6 +65,9 @@ instance HasSyntax Env where
 
 type Parser m =
     ( Monad m
+#if MIN_VERSION_base(4,13,0)
+    , MonadFail m
+#endif
     , MonadState Env m
     , TokenParsing m
     , DeltaParsing m
@@ -76,6 +81,9 @@ newtype EDE a = EDE { runEDE :: Tri.Parser a }
         , Applicative
         , Alternative
         , Monad
+#if MIN_VERSION_base(4,13,0)
+        , MonadFail
+#endif
         , MonadPlus
         , Parsing
         , CharParsing

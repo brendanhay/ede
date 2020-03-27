@@ -20,7 +20,6 @@ import Data.Aeson.Types
 import Data.Foldable
 import Data.List.NonEmpty      (NonEmpty(..))
 import Data.Maybe
-import Data.Monoid             (mempty)
 import Text.EDE.Internal.Types
 
 newtype Mu f = Mu (f (Mu f))
