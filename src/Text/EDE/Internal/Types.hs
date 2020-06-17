@@ -31,33 +31,49 @@ import           Control.Comonad
 import           Control.Comonad.Cofree
 import           Control.Lens
 import           Data.Aeson.Types             hiding (Result (..))
-import           Data.Foldable
 import           Data.HashMap.Strict          (HashMap)
 import           Data.List.NonEmpty           (NonEmpty (..))
 import qualified Data.List.NonEmpty           as NonEmpty
-import           Data.Monoid                  (mempty)
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
+#endif
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty (..))
-import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           Text.Trifecta.Delta
 #if MIN_VERSION_base(4,9,0)
 import qualified Data.List                    as List
 import qualified Data.Functor.Classes         as FunctorClasses
 #endif
 
+import           Data.Text.Prettyprint.Doc (Doc, Pretty (..))
+import qualified Data.Text.Prettyprint.Doc as PP
+import qualified Data.Text.Prettyprint.Doc.Render.Terminal as PP
+
+type AnsiDoc = Doc PP.AnsiStyle
+
+class AnsiPretty a where
+    apretty :: a -> AnsiDoc
+
 -- | Convenience wrapper for Pretty instances.
 newtype PP a = PP { unPP :: a }
 
-pp :: Pretty (PP a) => a -> Doc
-pp = pretty . PP
+pp :: AnsiPretty (PP a) => a -> AnsiDoc
+pp = apretty . PP
 
-instance Pretty (PP Text) where
-    pretty = PP.string . Text.unpack . unPP
+(</>) :: Doc ann -> Doc ann -> Doc ann
+x </> y = x <> PP.softline <> y
 
-instance Pretty (PP Value) where
-    pretty (PP v) =
+bold :: AnsiDoc -> AnsiDoc
+bold = PP.annotate PP.bold
+
+red :: AnsiDoc -> AnsiDoc
+red = PP.annotate (PP.color PP.Red)
+
+instance AnsiPretty (PP Text) where
+    apretty = pretty . Text.unpack . unPP
+
+instance AnsiPretty (PP Value) where
+    apretty (PP v) =
         case v of
             Null     -> "Null"
             Bool   _ -> "Bool"
@@ -69,7 +85,7 @@ instance Pretty (PP Value) where
 -- | The result of running parsing or rendering steps.
 data Result a
     = Success a
-    | Failure Doc
+    | Failure AnsiDoc
       deriving (Show, Functor, Foldable, Traversable)
 
 makePrisms ''Result
@@ -99,9 +115,9 @@ instance Alternative Result where
     empty = Failure mempty
     {-# INLINE empty #-}
 
-instance Show a => Pretty (Result a) where
-    pretty (Success x) = pretty (show x)
-    pretty (Failure e) = pretty e
+instance Show a => AnsiPretty (Result a) where
+    apretty (Success x) = pretty (show x)
+    apretty (Failure e) = e
 
 -- | Convert a 'Result' to an 'Either' with the 'Left' case holding a
 -- formatted error message, and 'Right' being the successful result over
@@ -110,9 +126,9 @@ eitherResult :: Result a -> Either String a
 eitherResult = result (Left . show) Right
 
 -- | Perform a case analysis on a 'Result'.
-result :: (Doc -> b) -- ^ Function to apply to the 'Failure' case.
-       -> (a -> b)   -- ^ Function to apply to the 'Success' case.
-       -> Result a   -- ^ The 'Result' to map over.
+result :: (AnsiDoc -> b) -- ^ Function to apply to the 'Failure' case.
+       -> (a -> b)       -- ^ Function to apply to the 'Success' case.
+       -> Result a       -- ^ The 'Result' to map over.
        -> b
 result _ g (Success x) = g x
 result f _ (Failure e) = f e
@@ -122,7 +138,7 @@ success :: Monad m => a -> m (Result a)
 success = return . Success
 
 -- | Convenience for returning an error 'Result'.
-failure :: Monad m => Doc -> m (Result a)
+failure :: Monad m => AnsiDoc -> m (Result a)
 failure = return . Failure
 
 type Delim = (String, String)
@@ -159,15 +175,15 @@ type Id = Text
 newtype Var = Var (NonEmpty Id)
     deriving (Eq)
 
-instance Pretty Var where
-    pretty (Var is) = PP.hcat
+instance AnsiPretty Var where
+    apretty (Var is) = PP.hcat
         . PP.punctuate "."
-        . map (PP.bold . pp)
+        . map (PP.annotate PP.bold . pp)
         . reverse
         $ NonEmpty.toList is
 
 instance Show Var where
-    show = show . pretty
+    show = show . apretty
 
 data Collection where
     Col :: Foldable f => Int -> f (Maybe Text, Value) -> Collection

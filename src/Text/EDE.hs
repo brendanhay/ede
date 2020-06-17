@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
@@ -120,8 +121,9 @@ import           Data.Foldable                (foldrM)
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as Map
 import           Data.List.NonEmpty           (NonEmpty (..))
-import           Data.Monoid                  (mappend, mempty)
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
+#endif
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Lazy               as LText
@@ -134,8 +136,8 @@ import qualified Text.EDE.Internal.Eval       as Eval
 import qualified Text.EDE.Internal.Parser     as Parser
 import           Text.EDE.Internal.Quoting    (Term)
 import           Text.EDE.Internal.Syntax
-import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (string)
+import           Text.EDE.Internal.Types      hiding ((</>))
+import           Data.Text.Prettyprint.Doc    (Pretty (..))
 import           Text.Trifecta.Delta
 
 -- | ED-E Version.
@@ -218,7 +220,7 @@ includeMap :: Monad m
            -> Resolver m          -- ^ Resolver for 'parseWith'.
 includeMap ts _ k _
     | Just v <- Map.lookup k ts = success v
-    | otherwise = failure ("unable to resolve " <> string (Text.unpack k))
+    | otherwise = failure ("unable to resolve " <> pretty (Text.unpack k))
       -- FIXME: utilise deltas in error messages
 
 -- | 'FilePath' resolver for @include@ expressions.
@@ -239,7 +241,7 @@ loadFile :: FilePath -> IO (Result ByteString)
 loadFile p = do
     e <- doesFileExist p
     if not e
-        then failure ("file " <> string p <> " doesn't exist.")
+        then failure ("file " <> pretty p <> " doesn't exist.")
         else BS.readFile p >>= success
 
 -- | Render an 'Object' using the supplied 'Template'.

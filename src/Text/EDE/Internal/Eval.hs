@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
@@ -14,7 +15,6 @@
 
 module Text.EDE.Internal.Eval where
 
-import           Control.Applicative
 import           Control.Comonad.Cofree
 import           Control.Monad
 import           Control.Monad.Reader
@@ -24,9 +24,10 @@ import           Data.HashMap.Strict               (HashMap)
 import qualified Data.HashMap.Strict               as Map
 import           Data.List.NonEmpty                (NonEmpty (..))
 import qualified Data.List.NonEmpty                as NonEmpty
-import           Data.Monoid                       (mempty)
 import           Data.Scientific                   (isFloating)
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
+#endif
 import qualified Data.Text                         as Text
 import qualified Data.Text.Buildable               as Build
 import           Data.Text.Lazy.Builder            (Builder)
@@ -35,9 +36,9 @@ import           Data.Text.Manipulate              (toOrdinal)
 import           Text.EDE.Internal.Filters         (stdlib)
 import           Text.EDE.Internal.Quoting
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen      (Doc, Pretty (..), (<+>))
-import qualified Text.PrettyPrint.ANSI.Leijen      as PP
 import           Text.Trifecta.Delta
+import           Data.Text.Prettyprint.Doc         ((<+>))
+import qualified Data.Text.Prettyprint.Doc         as PP
 
 data Env = Env
     { _templates :: HashMap Id (Exp Delta)
@@ -63,7 +64,7 @@ eval (_ :< ELit l) = return (qprim l)
 eval (d :< EVar v) = quote (Text.pack (show v)) 0 <$> variable d v
 eval (d :< EFun i) = do
     q <- Map.lookup i <$> asks _quoted
-    maybe (throwError d $ "filter" <+> PP.bold (pp i) <+> "doesn't exist.")
+    maybe (throwError d $ "filter" <+> bold (pp i) <+> "doesn't exist.")
           return
           q
 
@@ -127,7 +128,7 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
 
         shadowedErr n x = throwError d $
                 "variable"
-            <+> PP.bold (pp i)
+            <+> bold (pp i)
             <+> "shadows"
             <+> pp x
             <+> "in"
@@ -156,7 +157,7 @@ eval (d :< EIncl i) = do
         Just e  -> eval e
         Nothing -> throwError d $
                 "template"
-            <+> PP.bold (pp i)
+            <+> bold (pp i)
             <+> "is not in scope:"
             <+> PP.brackets (pp (Text.intercalate "," $ Map.keys ts))
 
@@ -169,7 +170,7 @@ variable d (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
     go []     _ v = return v
     go (k:ks) r v = do
         m <- nest v
-        maybe (throwError d $ "variable" <+> pretty cur <+> "doesn't exist.")
+        maybe (throwError d $ "variable" <+> apretty cur <+> "doesn't exist.")
               (go ks (k:r))
               (Map.lookup k m)
       where
@@ -178,7 +179,7 @@ variable d (Var is) = asks _values >>= go (NonEmpty.toList is) [] . Object
         nest :: Value -> Context Object
         nest (Object o) = return o
         nest x          = throwError d $ "variable"
-            <+> pretty cur
+            <+> apretty cur
             <+> "::"
             <+> pp x
             <+> "doesn't supported nested accessors."
@@ -215,5 +216,5 @@ build d x =
     throwError d ("unable to render literal" <+> pp x)
 
 -- FIXME: Add delta information to the thrown error document.
-throwError :: Delta -> Doc -> Context a
-throwError d doc = lift . Failure $ pretty d <+> PP.red "error:" <+> doc
+throwError :: Delta -> AnsiDoc -> Context a
+throwError d doc = lift . Failure $ prettyDelta d <+> red "error:" <+> doc

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE FlexibleInstances    #-}
@@ -30,7 +31,9 @@ import qualified Data.HashMap.Strict          as Map
 import           Data.List                    (sortBy)
 import           Data.Ord                     (comparing)
 import           Data.Scientific
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
+#endif
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
@@ -39,12 +42,12 @@ import           Data.Text.Lazy.Builder
 import           Data.Text.Manipulate         (toOrdinal)
 import qualified Data.Vector                  as Vector
 import           Text.EDE.Internal.Types
-import           Text.PrettyPrint.ANSI.Leijen (Doc, Pretty (..), (<+>), (</>))
-import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           Text.Trifecta.Delta
 import           Text.Trifecta.Rendering
+import           Data.Text.Prettyprint.Doc    (Pretty (..), (<+>))
+import qualified Data.Text.Prettyprint.Doc    as PP
 
-default (Doc, Double, Integer)
+default (AnsiDoc, Double, Integer)
 
 -- | A HOAS representation of (possibly partially applied) values
 -- in the environment.
@@ -52,23 +55,23 @@ data Term
     = TVal !Value
     | TLam (Term -> Result Term)
 
-instance Pretty Term where
-    pretty = \case
+instance AnsiPretty Term where
+    apretty = \case
         TLam _ -> "Function"
-        TVal v -> PP.bold (pp v)
+        TVal v -> bold (pp v)
 
 -- | Fully apply two 'Term's.
 qapply :: Delta -> Term -> Term -> Result Term
 qapply d a b = case (a, b) of
     (TLam f, x) ->
         case f x of
-            Failure e -> Failure (pretty d <+> PP.red "error:" <+> e)
+            Failure e -> Failure (prettyDelta d <+> red "error:" <+> e)
             Success y -> return y
     (TVal x, _) -> Failure $
         "unable to apply literal"
-            <+> pretty a
+            <+> apretty a
             <+> "->"
-            <+> pretty b
+            <+> apretty b
             </> pp x
 
 -- | Quote a primitive 'Value' from the top-level.
@@ -80,7 +83,7 @@ class Unquote a where
 
     default unquote :: FromJSON a => Id -> Int -> Term -> Result a
     unquote k n = \case
-        f@TLam{} -> typeErr k n (pretty f) "Value"
+        f@TLam{} -> typeErr k n (apretty f) "Value"
         TVal v   ->
             case fromJSON v of
                 A.Success x -> pure x
@@ -153,23 +156,23 @@ instance Quote Array
 instance Quote Builder where
     quote k n = quote k n . toLazyText
 
-typeErr :: Id -> Int -> Doc -> Doc -> Result a
+typeErr :: Id -> Int -> AnsiDoc -> AnsiDoc -> Result a
 typeErr k n x y = Failure $ "type" <+> pp k <+> pretty n <+> x <+> "::" <+> y
 
 argumentErr :: Pretty a => Id -> Int -> a -> Result b
 argumentErr k n e = Failure $ if self then app else arg
   where
     app = "unable to apply"
-        <+> PP.bold (pp k)
+        <+> bold (pp k)
         <+> "to left hand side:"
-        </> PP.indent 4 (pretty e </> pretty mark)
+        </> PP.indent 4 (pretty e </> prettyRendering mark)
 
     arg = "invalid"
-        <+> PP.bold (pp $ toOrdinal (n - 1))
+        <+> bold (pp $ toOrdinal (n - 1))
         <+> "argument to"
-        <+> PP.bold (pp k)
+        <+> bold (pp k)
         <>  ":"
-        </> PP.indent 4 (pretty e </> pretty mark)
+        </> PP.indent 4 (pretty e </> prettyRendering mark)
 
     mark = renderingCaret (Columns col col) $
         "... | " <> Text.encodeUtf8 k <> line
