@@ -1,5 +1,7 @@
 # ED-E
 
+[![Build Status](https://img.shields.io/travis/brendanhay/ede/develop.svg?maxAge=2592000)](https://travis-ci.org/brendanhay/ede)
+
 * [Introduction](#introduction)
 * [Syntax](#syntax)
 * [Contribute](#contribute)
