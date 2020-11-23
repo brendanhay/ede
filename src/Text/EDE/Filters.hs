@@ -1,5 +1,5 @@
 -- Module      : Text.EDE.Filters
--- Copyright   : (c) 2013-2015 Brendan Hay <brendan.g.hay@gmail.com>
+-- Copyright   : (c) 2013-2020 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
 --               A copy of the MPL can be found in the LICENSE file or
@@ -10,8 +10,7 @@
 
 -- | The means to construct your own filters.
 module Text.EDE.Filters
-    (
-    -- * Prelude
+  ( -- * Prelude
     -- $prelude
 
     -- ** Boolean
@@ -39,27 +38,28 @@ module Text.EDE.Filters
     -- $polymorphic
 
     -- * Constructing filters
-      Term    (..)
+    Term (..),
 
     -- ** Classes
-    , Quote   (..)
-    , Unquote (..)
+    Quote (..),
+    Unquote (..),
 
     -- ** Restricted quoters
-    , (@:)
-    , qapply
-    , qpoly2
-    , qnum1
-    , qnum2
-    , qcol1
+    (@:),
+    qapply,
+    qpoly2,
+    qnum1,
+    qnum2,
+    qcol1,
 
     -- ** Errors
-    , typeErr
-    , argumentErr
-    ) where
+    typeErr,
+    argumentErr,
+  )
+where
 
-import Text.EDE.Internal.Quoting
 import Text.EDE.Internal.Filters
+import Text.EDE.Internal.Quoting
 
 -- $prelude
 --

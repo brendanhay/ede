@@ -1,9 +1,9 @@
-{-# LANGUAGE CPP               #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TupleSections #-}
 
 -- Module      : Text.EDE
--- Copyright   : (c) 2013-2015 Brendan Hay <brendan.g.hay@gmail.com>
+-- Copyright   : (c) 2013-2020 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
 --               A copy of the MPL can be found in the LICENSE file or
@@ -17,66 +17,65 @@
 --
 -- (ED-E is a character from Fallout New Vegas, pronounced 'Eddie'.)
 module Text.EDE
-    (
-    -- * How to use this library
+  ( -- * How to use this library
     -- $usage
 
     -- * Parsing and Rendering
     -- $parsing_and_rendering
-      Template
+    Template,
 
     -- ** Parsing
-    , parse
-    , parseIO
-    , parseFile
-    , parseFileWith
-    , parseWith
+    parse,
+    parseIO,
+    parseFile,
+    parseFileWith,
+    parseWith,
 
     -- ** Includes
     -- $resolvers
-    , Resolver
-    , Id
-    , includeMap
-    , includeFile
+    Resolver,
+    Id,
+    includeMap,
+    includeFile,
 
     -- ** Rendering
-    , render
-    , renderWith
+    render,
+    renderWith,
 
     -- ** Either Variants
-    , eitherParse
-    , eitherParseFile
-    , eitherParseWith
-    , eitherRender
-    , eitherRenderWith
+    eitherParse,
+    eitherParseFile,
+    eitherParseWith,
+    eitherRender,
+    eitherRenderWith,
 
     -- ** Results and Errors
     -- $results
-    , Delta  (..)
-    , Result (..)
-    , eitherResult
-    , result
-    , success
-    , failure
+    Delta (..),
+    Result (..),
+    eitherResult,
+    result,
+    success,
+    failure,
+
     -- * Input
     -- $input
-    , fromValue
-    , fromPairs
-    , (.=)
+    fromValue,
+    fromPairs,
+    (.=),
 
     -- * Version
-    , version
+    version,
 
     -- * Syntax
-    , Delim
-    , Syntax
-    , delimPragma
-    , delimInline
-    , delimComment
-    , delimBlock
-
-    , defaultSyntax
-    , alternateSyntax
+    Delim,
+    Syntax,
+    delimPragma,
+    delimInline,
+    delimComment,
+    delimBlock,
+    defaultSyntax,
+    alternateSyntax,
 
     -- ** Pragmas
     -- $pragmas
@@ -110,35 +109,36 @@ module Text.EDE
 
     -- ** Let Expressions
     -- $let
-    ) where
+  )
+where
 
-import           Control.Monad
-import           Data.Aeson                   ((.=))
-import           Data.Aeson.Types             (Object)
-import           Data.ByteString              (ByteString)
-import qualified Data.ByteString              as BS
-import           Data.Foldable                (foldrM)
-import           Data.HashMap.Strict          (HashMap)
-import qualified Data.HashMap.Strict          as Map
-import           Data.List.NonEmpty           (NonEmpty (..))
+import Control.Monad
+import Data.Aeson ((.=))
+import Data.Aeson.Types (Object)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.Foldable (foldrM)
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as Map
+import Data.List.NonEmpty (NonEmpty (..))
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
-import           Data.Text                    (Text)
-import qualified Data.Text                    as Text
-import qualified Data.Text.Lazy               as LText
-import           Data.Text.Lazy.Builder       (toLazyText)
-import           Data.Version                 (Version)
-import qualified Paths_ede                    as Paths
-import           System.Directory
-import           System.FilePath
-import qualified Text.EDE.Internal.Eval       as Eval
-import qualified Text.EDE.Internal.Parser     as Parser
-import           Text.EDE.Internal.Quoting    (Term)
-import           Text.EDE.Internal.Syntax
-import           Text.EDE.Internal.Types      hiding ((</>))
-import           Data.Text.Prettyprint.Doc    (Pretty (..))
-import           Text.Trifecta.Delta
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as LText
+import Data.Text.Lazy.Builder (toLazyText)
+import Data.Text.Prettyprint.Doc (Pretty (..))
+import Data.Version (Version)
+import qualified Paths_ede as Paths
+import System.Directory
+import System.FilePath
+import qualified Text.EDE.Internal.Eval as Eval
+import qualified Text.EDE.Internal.Parser as Parser
+import Text.EDE.Internal.Quoting (Term)
+import Text.EDE.Internal.Syntax
+import Text.EDE.Internal.Types hiding ((</>))
+import Text.Trifecta.Delta
 
 -- | ED-E Version.
 version :: Version
@@ -151,17 +151,22 @@ version = Paths.version
 --
 -- See 'parseFile' or 'parseWith' for mechanisms to deal with @include@
 -- dependencies.
-parse :: ByteString -- ^ Strict 'ByteString' template definition.
-      -> Result Template
+parse ::
+  -- | Strict 'ByteString' template definition.
+  ByteString ->
+  Result Template
 parse = join . parseWith defaultSyntax (includeMap mempty) "Text.EDE.parse"
 
 -- | Parse 'Text' into a compiled 'Template'.
 --
 -- This function handles all @include@ expressions as 'FilePath's and performs
 -- recursive loading/parsing.
-parseIO :: FilePath   -- ^ Parent directory for relatively pathed includes.
-        -> ByteString -- ^ Strict 'ByteString' template definition.
-        -> IO (Result Template)
+parseIO ::
+  -- | Parent directory for relatively pathed includes.
+  FilePath ->
+  -- | Strict 'ByteString' template definition.
+  ByteString ->
+  IO (Result Template)
 parseIO p = parseWith defaultSyntax (includeFile p) "Text.EDE.parse"
 
 -- | Load and parse a 'Template' from a file.
@@ -169,16 +174,24 @@ parseIO p = parseWith defaultSyntax (includeFile p) "Text.EDE.parse"
 -- This function handles all @include@ expressions as 'FilePath's and performs
 -- recursive loading/parsing, with pathing of @include@s relatively to the
 -- target (unless absolute paths are used).
-parseFile :: FilePath -- ^ Path to the template to load and parse.
-          -> IO (Result Template)
+parseFile ::
+  -- | Path to the template to load and parse.
+  FilePath ->
+  IO (Result Template)
 parseFile = parseFileWith defaultSyntax
 
 -- | /See:/ 'parseFile'.
-parseFileWith :: Syntax   -- ^ Delimiters and parsing options.
-              -> FilePath -- ^ Path to the template to load and parse.
-              -> IO (Result Template)
-parseFileWith s p = loadFile p >>= result failure
-    (parseWith s (includeFile (takeDirectory p)) (Text.pack p))
+parseFileWith ::
+  -- | Delimiters and parsing options.
+  Syntax ->
+  -- | Path to the template to load and parse.
+  FilePath ->
+  IO (Result Template)
+parseFileWith s p =
+  loadFile p
+    >>= result
+      failure
+      (parseWith s (includeFile (takeDirectory p)) (Text.pack p))
 
 -- | Parse a 'Template' from a Strict 'ByteString' using a custom function for
 -- resolving @include@ expressions.
@@ -190,71 +203,92 @@ parseFileWith s p = loadFile p >>= result failure
 -- * 'includeFile'
 --
 -- 'parseFile' for example, is defined as: 'parseWith' 'includeFile'.
-parseWith :: Monad m
-          => Syntax     -- ^ Delimiters and parsing options.
-          -> Resolver m -- ^ Function to resolve includes.
-          -> Text       -- ^ Strict 'Text' name.
-          -> ByteString -- ^ Strict 'ByteString' template definition.
-          -> m (Result Template)
+parseWith ::
+  Monad m =>
+  -- | Delimiters and parsing options.
+  Syntax ->
+  -- | Function to resolve includes.
+  Resolver m ->
+  -- | Strict 'Text' name.
+  Text ->
+  -- | Strict 'ByteString' template definition.
+  ByteString ->
+  m (Result Template)
 parseWith o f n = result failure resolve . Parser.runParser o n
   where
     resolve (u, is) = do
-        r <- foldrM include (Success (Map.singleton n u)) (Map.toList is)
-        result failure
-               (success . Template n u)
-               r
+      r <- foldrM include (Success (Map.singleton n u)) (Map.toList is)
+      result
+        failure
+        (success . Template n u)
+        r
 
     -- Presuming self is always in self's includes, see singleton above.
     -- FIXME: utilise the list of deltas for failures
-    include (_, _)    (Failure  e) = failure e
-    include (k, d:|_) (Success ss) = f o k d >>=
-        result failure (success . mappend ss . _tmplIncl)
+    include (_, _) (Failure e) = failure e
+    include (k, d :| _) (Success ss) =
+      f o k d
+        >>= result failure (success . mappend ss . _tmplIncl)
 
 -- | 'HashMap' resolver for @include@ expressions.
 --
 -- The 'identifier' component of the @include@ expression is treated as a lookup
 -- key into the supplied 'HashMap'.
 -- If the 'identifier' doesn't exist in the 'HashMap', an 'Error' is returned.
-includeMap :: Monad m
-           => HashMap Id Template -- ^ A 'HashMap' of named 'Template's.
-           -> Resolver m          -- ^ Resolver for 'parseWith'.
+includeMap ::
+  Monad m =>
+  -- | A 'HashMap' of named 'Template's.
+  HashMap Id Template ->
+  -- | Resolver for 'parseWith'.
+  Resolver m
 includeMap ts _ k _
-    | Just v <- Map.lookup k ts = success v
-    | otherwise = failure ("unable to resolve " <> pretty (Text.unpack k))
-      -- FIXME: utilise deltas in error messages
+  | Just v <- Map.lookup k ts = success v
+  | otherwise = failure ("unable to resolve " <> pretty (Text.unpack k))
+
+-- FIXME: utilise deltas in error messages
 
 -- | 'FilePath' resolver for @include@ expressions.
 --
 -- The 'identifier' component of the @include@ expression is treated as a relative
 -- 'FilePath' and the template is loaded and parsed using 'parseFile'.
 -- If the 'identifier' doesn't exist as a valid 'FilePath', an 'Error' is returned.
-includeFile :: FilePath -- ^ Parent directory for relatively pathed includes.
-            -> Resolver IO
+includeFile ::
+  -- | Parent directory for relatively pathed includes.
+  FilePath ->
+  Resolver IO
 includeFile p o k _ = loadFile f >>= result failure (parseWith o inc k)
-    where
-      inc = includeFile (takeDirectory f)
+  where
+    inc = includeFile (takeDirectory f)
 
-      f | Text.null k = Text.unpack k
-        | otherwise   = p </> Text.unpack k
+    f
+      | Text.null k = Text.unpack k
+      | otherwise = p </> Text.unpack k
 
 loadFile :: FilePath -> IO (Result ByteString)
 loadFile p = do
-    e <- doesFileExist p
-    if not e
-        then failure ("file " <> pretty p <> " doesn't exist.")
-        else BS.readFile p >>= success
+  e <- doesFileExist p
+  if not e
+    then failure ("file " <> pretty p <> " doesn't exist.")
+    else BS.readFile p >>= success
 
 -- | Render an 'Object' using the supplied 'Template'.
-render :: Template -- ^ Parsed 'Template' to render.
-       -> Object   -- ^ Bindings to make available in the environment.
-       -> Result LText.Text
+render ::
+  -- | Parsed 'Template' to render.
+  Template ->
+  -- | Bindings to make available in the environment.
+  Object ->
+  Result LText.Text
 render = renderWith mempty
 
 -- | Render an 'Object' using the supplied 'Template'.
-renderWith :: HashMap Id Term -- ^ Filters to make available in the environment.
-           -> Template        -- ^ Parsed 'Template' to render.
-           -> Object          -- ^ Bindings to make available in the environment.
-           -> Result LText.Text
+renderWith ::
+  -- | Filters to make available in the environment.
+  HashMap Id Term ->
+  -- | Parsed 'Template' to render.
+  Template ->
+  -- | Bindings to make available in the environment.
+  Object ->
+  Result LText.Text
 renderWith fs (Template _ u ts) = fmap toLazyText . Eval.render ts fs u
 
 -- | /See:/ 'parse'
@@ -266,25 +300,28 @@ eitherParseFile :: FilePath -> IO (Either String Template)
 eitherParseFile = fmap eitherResult . parseFile
 
 -- | /See:/ 'parseWith'
-eitherParseWith :: (Functor m, Monad m)
-                => Syntax
-                -> Resolver m
-                -> Text
-                -> ByteString
-                -> m (Either String Template)
+eitherParseWith ::
+  (Functor m, Monad m) =>
+  Syntax ->
+  Resolver m ->
+  Text ->
+  ByteString ->
+  m (Either String Template)
 eitherParseWith o f n = fmap eitherResult . parseWith o f n
 
 -- | /See:/ 'render'
-eitherRender :: Template
-             -> Object
-             -> Either String LText.Text
+eitherRender ::
+  Template ->
+  Object ->
+  Either String LText.Text
 eitherRender t = eitherResult . render t
 
 -- | /See:/ 'renderWith'
-eitherRenderWith :: HashMap Id Term
-                 -> Template
-                 -> Object
-                 -> Either String LText.Text
+eitherRenderWith ::
+  HashMap Id Term ->
+  Template ->
+  Object ->
+  Either String LText.Text
 eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $usage
@@ -380,6 +417,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- #syntax#
 --
+
 -- $pragmas
 --
 -- Syntax can be modified either via the arguments to 'parseWith' or alternatively
@@ -430,12 +468,19 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- /Note:/
 --
+
 -- * Identifiers are named similarly to Haskell's rules.
+
 --
+
 -- * Booleans are lowered cased.
+
 --
+
 -- * The string quoting and escaping follows Haskell's rules.
+
 --
+
 -- * The Numeric format shares the same characteristics as the <http://json.org/ JSON specification.>
 
 -- $variables
@@ -638,7 +683,6 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- >    multiline
 -- >    comment
 -- > #}
---
 
 -- $let
 --

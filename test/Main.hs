@@ -12,21 +12,21 @@
 
 module Main (main) where
 
-import           Control.Applicative
-import qualified Data.Aeson              as Aeson
-import           Data.Bifunctor
-import qualified Data.ByteString         as BS
-import qualified Data.ByteString.Lazy    as LBS
-import           Data.List               (isSuffixOf)
-import           Data.Maybe
-import qualified Data.Text               as Text
+import Control.Applicative
+import qualified Data.Aeson as Aeson
+import Data.Bifunctor
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
+import Data.List (isSuffixOf)
+import Data.Maybe
+import qualified Data.Text as Text
 import qualified Data.Text.Lazy.Encoding as LText
-import           Paths_ede
-import           System.Directory
-import           System.IO.Unsafe
-import           Test.Tasty
-import           Test.Tasty.Golden
-import           Text.EDE
+import Paths_ede
+import System.Directory
+import System.IO.Unsafe
+import Test.Tasty
+import Test.Tasty.Golden
+import Text.EDE
 
 main :: IO ()
 main = defaultMain . testGroup "ED-E" $ unsafePerformIO tests
@@ -41,28 +41,32 @@ tests :: IO [TestTree]
 tests = files >>= mapM test
   where
     files :: IO [FilePath]
-    files = map (resources ++) . filter (isSuffixOf ".ede")
+    files =
+      map (resources ++) . filter (isSuffixOf ".ede")
         <$> getDirectoryContents resources
 
     test :: FilePath -> IO TestTree
     test f = do
-        (bs, n) <- (,)
-            <$> BS.readFile f
-            <*> pure (takeWhile (/= '.') f)
+      (bs, n) <-
+        (,)
+          <$> BS.readFile f
+          <*> pure (takeWhile (/= '.') f)
 
-        let (js, src) = split bs
-            name      = Text.pack (n ++ ".ede")
+      let (js, src) = split bs
+          name = Text.pack (n ++ ".ede")
 
-        return . goldenVsStringDiff n diff (n ++ ".golden") $ do
-            r <- parseWith defaultSyntax include name src
-            result (error  . show)
-                   (return . LText.encodeUtf8)
-                   (r >>= (`render` js))
+      return . goldenVsStringDiff n diff (n ++ ".golden") $ do
+        r <- parseWith defaultSyntax include name src
+        result
+          (error . show)
+          (return . LText.encodeUtf8)
+          (r >>= (`render` js))
 
     diff r n = ["diff", "-u", r, n]
 
     split = bimap input (BS.drop 4) . BS.breakSubstring "---"
 
-    input = fromMaybe (error "Failed parsing JSON")
+    input =
+      fromMaybe (error "Failed parsing JSON")
         . Aeson.decode'
         . LBS.fromStrict
