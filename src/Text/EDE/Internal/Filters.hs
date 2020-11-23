@@ -126,6 +126,7 @@ stdlib = Map.fromList
 
     -- polymorphic
     , "show"           @: (LText.decodeUtf8 . encode :: Value -> LText.Text)
+    , "singleton"      @: (pure :: Value -> Vector.Vector Value)
 
     -- FIXME: existence checks currently hardcoded into the evaluator:
     -- "default"
