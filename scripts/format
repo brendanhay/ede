@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# Usage: format
+
+# Run all formatters and linters ensuring codebase consistency
+
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+echo "Formatting Cabal"
+
+find . \
+    -path ./dist-newstyle -prune -o \
+    -type f -name '*.cabal' \
+    -exec cabal-fmt --inplace --indent=2 {} \+
+
+echo "Formatting Haskell"
+
+find . \
+    -path ./dist-newstyle -prune -o \
+    -type f -name '*.hs' \
+    -exec ormolu -i \
+    {} \+
+
+echo "Formatting Nix"
+
+find . \
+    -type f -name '*.nix' \
+    -exec nixfmt {} \+
+
+echo 'Done.'
