@@ -1,5 +1,5 @@
 name:               ede
-version:            0.2.9
+version:            0.3.0.0
 synopsis:
   Templating language with similar syntax and features to Liquid or Jinja2.
 
@@ -12,7 +12,7 @@ copyright:          Copyright (c) 2013-2020 Brendan Hay
 stability:          Experimental
 category:           Text, Template, Web
 build-type:         Simple
-cabal-version:      >=2.0
+cabal-version:      2.0
 description:
   ED-E is a templating language written in Haskell with a specific set of features:
   .
@@ -94,18 +94,18 @@ executable ede
   build-depends:
       aeson                 >=0.8
     , attoparsec
-    , base                  >=4.7    && <5
+    , base                  >=4.12   && <5
     , bytestring            >=0.10.4
     , ede
     , optparse-applicative  >=0.11
     , text                  >=1.2
-    , unordered-containers
 
 test-suite golden
   default-language: Haskell2010
   type:             exitcode-stdio-1.0
   hs-source-dirs:   test
   main-is:          Main.hs
+  other-modules:    Paths_ede
   ghc-options:      -Wall -threaded
   build-depends:
       aeson
