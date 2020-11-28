@@ -26,8 +26,8 @@ import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Scientific (isFloating)
 import qualified Data.Text as Text
-import           qualified Data.Text.Lazy.Builder           as  Text.Builder
 import Data.Text.Lazy.Builder (Builder)
+import qualified Data.Text.Lazy.Builder as Text.Builder
 import Data.Text.Lazy.Builder.Scientific
 import Data.Text.Manipulate (toOrdinal)
 import Data.Text.Prettyprint.Doc ((<+>))

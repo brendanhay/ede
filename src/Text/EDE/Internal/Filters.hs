@@ -106,8 +106,9 @@ stdlib =
       -- lists
       qlist1 "head" headT headV,
       qlist1 "last" lastT lastV,
-      qlist1 "tail" lastT tailV,
+      qlist1 "tail" tailT tailV,
       qlist1 "init" initT initV,
+      "at" @: (\x i -> x Vector.! i :: Value),
       -- object
       "keys" @: (Map.keys :: Object -> [Text]),
       "elems" @: (Map.elems :: Object -> [Value]),
