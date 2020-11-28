@@ -12,7 +12,6 @@
 
 module Main (main) where
 
-import Control.Applicative
 import qualified Data.Aeson as Aeson
 import Data.Bifunctor
 import qualified Data.ByteString as BS
