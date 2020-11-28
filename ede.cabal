@@ -97,11 +97,13 @@ executable ede
     ghc-options:       -Wall
     build-depends:
           aeson                >= 0.8
+        , attoparsec
         , bytestring           >= 0.10.4
         , base                 >= 4.7 && < 5
         , ede
         , optparse-applicative >= 0.11
         , text                 >= 1.2
+        , unordered-containers
 
 test-suite golden
     default-language:  Haskell2010
