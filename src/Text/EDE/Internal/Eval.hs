@@ -25,11 +25,8 @@ import qualified Data.HashMap.Strict as Map
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Scientific (isFloating)
-#if !MIN_VERSION_base(4,11,0)
-import           Data.Semigroup
-#endif
 import qualified Data.Text as Text
-import qualified Data.Text.Buildable as Build
+import           qualified Data.Text.Lazy.Builder           as  Text.Builder
 import Data.Text.Lazy.Builder (Builder)
 import Data.Text.Lazy.Builder.Scientific
 import Data.Text.Manipulate (toOrdinal)
@@ -211,7 +208,7 @@ binding d x y =
 
 build :: Delta -> Value -> Context Builder
 build _ Null = return mempty
-build _ (String t) = return (Build.build t)
+build _ (String t) = return (Text.Builder.fromText t)
 build _ (Bool True) = return "true"
 build _ (Bool False) = return "false"
 build _ (Number n)
