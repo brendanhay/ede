@@ -101,7 +101,7 @@ executable ede
     , optparse-applicative  >=0.11
     , text                  >=1.2
 
-test-suite golden
+test-suite tests
   import:         base
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
