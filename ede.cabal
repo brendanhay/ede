@@ -53,7 +53,6 @@ library
     Text.EDE.Filters
 
   other-modules:
-    Paths_ede
     Text.EDE.Internal.AST
     Text.EDE.Internal.Eval
     Text.EDE.Internal.Filters
@@ -106,6 +105,7 @@ test-suite golden
   hs-source-dirs:   test
   main-is:          Main.hs
   other-modules:    Paths_ede
+  autogen-modules:  Paths_ede
   ghc-options:      -Wall -threaded
   build-depends:
       aeson
