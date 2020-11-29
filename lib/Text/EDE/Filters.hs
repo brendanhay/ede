@@ -1,3 +1,4 @@
+-- |
 -- Module      : Text.EDE.Filters
 -- Copyright   : (c) 2013-2020 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -7,8 +8,8 @@
 -- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
-
--- | The means to construct your own filters.
+--
+-- The means to construct your own filters.
 module Text.EDE.Filters
   ( -- * Prelude
     -- $prelude

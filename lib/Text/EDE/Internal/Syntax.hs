@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
 -- Module      : Text.EDE.Internal.Syntax
 -- Copyright   : (c) 2013-2020 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -9,15 +10,22 @@
 -- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
-
+--
+-- /Warning/: this is an internal module, and does not have a stable
+-- API or name. Functions in this module may not check or enforce
+-- preconditions expected by public modules. Use at your own risk!
 module Text.EDE.Internal.Syntax where
 
-import Control.Lens
+import Control.Lens ((.~))
+import qualified Control.Lens as Lens
+import Data.Function ((&))
 import Data.HashSet (HashSet)
-import qualified Data.HashSet as Set
+import qualified Data.HashSet as HashSet
 import Text.EDE.Internal.Types
-import Text.Parser.Token.Style
-import Text.Trifecta
+import Text.Parser.Token.Style (CommentStyle)
+import qualified Text.Parser.Token.Style as Token
+import Text.Trifecta (IdentifierStyle, TokenParsing)
+import qualified Text.Trifecta as Trifecta
 
 -- | The default ED-E syntax.
 --
@@ -60,23 +68,26 @@ alternateSyntax =
     }
 
 commentStyle :: String -> String -> CommentStyle
-commentStyle s e = emptyCommentStyle & commentStart .~ s & commentEnd .~ e
+commentStyle s e =
+  Token.emptyCommentStyle & Token.commentStart .~ s & Token.commentEnd .~ e
 
 operatorStyle :: TokenParsing m => IdentifierStyle m
-operatorStyle = haskellOps & styleLetter .~ oneOf "-+!&|=><"
+operatorStyle =
+  Token.haskellOps & Trifecta.styleLetter .~ Trifecta.oneOf "-+!&|=><"
 
 variableStyle :: TokenParsing m => IdentifierStyle m
-variableStyle = keywordStyle & styleName .~ "variable"
+variableStyle =
+  keywordStyle & Trifecta.styleName .~ "variable"
 
 keywordStyle :: TokenParsing m => IdentifierStyle m
 keywordStyle =
-  haskellIdents
-    & styleReserved .~ keywordSet
-    & styleName .~ "keyword"
+  Token.haskellIdents
+    & Trifecta.styleReserved .~ keywordSet
+    & Trifecta.styleName .~ "keyword"
 
 keywordSet :: HashSet String
 keywordSet =
-  Set.fromList
+  HashSet.fromList
     [ "if",
       "elif",
       "else",
@@ -99,13 +110,13 @@ keywordSet =
 
 pragmaStyle :: TokenParsing m => IdentifierStyle m
 pragmaStyle =
-  haskellIdents
-    & styleReserved .~ pragmaSet
-    & styleName .~ "pragma field"
+  Token.haskellIdents
+    & Trifecta.styleReserved .~ pragmaSet
+    & Trifecta.styleName .~ "pragma field"
 
 pragmaSet :: HashSet String
 pragmaSet =
-  Set.fromList
+  HashSet.fromList
     [ "pragma",
       "inline",
       "comment",

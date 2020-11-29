@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -10,6 +9,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
+-- |
 -- Module      : Text.EDE.Internal.Types
 -- Copyright   : (c) 2013-2020 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -19,15 +19,21 @@
 -- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
-
+--
+-- /Warning/: this is an internal module, and does not have a stable
+-- API or name. Functions in this module may not check or enforce
+-- preconditions expected by public modules. Use at your own risk!
 module Text.EDE.Internal.Types where
 
-import Control.Applicative
-import Control.Comonad
-import Control.Comonad.Cofree
-import Control.Lens
-import Data.Aeson.Types hiding (Result (..))
-import qualified Data.Functor.Classes as FunctorClasses
+import Control.Applicative (Alternative (empty, (<|>)))
+import qualified Control.Comonad as Comonad
+import Control.Comonad.Cofree (Cofree)
+import qualified Control.Comonad.Cofree as Comonad.Cofree
+import qualified Control.Lens as Lens
+import qualified Data.Aeson as Aeson
+import Data.Aeson.Types (Object, Pair, Value (..))
+import qualified Data.Aeson.Types as Aeson.Types
+import qualified Data.Functor.Classes as Functor.Classes
 import Data.HashMap.Strict (HashMap)
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty (..))
@@ -37,7 +43,8 @@ import qualified Data.Text as Text
 import Data.Text.Prettyprint.Doc (Doc, Pretty (..))
 import qualified Data.Text.Prettyprint.Doc as PP
 import qualified Data.Text.Prettyprint.Doc.Render.Terminal as PP
-import Text.Trifecta.Delta
+import Text.Trifecta.Delta (Delta, HasDelta)
+import qualified Text.Trifecta.Delta as Trifecta.Delta
 
 type AnsiDoc = Doc PP.AnsiStyle
 
@@ -78,11 +85,12 @@ data Result a
   | Failure AnsiDoc
   deriving (Show, Functor, Foldable, Traversable)
 
-makePrisms ''Result
+$(Lens.makePrisms ''Result)
 
 instance Monad Result where
   return = Success
   {-# INLINE return #-}
+
   Success x >>= k = k x
   Failure e >>= _ = Failure e
   {-# INLINE (>>=) #-}
@@ -90,6 +98,7 @@ instance Monad Result where
 instance Applicative Result where
   pure = return
   {-# INLINE pure #-}
+
   Success f <*> Success x = Success (f x)
   Success _ <*> Failure e = Failure e
   Failure e <*> Success _ = Failure e
@@ -102,6 +111,7 @@ instance Alternative Result where
   Failure _ <|> Success x = Success x
   Failure e <|> Failure e' = Failure (PP.vsep [e, e'])
   {-# INLINE (<|>) #-}
+
   empty = Failure mempty
   {-# INLINE empty #-}
 
@@ -144,7 +154,7 @@ data Syntax = Syntax
     _delimBlock :: !Delim
   }
 
-makeClassy ''Syntax
+$(Lens.makeClassy ''Syntax)
 
 -- | A function to resolve the target of an @include@ expression.
 type Resolver m = Syntax -> Id -> Delta -> m (Result Template)
@@ -199,7 +209,7 @@ data ExpF a
   | EIncl !Text
   deriving (Eq, Show, Functor)
 
-instance FunctorClasses.Eq1 ExpF where
+instance Functor.Classes.Eq1 ExpF where
   liftEq _ (ELit a) (ELit b) = a == b
   liftEq _ (EVar a) (EVar b) = a == b
   liftEq _ (EFun a) (EFun b) = a == b
@@ -215,7 +225,7 @@ instance FunctorClasses.Eq1 ExpF where
 type Exp = Cofree ExpF
 
 instance HasDelta (Exp Delta) where
-  delta = extract
+  delta = Comonad.extract
 
 -- | Unwrap a 'Value' to an 'Object' safely.
 --
@@ -228,4 +238,4 @@ fromValue _ = Nothing
 --
 -- See 'Aeson''s documentation for more details.
 fromPairs :: [Pair] -> Object
-fromPairs = (\(Object o) -> o) . object
+fromPairs = (\(Object o) -> o) . Aeson.object

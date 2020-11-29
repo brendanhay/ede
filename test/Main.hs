@@ -13,59 +13,66 @@
 module Main (main) where
 
 import qualified Data.Aeson as Aeson
-import Data.Bifunctor
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
-import Data.List (isSuffixOf)
-import Data.Maybe
+import qualified Data.Bifunctor as Bifunctor
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Lazy as ByteString.Lazy
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
-import qualified Data.Text.Lazy.Encoding as LText
-import Paths_ede
-import System.Directory
-import System.IO.Unsafe
-import Test.Tasty
-import Test.Tasty.Golden
-import Text.EDE
+import qualified Data.Text.Lazy.Encoding as Text.Lazy.Encoding
+import qualified Paths_ede as Paths
+import qualified System.Directory as Directory
+import qualified System.IO.Unsafe as IO.Unsafe
+import qualified Test.Tasty as Tasty
+import qualified Test.Tasty.Golden as Tasty.Golden
+import qualified Text.EDE as EDE
 
+-- FIXME: migrate to tasty's resource bracketing.
 main :: IO ()
-main = defaultMain . testGroup "ED-E" $ unsafePerformIO tests
+main =
+  Tasty.defaultMain $
+    Tasty.testGroup "ED-E" $
+      IO.Unsafe.unsafePerformIO tests
 
 resources :: FilePath
-resources = unsafePerformIO getDataDir
+resources = IO.Unsafe.unsafePerformIO Paths.getDataDir
 
-include :: Resolver IO
-include = includeFile resources
+include :: EDE.Resolver IO
+include = EDE.includeFile resources
 
-tests :: IO [TestTree]
+tests :: IO [Tasty.TestTree]
 tests = files >>= mapM test
   where
     files :: IO [FilePath]
     files =
-      map (resources ++) . filter (isSuffixOf ".ede")
-        <$> getDirectoryContents resources
+      map (resources ++) . filter (List.isSuffixOf ".ede")
+        <$> Directory.getDirectoryContents resources
 
-    test :: FilePath -> IO TestTree
+    test :: FilePath -> IO Tasty.TestTree
     test f = do
       (bs, n) <-
         (,)
-          <$> BS.readFile f
-          <*> pure (takeWhile (/= '.') f)
+          <$> ByteString.readFile f
+          <*> pure (List.takeWhile (/= '.') f)
 
       let (js, src) = split bs
           name = Text.pack (n ++ ".ede")
 
-      return . goldenVsStringDiff n diff (n ++ ".golden") $ do
-        r <- parseWith defaultSyntax include name src
-        result
+      pure . Tasty.Golden.goldenVsStringDiff n diff (n ++ ".golden") $ do
+        r <- EDE.parseWith EDE.defaultSyntax include name src
+
+        EDE.result
           (error . show)
-          (return . LText.encodeUtf8)
-          (r >>= (`render` js))
+          (pure . Text.Lazy.Encoding.encodeUtf8)
+          (r >>= (`EDE.render` js))
 
     diff r n = ["diff", "-u", r, n]
 
-    split = bimap input (BS.drop 4) . BS.breakSubstring "---"
+    split =
+      Bifunctor.bimap input (ByteString.drop 4)
+        . ByteString.breakSubstring "---"
 
     input =
-      fromMaybe (error "Failed parsing JSON")
+      Maybe.fromMaybe (error "Failed parsing JSON")
         . Aeson.decode'
-        . LBS.fromStrict
+        . ByteString.Lazy.fromStrict

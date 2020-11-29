@@ -3,13 +3,11 @@
 
 module Main (main) where
 
-import Control.Applicative ((<*>))
+import qualified Control.Monad.Fail as Fail
 import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.ByteString as Parsec
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.Functor ((<$>))
-import Data.Semigroup ((<>))
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import qualified Data.Text.Lazy.IO as Text.Lazy.IO
@@ -123,7 +121,7 @@ stdinParser = Aeson.json >>= requireObject
 readValue :: Options.ReadM Aeson.Value
 readValue = Options.str >>= decodeJsonStr
 
-decodeJsonStr :: Monad m => String -> m Aeson.Value
+decodeJsonStr :: Fail.MonadFail m => String -> m Aeson.Value
 decodeJsonStr =
   either fail pure . Aeson.eitherDecode . ByteString.Lazy.fromStrict
     . Text.Encoding.encodeUtf8
@@ -132,7 +130,7 @@ decodeJsonStr =
 readObject :: Options.ReadM Aeson.Object
 readObject = readValue >>= requireObject
 
-requireObject :: Monad m => Aeson.Value -> m Aeson.Object
+requireObject :: Fail.MonadFail m => Aeson.Value -> m Aeson.Object
 requireObject = \case
   Aeson.Object obj -> pure obj
   _ -> fail "JSON value must be an object"

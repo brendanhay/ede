@@ -1,3 +1,4 @@
+cabal-version:      2.2
 name:               ede
 version:            0.3.0.0
 synopsis:
@@ -12,7 +13,6 @@ copyright:          Copyright (c) 2013-2020 Brendan Hay
 stability:          Experimental
 category:           Text, Template, Web
 build-type:         Simple
-cabal-version:      2.0
 description:
   ED-E is a templating language written in Haskell with a specific set of features:
   .
@@ -45,14 +45,22 @@ source-repository head
   type:     git
   location: git://github.com/brendanhay/ede.git
 
-library
+common base
   default-language: Haskell2010
-  hs-source-dirs:   src
+  ghc-options:
+    -Wall -funbox-strict-fields -fwarn-incomplete-uni-patterns
+    -fwarn-incomplete-record-updates
+
+  build-depends:    base >=4.12 && <5
+  autogen-modules:  Paths_ede
+  other-modules:    Paths_ede
+
+library
+  import:          base
+  hs-source-dirs:  lib
   exposed-modules:
     Text.EDE
     Text.EDE.Filters
-
-  other-modules:
     Text.EDE.Internal.AST
     Text.EDE.Internal.Eval
     Text.EDE.Internal.Filters
@@ -61,15 +69,11 @@ library
     Text.EDE.Internal.Syntax
     Text.EDE.Internal.Types
 
-  ghc-options:      -Wall
   build-depends:
-      aeson                        >=0.7
-    , base                         >=4.12     && <5
-    , bifunctors                   >=4
+    , aeson                        >=0.7
     , bytestring                   >=0.9
     , comonad                      >=4.2
     , directory                    >=1.2
-    , double-conversion            >=2.0.2
     , filepath                     >=1.2
     , free                         >=4.8
     , lens                         >=4.0
@@ -78,7 +82,6 @@ library
     , prettyprinter                >=1.6
     , prettyprinter-ansi-terminal  >=1.1
     , scientific                   >=0.3.1
-    , semigroups                   >=0.15
     , text                         >=1.2
     , text-manipulate              >=0.1.2
     , trifecta                     >=2.1
@@ -86,30 +89,26 @@ library
     , vector                       >=0.7.1
 
 executable ede
-  default-language: Haskell2010
-  hs-source-dirs:   app
-  main-is:          ede.hs
-  ghc-options:      -Wall
+  import:         base
+  hs-source-dirs: app
+  main-is:        Main.hs
+  ghc-options:    -threaded -rtsopts -with-rtsopts=-A128m
   build-depends:
-      aeson                 >=0.8
+    , aeson                 >=0.8
     , attoparsec
-    , base                  >=4.12   && <5
     , bytestring            >=0.10.4
     , ede
     , optparse-applicative  >=0.11
     , text                  >=1.2
 
 test-suite golden
-  default-language: Haskell2010
-  type:             exitcode-stdio-1.0
-  hs-source-dirs:   test
-  main-is:          Main.hs
-  other-modules:    Paths_ede
-  autogen-modules:  Paths_ede
-  ghc-options:      -Wall -threaded
+  import:         base
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        Main.hs
+  ghc-options:    -threaded -rtsopts -with-rtsopts=-A128m
   build-depends:
-      aeson
-    , base          >=4.12 && <5
+    , aeson
     , bifunctors
     , bytestring
     , directory

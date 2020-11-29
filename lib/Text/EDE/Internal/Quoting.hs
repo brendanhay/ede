@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -6,8 +5,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
+-- |
 -- Module      : Text.EDE.Internal.Quoting
 -- Copyright   : (c) 2013-2020 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
@@ -17,34 +16,38 @@
 -- Maintainer  : Brendan Hay <brendan.g.hay@gmail.com>
 -- Stability   : experimental
 -- Portability : non-portable (GHC extensions)
-
+--
+-- /Warning/: this is an internal module, and does not have a stable
+-- API or name. Functions in this module may not check or enforce
+-- preconditions expected by public modules. Use at your own risk!
 module Text.EDE.Internal.Quoting where
 
-import Control.Applicative
-import Control.Monad
-import Data.Aeson hiding (Result (..))
-import qualified Data.Aeson as A
-import Data.Bifunctor
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.HashMap.Strict as Map
+import Control.Applicative ((<|>))
+import Control.Monad ((>=>))
+import Data.Aeson (FromJSON, ToJSON)
+import qualified Data.Aeson as Aeson
+import Data.Aeson.Types (Array, Object, Value (..))
+import qualified Data.Bifunctor as Bifunctor
+import qualified Data.ByteString.Char8 as ByteString.Char8
+import qualified Data.HashMap.Strict as HashMap
 import Data.List (sortBy)
 import Data.Ord (comparing)
-import Data.Scientific
-#if !MIN_VERSION_base(4,11,0)
-import           Data.Semigroup
-#endif
+import Data.Scientific (Scientific)
+import qualified Data.Scientific as Scientific
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Text.Lazy as LText
-import Data.Text.Lazy.Builder
+import qualified Data.Text.Encoding as Text.Encoding
+import qualified Data.Text.Lazy as Text.Lazy
+import Data.Text.Lazy.Builder (Builder)
+import qualified Data.Text.Lazy.Builder as Text.Builder
 import Data.Text.Manipulate (toOrdinal)
 import Data.Text.Prettyprint.Doc (Pretty (..), (<+>))
 import qualified Data.Text.Prettyprint.Doc as PP
 import qualified Data.Vector as Vector
 import Text.EDE.Internal.Types
-import Text.Trifecta.Delta
-import Text.Trifecta.Rendering
+import Text.Trifecta.Delta (Delta)
+import qualified Text.Trifecta.Delta as Trifecta.Delta
+import qualified Text.Trifecta.Rendering as Trifecta.Rendering
 
 default (AnsiDoc, Double, Integer)
 
@@ -64,8 +67,8 @@ qapply :: Delta -> Term -> Term -> Result Term
 qapply d a b = case (a, b) of
   (TLam f, x) ->
     case f x of
-      Failure e -> Failure (prettyDelta d <+> red "error:" <+> e)
-      Success y -> return y
+      Failure e -> Failure (Trifecta.Delta.prettyDelta d <+> red "error:" <+> e)
+      Success y -> pure y
   (TVal x, _) ->
     Failure $
       "unable to apply literal"
@@ -73,10 +76,12 @@ qapply d a b = case (a, b) of
         <+> "->"
         <+> apretty b
         </> pp x
+{-# INLINEABLE qapply #-}
 
 -- | Quote a primitive 'Value' from the top-level.
 qprim :: (ToJSON a, Quote a) => a -> Term
 qprim = quote "Value" 0
+{-# INLINEABLE qprim #-}
 
 class Unquote a where
   unquote :: Id -> Int -> Term -> Result a
@@ -84,9 +89,10 @@ class Unquote a where
   unquote k n = \case
     f@TLam {} -> typeErr k n (apretty f) "Value"
     TVal v ->
-      case fromJSON v of
-        A.Success x -> pure x
-        A.Error e -> argumentErr k n e
+      case Aeson.fromJSON v of
+        Aeson.Success x -> pure x
+        Aeson.Error e -> argumentErr k n e
+  {-# INLINEABLE unquote #-}
 
 instance Unquote Value
 
@@ -94,7 +100,7 @@ instance Unquote Text
 
 instance Unquote [Text]
 
-instance Unquote LText.Text
+instance Unquote Text.Lazy.Text
 
 instance Unquote Bool
 
@@ -110,13 +116,15 @@ instance Unquote Int where
   unquote k n =
     unquote k n
       >=> maybe (typeErr k n "Double" "Int") pure
-        . toBoundedInteger
+        . Scientific.toBoundedInteger
+  {-# INLINEABLE unquote #-}
 
 instance Unquote Integer where
   unquote k n =
     unquote k n
       >=> either (const (typeErr k n "Double" "Integral")) pure
-        . floatingOrInteger
+        . Scientific.floatingOrInteger
+  {-# INLINEABLE unquote #-}
 
 instance Unquote Collection where
   unquote k n q =
@@ -130,25 +138,29 @@ instance Unquote Collection where
           $ Text.unpack t
 
       hashMap m =
-        Col (Map.size m)
-          . map (first Just)
+        Col (HashMap.size m)
+          . map (Bifunctor.first Just)
           . sortBy (comparing fst)
-          $ Map.toList m
+          $ HashMap.toList m
 
       vector v = Col (Vector.length v) (Vector.map (Nothing,) v)
+  {-# INLINEABLE unquote #-}
 
 class Quote a where
   quote :: Id -> Int -> a -> Term
   default quote :: ToJSON a => Id -> Int -> a -> Term
-  quote _ _ = TVal . toJSON
+  quote _ _ = TVal . Aeson.toJSON
+  {-# INLINEABLE quote #-}
 
 instance (Unquote a, Quote b) => Quote (a -> b) where
   quote k n f = TLam $ \x -> quote k n' . f <$> unquote k n' x
     where
       n' = succ n
+  {-# INLINEABLE quote #-}
 
 instance Quote Term where
   quote _ _ = id
+  {-# INLINEABLE quote #-}
 
 instance Quote Value
 
@@ -158,7 +170,7 @@ instance Quote Text
 
 instance Quote [Text]
 
-instance Quote LText.Text
+instance Quote Text.Lazy.Text
 
 instance Quote Bool
 
@@ -175,7 +187,8 @@ instance Quote Object
 instance Quote Array
 
 instance Quote Builder where
-  quote k n = quote k n . toLazyText
+  quote k n = quote k n . Text.Builder.toLazyText
+  {-# INLINEABLE quote #-}
 
 typeErr :: Id -> Int -> AnsiDoc -> AnsiDoc -> Result a
 typeErr k n x y = Failure $ "type" <+> pp k <+> pretty n <+> x <+> "::" <+> y
@@ -187,7 +200,7 @@ argumentErr k n e = Failure $ if self then app else arg
       "unable to apply"
         <+> bold (pp k)
         <+> "to left hand side:"
-        </> PP.indent 4 (pretty e </> prettyRendering mark)
+        </> PP.indent 4 (pretty e </> Trifecta.Rendering.prettyRendering mark)
 
     arg =
       "invalid"
@@ -195,11 +208,11 @@ argumentErr k n e = Failure $ if self then app else arg
         <+> "argument to"
         <+> bold (pp k)
         <> ":"
-        </> PP.indent 4 (pretty e </> prettyRendering mark)
+        </> PP.indent 4 (pretty e </> Trifecta.Rendering.prettyRendering mark)
 
     mark =
-      renderingCaret (Columns col col) $
-        "... | " <> Text.encodeUtf8 k <> line
+      Trifecta.Rendering.renderingCaret (Trifecta.Delta.Columns col col) $
+        "... | " <> Text.Encoding.encodeUtf8 k <> line
 
     col
       | self = 1
@@ -208,6 +221,6 @@ argumentErr k n e = Failure $ if self then app else arg
     line
       | self = "\n"
       | otherwise =
-        "(" <> BS.intercalate ", " (replicate (n - 1) "...") <> "\n"
+        "(" <> ByteString.Char8.intercalate ", " (replicate (n - 1) "...") <> "\n"
 
     self = n <= 1
