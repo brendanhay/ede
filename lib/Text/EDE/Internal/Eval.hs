@@ -20,15 +20,14 @@
 module Text.EDE.Internal.Eval where
 
 import Control.Comonad.Cofree (Cofree ((:<)))
-import qualified Control.Comonad.Cofree as Comonad.Cofree
 import qualified Control.Monad as Monad
 import Control.Monad.Reader (ReaderT)
 import qualified Control.Monad.Reader as Reader
 import Control.Monad.Trans (lift)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Types (Array, Object, Value (..))
-import Data.Foldable (foldlM)
+import Data.Aeson.Types (Object, Value (..))
+import qualified Data.Foldable as Foldable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List.NonEmpty (NonEmpty (..))
@@ -118,7 +117,7 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
     d = Trifecta.Delta.delta bdy
 
     loop :: Collection -> Context Term
-    loop (Col l xs) = snd <$> foldlM iter (1, qprim (String mempty)) xs
+    loop (Col l xs) = snd <$> Foldable.foldlM iter (1, qprim (String mempty)) xs
       where
         iter (n, p) x = do
           shadowed n

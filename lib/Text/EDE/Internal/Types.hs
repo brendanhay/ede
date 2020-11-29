@@ -28,11 +28,9 @@ module Text.EDE.Internal.Types where
 import Control.Applicative (Alternative (empty, (<|>)))
 import qualified Control.Comonad as Comonad
 import Control.Comonad.Cofree (Cofree)
-import qualified Control.Comonad.Cofree as Comonad.Cofree
 import qualified Control.Lens as Lens
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Object, Pair, Value (..))
-import qualified Data.Aeson.Types as Aeson.Types
 import qualified Data.Functor.Classes as Functor.Classes
 import Data.HashMap.Strict (HashMap)
 import qualified Data.List as List
@@ -229,13 +227,16 @@ instance HasDelta (Exp Delta) where
 
 -- | Unwrap a 'Value' to an 'Object' safely.
 --
--- See 'Aeson''s documentation for more details.
+-- See Aeson\'s documentation for more details.
 fromValue :: Value -> Maybe Object
 fromValue (Object o) = Just o
 fromValue _ = Nothing
 
 -- | Create an 'Object' from a list of name/value 'Pair's.
 --
--- See 'Aeson''s documentation for more details.
+-- See Aeson\'s documentation for more details.
 fromPairs :: [Pair] -> Object
-fromPairs = (\(Object o) -> o) . Aeson.object
+fromPairs xs =
+  case Aeson.object xs of
+    Object o -> o
+    _other -> mempty

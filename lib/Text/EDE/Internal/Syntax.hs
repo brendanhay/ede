@@ -17,7 +17,6 @@
 module Text.EDE.Internal.Syntax where
 
 import Control.Lens ((.~))
-import qualified Control.Lens as Lens
 import Data.Function ((&))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet

@@ -211,9 +211,9 @@ parseWith ::
   -- | Strict 'ByteString' template definition.
   ByteString ->
   m (Result Template)
-parseWith syntax f name =
+parseWith config f name =
   result failure resolve
-    . Parser.runParser syntax name
+    . Parser.runParser config name
   where
     resolve (u, is) =
       Foldable.foldrM include (Success (HashMap.singleton name u)) (HashMap.toList is)
@@ -223,7 +223,7 @@ parseWith syntax f name =
     -- FIXME: utilise the list of deltas for failures
     include (_, _) (Failure err) = failure err
     include (key, delta :| _) (Success ss) =
-      f syntax key delta
+      f config key delta
         >>= result failure (success . mappend ss . _tmplIncl)
 
 -- | 'HashMap' resolver for @include@ expressions.
@@ -237,7 +237,7 @@ includeMap ::
   HashMap Id Template ->
   -- | Resolver for 'parseWith'.
   Resolver m
-includeMap templates _syntax key _delta
+includeMap templates _config key _delta
   | Just val <- HashMap.lookup key templates = success val
   | otherwise = failure ("unable to resolve " <> pretty (Text.unpack key))
 
@@ -252,8 +252,8 @@ includeFile ::
   -- | Parent directory for relatively pathed includes.
   FilePath ->
   Resolver IO
-includeFile path syntax key _delta =
-  loadFile file >>= result failure (parseWith syntax include key)
+includeFile path config key _delta =
+  loadFile file >>= result failure (parseWith config include key)
   where
     include :: Resolver IO
     include = includeFile (FilePath.takeDirectory file)

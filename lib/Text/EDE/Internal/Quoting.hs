@@ -123,7 +123,7 @@ instance Unquote Integer where
   unquote k n =
     unquote k n
       >=> either (const (typeErr k n "Double" "Integral")) pure
-        . Scientific.floatingOrInteger
+        . (Scientific.floatingOrInteger :: Scientific -> Either Double Integer)
   {-# INLINEABLE unquote #-}
 
 instance Unquote Collection where

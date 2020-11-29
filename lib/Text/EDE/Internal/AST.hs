@@ -21,9 +21,7 @@ module Text.EDE.Internal.AST where
 
 import qualified Control.Comonad as Comonad
 import Control.Comonad.Cofree (Cofree ((:<)))
-import qualified Control.Comonad.Cofree as Cofree
-import Data.Aeson.Types (Array, Object, Value (..))
-import qualified Data.Aeson.Types as Aeson.Types
+import Data.Aeson.Types (Value (..))
 import qualified Data.Foldable as Foldable
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Maybe as Maybe

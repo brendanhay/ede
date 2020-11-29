@@ -26,10 +26,9 @@
 -- preconditions expected by public modules. Use at your own risk!
 module Text.EDE.Internal.Parser where
 
-import Control.Applicative (Alternative (empty, (<|>)))
+import Control.Applicative (Alternative ((<|>)))
 import qualified Control.Comonad as Comonad
 import Control.Comonad.Cofree (Cofree ((:<)))
-import qualified Control.Comonad.Cofree as Comonad.Cofree
 import Control.Lens ((%=))
 import qualified Control.Lens as Lens
 import Control.Monad (MonadPlus, void)
