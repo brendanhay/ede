@@ -94,12 +94,14 @@ executable ede
   main-is:        Main.hs
   ghc-options:    -threaded -rtsopts -with-rtsopts=-A128m
   build-depends:
-    , aeson                 >=0.8
+    , aeson                        >=0.8
     , attoparsec
-    , bytestring            >=0.10.4
+    , bytestring                   >=0.10.4
     , ede
-    , optparse-applicative  >=0.11
-    , text                  >=1.2
+    , optparse-applicative         >=0.11
+    , prettyprinter                >=1.6
+    , prettyprinter-ansi-terminal  >=1.1
+    , text                         >=1.2
 
 test-suite tests
   import:         base
