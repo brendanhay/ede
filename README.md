@@ -1,12 +1,21 @@
 # ED-E
 
-[![Build][build-badge]][build]
+[![MPL2][license-badge]][license]
 [![Hackage][hackage-badge]][hackage]
+[![Build][build-badge]][build]
+[![Nix][nix-badge]][nix]
+[![Cachix][cachix-badge]][cachix]
 
-[build]: https://github.com/brendanhay/ede/actions
-[build-badge]: https://github.com/brendanhay/ede/workflows/Build/badge.svg
+[license]: https://opensource.org/licenses/MPL-2.0
+[license-badge]: https://img.shields.io/badge/License-MPL%202.0-blue.svg?style=flat
 [hackage]: http://hackage.haskell.org/package/ede
 [hackage-badge]: https://img.shields.io/hackage/v/ede.svg?style=flat
+[build]: https://github.com/brendanhay/ede/actions
+[build-badge]: https://github.com/brendanhay/ede/workflows/Build/badge.svg?style=flat
+[nix]: https://nixos.org
+[nix-badge]: https://img.shields.io/badge/builtwith-nix-purple.svg?style=flat
+[cachix]: https://amazonka.cachix.org
+[cachix-badge]: https://img.shields.io/badge/cachix-amazonka-purple.svg?style=flat
 
 * [Introduction](#introduction)
 * [Syntax](#syntax)
