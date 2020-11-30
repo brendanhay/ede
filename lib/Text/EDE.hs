@@ -141,7 +141,7 @@ import qualified Text.Trifecta.Delta as Trifecta.Delta
 version :: Version
 version = Paths.version
 
--- | Parse Lazy 'Text.Lazy.Text' into a compiled 'Template'.
+-- | Parse a 'ByteString' into a compiled 'Template'.
 --
 -- Because this function is pure and does not resolve @include@s,
 -- encountering an @include@ expression during parsing will result in an 'Error'.
@@ -154,7 +154,7 @@ parse ::
   Result Template
 parse = Monad.join . parseWith defaultSyntax (includeMap mempty) "Text.EDE.parse"
 
--- | Parse 'Text' into a compiled 'Template'.
+-- | Parse a 'ByteString' into a compiled 'Template'.
 --
 -- This function handles all @include@ expressions as 'FilePath's and performs
 -- recursive loading/parsing.
