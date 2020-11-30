@@ -1,21 +1,21 @@
 # ED-E
 
 [![MPL2][license-badge]][license]
-[![Hackage][hackage-badge]][hackage]
 [![Build][build-badge]][build]
+[![Hackage][hackage-badge]][hackage]
 [![Nix][nix-badge]][nix]
 [![Cachix][cachix-badge]][cachix]
 
 [license]: https://opensource.org/licenses/MPL-2.0
-[license-badge]: https://img.shields.io/badge/License-MPL%202.0-blue.svg?style=flat
-[hackage]: http://hackage.haskell.org/package/ede
-[hackage-badge]: https://img.shields.io/hackage/v/ede.svg?style=flat
+[license-badge]: https://img.shields.io/badge/License-MPL%202.0-blue.svg
 [build]: https://github.com/brendanhay/ede/actions
-[build-badge]: https://github.com/brendanhay/ede/workflows/Build/badge.svg?style=flat
+[build-badge]: https://github.com/brendanhay/ede/workflows/Build/badge.svg
+[hackage]: http://hackage.haskell.org/package/ede
+[hackage-badge]: https://img.shields.io/hackage/v/ede.svg
 [nix]: https://nixos.org
-[nix-badge]: https://img.shields.io/badge/builtwith-nix-purple.svg?style=flat
+[nix-badge]: https://img.shields.io/badge/builtwith-nix-purple.svg
 [cachix]: https://amazonka.cachix.org
-[cachix-badge]: https://img.shields.io/badge/cachix-amazonka-purple.svg?style=flat
+[cachix-badge]: https://img.shields.io/badge/cachix-amazonka-purple.svg
 
 * [Introduction](#introduction)
 * [Syntax](#syntax)
