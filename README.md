@@ -7,9 +7,9 @@
 [![Cachix][cachix-badge]][cachix]
 
 [license]: https://opensource.org/licenses/MPL-2.0
-[license-badge]: https://img.shields.io/badge/License-MPL%202.0-blue.svg
+[license-badge]: https://img.shields.io/badge/license-MPL%202.0-blue.svg
 [build]: https://github.com/brendanhay/ede/actions
-[build-badge]: https://github.com/brendanhay/ede/workflows/Build/badge.svg
+[build-badge]: https://github.com/brendanhay/ede/workflows/build/badge.svg
 [hackage]: http://hackage.haskell.org/package/ede
 [hackage-badge]: https://img.shields.io/hackage/v/ede.svg
 [nix]: https://nixos.org
