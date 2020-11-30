@@ -1,11 +1,12 @@
 # ED-E
 
-[![Build][build-badge]][https://github.com/brendanhay/ede/actions]
-[![Hackage][hackage-badge]][http://hackage.haskell.org/package/ede]
+[![Build][build-badge]][build]
+[![Hackage][hackage-badge]][hackage]
 
+[build]: https://github.com/brendanhay/ede/actions
 [build-badge]: https://github.com/brendanhay/ede/workflows/Build/badge.svg
+[hackage]: http://hackage.haskell.org/package/ede
 [hackage-badge]: https://img.shields.io/hackage/v/ede.svg?style=flat
-
 
 * [Introduction](#introduction)
 * [Syntax](#syntax)
