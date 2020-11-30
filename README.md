@@ -1,6 +1,11 @@
 # ED-E
 
-[![Build Status](https://img.shields.io/travis/brendanhay/ede/develop.svg?maxAge=2592000)](https://travis-ci.org/brendanhay/ede)
+[![Build][build-badge]][https://github.com/brendanhay/ede/actions]
+[![Hackage][hackage-badge]][http://hackage.haskell.org/package/ede]
+
+[build-badge]: https://github.com/brendanhay/ede/workflows/Build/badge.svg
+[hackage-badge]: https://img.shields.io/hackage/v/ede.svg?style=flat
+
 
 * [Introduction](#introduction)
 * [Syntax](#syntax)
