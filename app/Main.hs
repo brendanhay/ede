@@ -15,6 +15,8 @@ import qualified Options.Applicative as Options
 import qualified Options.Applicative.Help.Pretty as Pretty
 import qualified System.Exit as Exit
 import qualified Text.EDE as EDE
+import qualified Prettyprinter as PP
+import qualified Prettyprinter.Render.Terminal as PP
 
 data Options = Options
   { templateFile :: FilePath,
@@ -109,10 +111,10 @@ main = do
           >>= either fail pure . Parsec.parseOnly stdinParser
 
   EDE.parseFile (templateFile options) >>= \case
-    EDE.Failure err -> print err >> Exit.exitFailure
+    EDE.Failure err -> PP.putDoc (err <> PP.hardline) >> Exit.exitFailure
     EDE.Success tpl ->
       case EDE.render tpl ctx of
-        EDE.Failure err -> print err >> Exit.exitFailure
+        EDE.Failure err -> PP.putDoc (err <> PP.hardline) >> Exit.exitFailure
         EDE.Success output -> Text.Lazy.IO.putStr output
 
 stdinParser :: Parsec.Parser Aeson.Object
