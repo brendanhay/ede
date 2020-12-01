@@ -1,6 +1,6 @@
 cabal-version:      2.2
 name:               ede
-version:            0.3.1.0
+version:            0.3.2.0
 synopsis:
   Templating language with similar syntax and features to Liquid or Jinja2.
 
