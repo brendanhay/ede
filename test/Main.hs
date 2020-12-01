@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- Module      : Main
--- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
+-- Copyright   : (c) 2013-2020 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
 --               A copy of the MPL can be found in the LICENSE file or
@@ -16,57 +16,52 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
+import Data.Functor ((<&>))
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy.Encoding as Text.Lazy.Encoding
 import qualified Paths_ede as Paths
 import qualified System.Directory as Directory
-import qualified System.IO.Unsafe as IO.Unsafe
+import System.FilePath ((-<.>), (</>))
+import qualified System.FilePath as FilePath
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Golden as Tasty.Golden
 import qualified Text.EDE as EDE
 
--- FIXME: migrate to tasty's resource bracketing.
 main :: IO ()
-main =
+main = do
+  resources <-
+    Paths.getDataDir <&> (</> "test/resources")
+
+  templates <-
+    map (FilePath.combine resources) . filter (List.isSuffixOf ".ede")
+      <$> Directory.listDirectory resources
+
   Tasty.defaultMain $
     Tasty.testGroup "ED-E" $
-      IO.Unsafe.unsafePerformIO tests
+      map (test resources . FilePath.normalise) templates
 
-resources :: FilePath
-resources = IO.Unsafe.unsafePerformIO Paths.getDataDir
+test :: FilePath -> FilePath -> Tasty.TestTree
+test dir path =
+  Tasty.Golden.goldenVsStringDiff path diff (path -<.> ".golden") $ do
+    (context, template) <-
+      split <$> ByteString.readFile path
 
-include :: EDE.Resolver IO
-include = EDE.includeFile resources
+    result <-
+      EDE.parseWith
+        EDE.defaultSyntax
+        (EDE.includeFile dir)
+        (Text.pack path)
+        template
 
-tests :: IO [Tasty.TestTree]
-tests = files >>= mapM test
+    EDE.result
+      (error . show)
+      (pure . Text.Lazy.Encoding.encodeUtf8)
+      (result >>= flip EDE.render context)
   where
-    files :: IO [FilePath]
-    files =
-      map (resources ++) . filter (List.isSuffixOf ".ede")
-        <$> Directory.getDirectoryContents resources
-
-    test :: FilePath -> IO Tasty.TestTree
-    test f = do
-      (bs, n) <-
-        (,)
-          <$> ByteString.readFile f
-          <*> pure (List.takeWhile (/= '.') f)
-
-      let (js, src) = split bs
-          name = Text.pack (n ++ ".ede")
-
-      pure . Tasty.Golden.goldenVsStringDiff n diff (n ++ ".golden") $ do
-        r <- EDE.parseWith EDE.defaultSyntax include name src
-
-        EDE.result
-          (error . show)
-          (pure . Text.Lazy.Encoding.encodeUtf8)
-          (r >>= (`EDE.render` js))
-
-    diff r n = ["diff", "-u", r, n]
+    diff ref new =
+      ["diff", "-u", ref, new]
 
     split =
       Bifunctor.bimap input (ByteString.drop 4)

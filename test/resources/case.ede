@@ -1,4 +1,4 @@
-{ "var": "BiNGo!" }
+{ "var": "BiNGo!", "list": ["foo", "bar", "buck"] }
 ---
     {% case var %}
     {% when "other" %}
@@ -15,3 +15,14 @@
 {% else %}
 El fino.
 {% endcase %}
+
+  {% for item in list %}
+    {% case item.value %}
+    {% when "foo" %}
+      FOO
+    {% when "bar" %}
+        BAR
+    {% else %}
+    BAZ
+    {% endcase %}
+  {% endfor %}

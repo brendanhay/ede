@@ -31,7 +31,7 @@ import qualified Control.Comonad as Comonad
 import Control.Comonad.Cofree (Cofree ((:<)))
 import Control.Lens ((%=))
 import qualified Control.Lens as Lens
-import Control.Monad (MonadPlus, void)
+import Control.Monad (MonadPlus, void, unless)
 import Control.Monad.State.Strict (MonadState, StateT)
 import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
@@ -137,7 +137,10 @@ runParser o n = res . Trifecta.parseByteString (runEDE run) pos
 pragma :: Parser m => m ()
 pragma =
   void . Trifecta.many $ do
-    !xs <- pragmal *> Trifecta.symbol "EDE_SYNTAX" *> Trifecta.sepBy field spaces <* trimr pragmar
+    !xs <- pragmal
+      *> Trifecta.symbol "EDE_SYNTAX"
+      *> Trifecta.sepBy field spaces
+      <* trimr pragmar
 
     mapM_ (uncurry Lens.assign) xs
   where
@@ -161,7 +164,7 @@ document :: Parser m => m (Exp Delta)
 document =
   eapp
     <$> Trifecta.position
-    <*> Trifecta.many (statement <|> inline <|> fragment)
+    <*> Trifecta.many (blankLine <|> statement <|> inline <|> fragment)
 
 inline :: Parser m => m (Exp Delta)
 inline = Trifecta.between inlinel inliner term
@@ -191,7 +194,7 @@ statement =
 block :: Parser m => String -> m a -> m a
 block k p =
   Trifecta.try (multiLine (keyword k) p)
-    <|> singleLine (keyword k) p
+  <|> singleLine (keyword k) p
 
 multiLine :: Parser m => m b -> m a -> m a
 multiLine s =
@@ -200,6 +203,15 @@ multiLine s =
 singleLine :: Parser m => m b -> m a -> m a
 singleLine s =
   Trifecta.between (Trifecta.try (blockl *> s)) blockr
+
+blankLine :: Parser m => m (Exp Delta)
+blankLine = do
+  c <- Trifecta.Delta.column <$> Trifecta.position
+
+  unless (c == 0) $
+    fail "expected blank line"
+
+  ann (ELit . String . Text.singleton <$> Trifecta.newline)
 
 ifelif :: Parser m => m (Exp Delta)
 ifelif =
@@ -401,13 +413,13 @@ pack = fmap (String . Text.pack)
 
 triml :: Parser m => m a -> m a
 triml p = do
-  c <- Trifecta.Delta.column <$> Trifecta.position
-  if c == 0
-    then Trifecta.spaces *> p
-    else fail "left whitespace removal failed"
+    c <- Trifecta.Delta.column <$> Trifecta.position
+    if c == 0
+        then Trifecta.spaces *> p
+        else fail "left whitespace removal failed"
 
 trimr :: Parser m => m a -> m a
-trimr p = p <* Trifecta.spaces <* Trifecta.newline
+trimr p = p <* Trifecta.newline -- <* Trifecta.newline
 
 pragmak :: Parser m => String -> m ()
 pragmak = Trifecta.reserve pragmaStyle

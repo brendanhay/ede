@@ -108,13 +108,14 @@ test-suite tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
   main-is:        Main.hs
-  ghc-options:    -threaded -rtsopts -with-rtsopts=-A128m
+  ghc-options:    -threaded
   build-depends:
     , aeson
     , bifunctors
     , bytestring
     , directory
     , ede
+    , filepath
     , tasty
     , tasty-golden
     , text
