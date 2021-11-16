@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -125,7 +126,11 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import qualified Data.Text.Lazy.Builder as Text.Builder
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter (Pretty (..))
+#else
 import Data.Text.Prettyprint.Doc (Pretty (..))
+#endif
 import Data.Version (Version)
 import qualified Paths_ede as Paths
 import qualified System.Directory as Directory
@@ -290,6 +295,9 @@ renderWith ::
   Result Text.Lazy.Text
 renderWith fs (Template _ u ts) =
   fmap Text.Builder.toLazyText . Eval.render ts fs u
+#if MIN_VERSION_aeson(2,0,0)
+       . Eval.fromKeyMap
+#endif
 
 -- | /See:/ 'parse'
 eitherParse :: ByteString -> Either String Template

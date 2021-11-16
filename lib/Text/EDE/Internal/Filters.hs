@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -23,6 +24,10 @@ module Text.EDE.Internal.Filters where
 
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Array, Object, Value (..))
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
+#endif
 import qualified Data.Char as Char
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
@@ -33,7 +38,11 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import qualified Data.Text.Lazy.Encoding as Text.Lazy.Encoding
 import qualified Data.Text.Manipulate as Text.Manipulate
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter ((<+>))
+#else
 import Data.Text.Prettyprint.Doc ((<+>))
+#endif
 import qualified Data.Text.Unsafe as Text.Unsafe
 import qualified Data.Vector as Vector
 import Text.EDE.Internal.Quoting
@@ -100,8 +109,13 @@ stdlib =
       "justifyRight" @: (\x n -> Text.justifyRight n ' ' x),
       "center" @: (\x n -> Text.center n ' ' x),
       -- sequences
+#if MIN_VERSION_aeson(2,0,0)
+      qcol1 "length" Text.length KeyMap.size Vector.length,
+      qcol1 "empty" Text.null KeyMap.null Vector.null,
+#else
       qcol1 "length" Text.length HashMap.size Vector.length,
       qcol1 "empty" Text.null HashMap.null Vector.null,
+#endif
       qcol1 "reverse" Text.reverse id Vector.reverse,
       -- lists
       qlist1 "head" headT headV,
@@ -110,8 +124,13 @@ stdlib =
       qlist1 "init" initT initV,
       "at" @: (\x i -> x Vector.! i :: Value),
       -- object
+#if MIN_VERSION_aeson(2,0,0)
+      "keys" @: (map Key.toText . KeyMap.keys :: Object -> [Text]),
+      "elems" @: (map snd . KeyMap.toList :: Object -> [Value]),
+#else
       "keys" @: (HashMap.keys :: Object -> [Text]),
       "elems" @: (HashMap.elems :: Object -> [Value]),
+#endif
       -- , "map"        @: undefined
       -- , "filter"     @: undefined
       -- , "zip"        @: undefined

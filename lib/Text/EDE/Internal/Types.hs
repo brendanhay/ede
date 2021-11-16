@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -38,9 +39,15 @@ import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Data.Text as Text
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter (Doc, Pretty (..))
+import qualified Prettyprinter as PP
+import qualified Prettyprinter.Render.Terminal as PP
+#else
 import Data.Text.Prettyprint.Doc (Doc, Pretty (..))
 import qualified Data.Text.Prettyprint.Doc as PP
 import qualified Data.Text.Prettyprint.Doc.Render.Terminal as PP
+#endif
 import Text.Trifecta.Delta (Delta, HasDelta)
 import qualified Text.Trifecta.Delta as Trifecta.Delta
 

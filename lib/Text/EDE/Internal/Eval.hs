@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -27,6 +28,12 @@ import Control.Monad.Trans (lift)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Object, Value (..))
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as Key
+import Data.Aeson.KeyMap (KeyMap)
+import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.Bifunctor as Bifunctor
+#endif
 import qualified Data.Foldable as Foldable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
@@ -38,8 +45,13 @@ import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Text.Builder
 import Data.Text.Lazy.Builder.Scientific (FPFormat (Fixed), formatScientificBuilder)
 import Data.Text.Manipulate (toOrdinal)
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter ((<+>))
+import qualified Prettyprinter as PP
+#else
 import Data.Text.Prettyprint.Doc ((<+>))
 import qualified Data.Text.Prettyprint.Doc as PP
+#endif
 import Text.EDE.Internal.Filters (stdlib)
 import Text.EDE.Internal.Quoting
 import Text.EDE.Internal.Types
@@ -49,7 +61,11 @@ import qualified Text.Trifecta.Delta as Trifecta.Delta
 data Env = Env
   { _templates :: HashMap Id (Exp Delta),
     _quoted :: HashMap Id Term,
+#if MIN_VERSION_aeson(2,0,0)
+    _values :: KeyMap Value
+#else
     _values :: HashMap Id Value
+#endif
   }
 
 type Context = ReaderT Env Result
@@ -61,7 +77,11 @@ render ::
   HashMap Id Value ->
   Result Builder
 render ts fs e o =
+#if MIN_VERSION_aeson(2,0,0)
+  Reader.runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) $ toKeyMap o)
+#else
   Reader.runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) o)
+#endif
   where
     nf (TVal v) = build (Trifecta.Delta.delta e) v
     nf _ =
@@ -86,7 +106,11 @@ eval (d :< EApp a b) = do
 eval (_ :< ELet k rhs bdy) = do
   q <- eval rhs
   v <- lift (unquote k 0 q)
+#if MIN_VERSION_aeson(2,0,0)
+  bind (KeyMap.insert (Key.fromText k) v) (eval bdy)
+#else
   bind (HashMap.insert k v) (eval bdy)
+#endif
 
 -- FIXME: We have to recompute c everytime due to the predicate
 eval (d :< ECase p ws) = go ws
@@ -121,7 +145,11 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
       where
         iter (n, p) x = do
           shadowed n
+#if MIN_VERSION_aeson(2,0,0)
+          q <- bind (KeyMap.insert (Key.fromText i) (context n x)) (eval bdy)
+#else
           q <- bind (HashMap.insert i (context n x)) (eval bdy)
+#endif
           r <- binding d p q
           pure (n + 1, r)
 
@@ -130,7 +158,11 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
           maybe
             (pure ())
             (shadowedErr n)
+#if MIN_VERSION_aeson(2,0,0)
+            (KeyMap.lookup (Key.fromText i) m)
+#else
             (HashMap.lookup i m)
+#endif
 
         shadowedErr n x =
           throwError d $
@@ -171,6 +203,16 @@ eval (d :< EIncl i) = do
           <+> PP.brackets (pp (Text.intercalate "," $ HashMap.keys ts))
 {-# INLINEABLE eval #-}
 
+#if MIN_VERSION_aeson(2,0,0)
+fromKeyMap :: KeyMap Value -> HashMap Id Value
+fromKeyMap = HashMap.fromList . map (Bifunctor.first Key.toText) . KeyMap.toList
+{-# INLINEABLE fromKeyMap #-}
+
+toKeyMap :: HashMap Id Value -> KeyMap Value
+toKeyMap = KeyMap.fromList . map (Bifunctor.first Key.fromText) . HashMap.toList
+{-# INLINEABLE toKeyMap #-}
+#endif
+
 bind :: (Object -> Object) -> Context a -> Context a
 bind f = Reader.withReaderT (\x -> x {_values = f (_values x)})
 {-# INLINEABLE bind #-}
@@ -185,7 +227,11 @@ variable d (Var is) =
       maybe
         (throwError d $ "variable" <+> apretty cur <+> "doesn't exist.")
         (go ks (k : r))
+#if MIN_VERSION_aeson(2,0,0)
+        (KeyMap.lookup (Key.fromText k) m)
+#else
         (HashMap.lookup k m)
+#endif
       where
         cur = Var (k :| r)
 

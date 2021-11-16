@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -27,9 +28,14 @@ import Control.Monad ((>=>))
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Array, Object, Value (..))
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
+#else
+import qualified Data.HashMap.Strict as HashMap
+#endif
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.ByteString.Char8 as ByteString.Char8
-import qualified Data.HashMap.Strict as HashMap
 import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Scientific (Scientific)
@@ -41,8 +47,13 @@ import qualified Data.Text.Lazy as Text.Lazy
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Text.Builder
 import Data.Text.Manipulate (toOrdinal)
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter (Pretty (..), (<+>))
+import qualified Prettyprinter as PP
+#else
 import Data.Text.Prettyprint.Doc (Pretty (..), (<+>))
 import qualified Data.Text.Prettyprint.Doc as PP
+#endif
 import qualified Data.Vector as Vector
 import Text.EDE.Internal.Types
 import Text.Trifecta.Delta (Delta)
@@ -138,10 +149,17 @@ instance Unquote Collection where
           $ Text.unpack t
 
       hashMap m =
+#if MIN_VERSION_aeson(2,0,0)
+        Col (KeyMap.size m)
+          . map (Bifunctor.first $ Just . Key.toText)
+          . sortBy (comparing fst)
+          $ KeyMap.toList m
+#else
         Col (HashMap.size m)
           . map (Bifunctor.first Just)
           . sortBy (comparing fst)
           $ HashMap.toList m
+#endif
 
       vector v = Col (Vector.length v) (Vector.map (Nothing,) v)
   {-# INLINEABLE unquote #-}

@@ -36,6 +36,9 @@ import Control.Monad.State.Strict (MonadState, StateT)
 import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
 import Data.Aeson.Types (Array, Object, Value (..))
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.KeyMap as KeyMap
+#endif
 import qualified Data.Bifunctor as Bifunctor
 import Data.ByteString (ByteString)
 import qualified Data.Char as Char
@@ -365,7 +368,11 @@ bool =
     <|> Trifecta.symbol "false" *> pure False
 
 object :: Parser m => m Object
+#if MIN_VERSION_aeson(2,0,0)
+object = KeyMap.fromList <$> Trifecta.braces (Trifecta.commaSep pair)
+#else
 object = HashMap.fromList <$> Trifecta.braces (Trifecta.commaSep pair)
+#endif
   where
     pair =
       (,)
