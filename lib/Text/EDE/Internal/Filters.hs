@@ -25,7 +25,6 @@ module Text.EDE.Internal.Filters where
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Array, Object, Value (..))
 #if MIN_VERSION_aeson(2,0,0)
-import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 #endif
 import qualified Data.Char as Char
@@ -125,7 +124,7 @@ stdlib =
       "at" @: (\x i -> x Vector.! i :: Value),
       -- object
 #if MIN_VERSION_aeson(2,0,0)
-      "keys" @: (map Key.toText . KeyMap.keys :: Object -> [Text]),
+      "keys" @: (map fromKey . KeyMap.keys :: Object -> [Text]),
       "elems" @: (map snd . KeyMap.toList :: Object -> [Value]),
 #else
       "keys" @: (HashMap.keys :: Object -> [Text]),

@@ -29,10 +29,8 @@ import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Object, Value (..))
 #if MIN_VERSION_aeson(2,0,0)
-import qualified Data.Aeson.Key as Key
 import Data.Aeson.KeyMap (KeyMap)
 import qualified Data.Aeson.KeyMap as KeyMap
-import qualified Data.Bifunctor as Bifunctor
 #endif
 import qualified Data.Foldable as Foldable
 import Data.HashMap.Strict (HashMap)
@@ -107,7 +105,7 @@ eval (_ :< ELet k rhs bdy) = do
   q <- eval rhs
   v <- lift (unquote k 0 q)
 #if MIN_VERSION_aeson(2,0,0)
-  bind (KeyMap.insert (Key.fromText k) v) (eval bdy)
+  bind (KeyMap.insert (toKey k) v) (eval bdy)
 #else
   bind (HashMap.insert k v) (eval bdy)
 #endif
@@ -146,7 +144,7 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
         iter (n, p) x = do
           shadowed n
 #if MIN_VERSION_aeson(2,0,0)
-          q <- bind (KeyMap.insert (Key.fromText i) (context n x)) (eval bdy)
+          q <- bind (KeyMap.insert (toKey i) (context n x)) (eval bdy)
 #else
           q <- bind (HashMap.insert i (context n x)) (eval bdy)
 #endif
@@ -159,7 +157,7 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
             (pure ())
             (shadowedErr n)
 #if MIN_VERSION_aeson(2,0,0)
-            (KeyMap.lookup (Key.fromText i) m)
+            (KeyMap.lookup (toKey i) m)
 #else
             (HashMap.lookup i m)
 #endif
@@ -203,16 +201,6 @@ eval (d :< EIncl i) = do
           <+> PP.brackets (pp (Text.intercalate "," $ HashMap.keys ts))
 {-# INLINEABLE eval #-}
 
-#if MIN_VERSION_aeson(2,0,0)
-fromKeyMap :: KeyMap Value -> HashMap Id Value
-fromKeyMap = HashMap.fromList . map (Bifunctor.first Key.toText) . KeyMap.toList
-{-# INLINEABLE fromKeyMap #-}
-
-toKeyMap :: HashMap Id Value -> KeyMap Value
-toKeyMap = KeyMap.fromList . map (Bifunctor.first Key.fromText) . HashMap.toList
-{-# INLINEABLE toKeyMap #-}
-#endif
-
 bind :: (Object -> Object) -> Context a -> Context a
 bind f = Reader.withReaderT (\x -> x {_values = f (_values x)})
 {-# INLINEABLE bind #-}
@@ -228,7 +216,7 @@ variable d (Var is) =
         (throwError d $ "variable" <+> apretty cur <+> "doesn't exist.")
         (go ks (k : r))
 #if MIN_VERSION_aeson(2,0,0)
-        (KeyMap.lookup (Key.fromText k) m)
+        (KeyMap.lookup (toKey k) m)
 #else
         (HashMap.lookup k m)
 #endif

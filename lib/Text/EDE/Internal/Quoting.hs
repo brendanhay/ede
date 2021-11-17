@@ -29,7 +29,6 @@ import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Array, Object, Value (..))
 #if MIN_VERSION_aeson(2,0,0)
-import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 #else
 import qualified Data.HashMap.Strict as HashMap
@@ -151,7 +150,7 @@ instance Unquote Collection where
       hashMap m =
 #if MIN_VERSION_aeson(2,0,0)
         Col (KeyMap.size m)
-          . map (Bifunctor.first $ Just . Key.toText)
+          . map (Bifunctor.first $ Just . fromKey)
           . sortBy (comparing fst)
           $ KeyMap.toList m
 #else
