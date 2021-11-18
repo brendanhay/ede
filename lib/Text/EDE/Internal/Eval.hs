@@ -72,7 +72,11 @@ render ::
   HashMap Id (Exp Delta) ->
   HashMap Id Term ->
   Exp Delta ->
+#if MIN_VERSION_aeson(2,0,0)
   KeyMap Value ->
+#else
+  HashMap Id Value ->
+#endif
   Result Builder
 render ts fs e o =
   Reader.runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) o)
