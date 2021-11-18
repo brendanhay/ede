@@ -72,14 +72,10 @@ render ::
   HashMap Id (Exp Delta) ->
   HashMap Id Term ->
   Exp Delta ->
-  HashMap Id Value ->
+  KeyMap Value ->
   Result Builder
 render ts fs e o =
-#if MIN_VERSION_aeson(2,0,0)
-  Reader.runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) $ toKeyMap o)
-#else
   Reader.runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) o)
-#endif
   where
     nf (TVal v) = build (Trifecta.Delta.delta e) v
     nf _ =

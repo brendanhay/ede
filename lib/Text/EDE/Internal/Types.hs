@@ -35,10 +35,6 @@ import Data.Aeson.Types (Object, Pair, Value (..))
 #if MIN_VERSION_aeson(2,0,0)
 import Data.Aeson.Key (Key)
 import qualified Data.Aeson.Key as Key
-import Data.Aeson.KeyMap (KeyMap)
-import qualified Data.Aeson.KeyMap as KeyMap
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Bifunctor as Bifunctor
 import Data.Type.Coercion (coerceWith, sym)
 #endif
 import qualified Data.Functor.Classes as Functor.Classes
@@ -271,22 +267,4 @@ toKey =
     Just textCoercion -> coerceWith (sym textCoercion)
     Nothing -> Key.fromText
 {-# INLINEABLE toKey #-}
-
-fromKeyMap :: KeyMap Value -> HashMap Id Value
-fromKeyMap =
-  case KeyMap.coercionToHashMap of
-    Just hashMapCoercion ->
-      HashMap.mapKeys fromKey . coerceWith (sym hashMapCoercion)
-    Nothing ->
-      HashMap.fromList . map (Bifunctor.first fromKey) . KeyMap.toList
-{-# INLINEABLE fromKeyMap #-}
-
-toKeyMap :: HashMap Id Value -> KeyMap Value
-toKeyMap =
-  case KeyMap.coercionToHashMap of
-    Just hashMapCoercion ->
-      coerceWith hashMapCoercion . HashMap.mapKeys toKey
-    Nothing ->
-      KeyMap.fromList . map (Bifunctor.first toKey) . HashMap.toList
-{-# INLINEABLE toKeyMap #-}
 #endif

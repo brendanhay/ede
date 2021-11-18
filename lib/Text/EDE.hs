@@ -295,9 +295,6 @@ renderWith ::
   Result Text.Lazy.Text
 renderWith fs (Template _ u ts) =
   fmap Text.Builder.toLazyText . Eval.render ts fs u
-#if MIN_VERSION_aeson(2,0,0)
-       . fromKeyMap
-#endif
 
 -- | /See:/ 'parse'
 eitherParse :: ByteString -> Either String Template
