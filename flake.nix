@@ -13,7 +13,8 @@
 
       in
       {
-        packages.${name} = pkgs.haskellPackages.callCabal2nix name self { };
+        packages.${name} =
+          pkgs.haskell.lib.dontCheck (pkgs.haskellPackages.callCabal2nix name self {});
 
         defaultPackage = self.packages.${system}.${name};
 
