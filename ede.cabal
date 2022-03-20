@@ -9,7 +9,7 @@ license:            MPL-2.0
 license-file:       LICENSE
 author:             Brendan Hay
 maintainer:         Brendan Hay <brendan.g.hay@gmail.com>
-copyright:          Copyright (c) 2013-2020 Brendan Hay
+copyright:          Copyright (c) 2013-2022 Brendan Hay
 stability:          Experimental
 category:           Text, Template, Web
 build-type:         Simple
