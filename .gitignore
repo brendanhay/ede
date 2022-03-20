@@ -12,6 +12,7 @@
 
 # Nix
 result*
+.direnv
 
 # Certificates
 *.pem

@@ -8,6 +8,12 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+echo "Formatting Nix"
+
+find . \
+    -type f -name '*.nix' \
+    -exec nixpkgs-fmt {} \+
+
 echo "Formatting Cabal"
 
 find . \
@@ -22,11 +28,5 @@ find . \
     -type f -name '*.hs' \
     -exec ormolu -i \
     {} \+
-
-echo "Formatting Nix"
-
-find . \
-    -type f -name '*.nix' \
-    -exec nixfmt {} \+
 
 echo 'Done.'
