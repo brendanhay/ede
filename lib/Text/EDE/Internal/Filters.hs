@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -22,7 +23,7 @@
 module Text.EDE.Internal.Filters where
 
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Types (Array, Object, Value (..))
+import Data.Aeson.Types (Value (..))
 import qualified Data.Char as Char
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
@@ -33,9 +34,11 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import qualified Data.Text.Lazy.Encoding as Text.Lazy.Encoding
 import qualified Data.Text.Manipulate as Text.Manipulate
-import Data.Text.Prettyprint.Doc ((<+>))
 import qualified Data.Text.Unsafe as Text.Unsafe
+import Data.Vector (Vector)
 import qualified Data.Vector as Vector
+import Prettyprinter ((<+>))
+import Text.EDE.Internal.Compat
 import Text.EDE.Internal.Quoting
 import Text.EDE.Internal.Types
 
@@ -110,8 +113,8 @@ stdlib =
       qlist1 "init" initT initV,
       "at" @: (\x i -> x Vector.! i :: Value),
       -- object
-      "keys" @: (HashMap.keys :: Object -> [Text]),
-      "elems" @: (HashMap.elems :: Object -> [Value]),
+      "keys" @: (HashMap.keys :: HashMap Text Value -> [Text]),
+      "elems" @: (HashMap.elems :: HashMap Text Value -> [Value]),
       -- , "map"        @: undefined
       -- , "filter"     @: undefined
       -- , "zip"        @: undefined
@@ -119,7 +122,7 @@ stdlib =
 
       -- polymorphic
       "show" @: (Text.Lazy.Encoding.decodeUtf8 . Aeson.encode :: Value -> Text.Lazy.Text),
-      "singleton" @: (pure :: Value -> Vector.Vector Value)
+      "singleton" @: (pure :: Value -> Vector Value)
       -- FIXME: existence checks currently hardcoded into the evaluator:
       -- "default"
       -- "defined"
@@ -146,7 +149,7 @@ qlist1 ::
   (Quote a, Quote b) =>
   Id ->
   (Text -> a) ->
-  (Array -> b) ->
+  (Vector Value -> b) ->
   (Id, Term)
 qlist1 k f g = (k,) . TLam $ \case
   TVal (String t) -> pure . quote k 0 $ f t
@@ -161,12 +164,12 @@ qcol1 ::
   (Quote a, Quote b, Quote c) =>
   Id ->
   (Text -> a) ->
-  (Object -> b) ->
-  (Array -> c) ->
+  (HashMap Text Value -> b) ->
+  (Vector Value -> c) ->
   (Id, Term)
 qcol1 k f g h = (k,) . TLam $ \case
   TVal (String t) -> pure . quote k 0 $ f t
-  TVal (Object o) -> pure . quote k 0 $ g o
+  TVal (Object o) -> pure . quote k 0 $ g (toHashMapText o)
   TVal (Array v) -> pure . quote k 0 $ h v
   x ->
     Failure $
@@ -178,7 +181,7 @@ lastT = text (Text.singleton . Text.last)
 tailT = text Text.Unsafe.unsafeTail
 initT = text Text.init
 
-headV, lastV, tailV, initV :: Array -> Value
+headV, lastV, tailV, initV :: Vector Value -> Value
 headV = vec Vector.unsafeHead
 lastV = vec Vector.unsafeLast
 tailV = vec (Array . Vector.unsafeTail)
@@ -187,7 +190,7 @@ initV = vec (Array . Vector.unsafeInit)
 text :: (Text -> Text) -> Text -> Value
 text f = String . safe mempty Text.null f
 
-vec :: (Array -> Value) -> Array -> Value
+vec :: (Vector Value -> Value) -> Vector Value -> Value
 vec = safe (Array Vector.empty) Vector.null
 
 safe :: b -> (a -> Bool) -> (a -> b) -> a -> b

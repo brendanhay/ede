@@ -30,7 +30,7 @@ import qualified Control.Comonad as Comonad
 import Control.Comonad.Cofree (Cofree)
 import qualified Control.Lens as Lens
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Types (Object, Pair, Value (..))
+import Data.Aeson.Types (Pair, Value (..))
 import qualified Data.Functor.Classes as Functor.Classes
 import Data.HashMap.Strict (HashMap)
 import qualified Data.List as List
@@ -38,9 +38,10 @@ import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Text.Prettyprint.Doc (Doc, Pretty (..))
-import qualified Data.Text.Prettyprint.Doc as PP
-import qualified Data.Text.Prettyprint.Doc.Render.Terminal as PP
+import Prettyprinter (Doc, Pretty (..))
+import qualified Prettyprinter as PP
+import qualified Prettyprinter.Render.Terminal as PP
+import Text.EDE.Internal.Compat
 import Text.Trifecta.Delta (Delta, HasDelta)
 import qualified Text.Trifecta.Delta as Trifecta.Delta
 
@@ -86,7 +87,7 @@ data Result a
 $(Lens.makePrisms ''Result)
 
 instance Monad Result where
-  return = Success
+  return = pure
   {-# INLINE return #-}
 
   Success x >>= k = k x
@@ -94,7 +95,7 @@ instance Monad Result where
   {-# INLINE (>>=) #-}
 
 instance Applicative Result where
-  pure = return
+  pure = Success
   {-# INLINE pure #-}
 
   Success f <*> Success x = Success (f x)
@@ -228,15 +229,15 @@ instance HasDelta (Exp Delta) where
 -- | Unwrap a 'Value' to an 'Object' safely.
 --
 -- See Aeson\'s documentation for more details.
-fromValue :: Value -> Maybe Object
-fromValue (Object o) = Just o
+fromValue :: Value -> Maybe (HashMap Text Value)
+fromValue (Object o) = Just (toHashMapText o)
 fromValue _ = Nothing
 
 -- | Create an 'Object' from a list of name/value 'Pair's.
 --
 -- See Aeson\'s documentation for more details.
-fromPairs :: [Pair] -> Object
+fromPairs :: [Pair] -> HashMap Text Value
 fromPairs xs =
   case Aeson.object xs of
-    Object o -> o
+    Object o -> toHashMapText o
     _other -> mempty

@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -31,11 +30,11 @@ import qualified Control.Comonad as Comonad
 import Control.Comonad.Cofree (Cofree ((:<)))
 import Control.Lens ((%=))
 import qualified Control.Lens as Lens
-import Control.Monad (MonadPlus, void, unless)
+import Control.Monad (MonadPlus, unless, void)
 import Control.Monad.State.Strict (MonadState, StateT)
 import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
-import Data.Aeson.Types (Array, Object, Value (..))
+import Data.Aeson.Types (Value (..))
 import qualified Data.Bifunctor as Bifunctor
 import Data.ByteString (ByteString)
 import qualified Data.Char as Char
@@ -48,8 +47,10 @@ import qualified Data.Scientific as Scientific
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
+import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import Text.EDE.Internal.AST
+import Text.EDE.Internal.Compat
 import Text.EDE.Internal.Syntax
 import Text.EDE.Internal.Types
 import qualified Text.Parser.Expression as Expression
@@ -73,9 +74,7 @@ instance HasSyntax Env where
 
 type Parser m =
   ( Monad m,
-#if MIN_VERSION_base(4,13,0)
     MonadFail m,
-#endif
     MonadState Env m,
     Trifecta.TokenParsing m,
     Trifecta.DeltaParsing m,
@@ -89,9 +88,7 @@ newtype EDE a = EDE {runEDE :: Trifecta.Parser a}
       Applicative,
       Alternative,
       Monad,
-#if MIN_VERSION_base(4,13,0)
       MonadFail,
-#endif
       MonadPlus,
       Trifecta.Parsing,
       Trifecta.CharParsing,
@@ -137,10 +134,11 @@ runParser o n = res . Trifecta.parseByteString (runEDE run) pos
 pragma :: Parser m => m ()
 pragma =
   void . Trifecta.many $ do
-    !xs <- pragmal
-      *> Trifecta.symbol "EDE_SYNTAX"
-      *> Trifecta.sepBy field spaces
-      <* trimr pragmar
+    !xs <-
+      pragmal
+        *> Trifecta.symbol "EDE_SYNTAX"
+        *> Trifecta.sepBy field spaces
+        <* trimr pragmar
 
     mapM_ (uncurry Lens.assign) xs
   where
@@ -194,7 +192,7 @@ statement =
 block :: Parser m => String -> m a -> m a
 block k p =
   Trifecta.try (multiLine (keyword k) p)
-  <|> singleLine (keyword k) p
+    <|> singleLine (keyword k) p
 
 multiLine :: Parser m => m b -> m a -> m a
 multiLine s =
@@ -342,7 +340,7 @@ collection :: Parser m => m (Exp Delta)
 collection = ann (EVar <$> variable <|> ELit <$> col)
   where
     col =
-      Object <$> object
+      (Object . fromHashMapText) <$> object
         <|> Array <$> array
         <|> String <$> Trifecta.stringLiteral
 
@@ -351,7 +349,7 @@ literal =
   Bool <$> bool
     <|> Number <$> number
     <|> String <$> Trifecta.stringLiteral
-    <|> Object <$> object
+    <|> (Object . fromHashMapText) <$> object
     <|> Array <$> array
 
 number :: Parser m => m Scientific
@@ -364,7 +362,7 @@ bool =
   Trifecta.symbol "true" *> pure True
     <|> Trifecta.symbol "false" *> pure False
 
-object :: Parser m => m Object
+object :: Parser m => m (HashMap Text Value)
 object = HashMap.fromList <$> Trifecta.braces (Trifecta.commaSep pair)
   where
     pair =
@@ -372,7 +370,7 @@ object = HashMap.fromList <$> Trifecta.braces (Trifecta.commaSep pair)
         <$> (Trifecta.stringLiteral <* Trifecta.spaces)
         <*> (Trifecta.char ':' *> Trifecta.spaces *> literal)
 
-array :: Parser m => m Array
+array :: Parser m => m (Vector Value)
 array = Vector.fromList <$> Trifecta.brackets (Trifecta.commaSep literal)
 
 operator :: Parser m => Text -> m Delta
@@ -413,10 +411,10 @@ pack = fmap (String . Text.pack)
 
 triml :: Parser m => m a -> m a
 triml p = do
-    c <- Trifecta.Delta.column <$> Trifecta.position
-    if c == 0
-        then Trifecta.spaces *> p
-        else fail "left whitespace removal failed"
+  c <- Trifecta.Delta.column <$> Trifecta.position
+  if c == 0
+    then Trifecta.spaces *> p
+    else fail "left whitespace removal failed"
 
 trimr :: Parser m => m a -> m a
 trimr p = p <* Trifecta.newline -- <* Trifecta.newline

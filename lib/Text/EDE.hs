@@ -114,7 +114,7 @@ where
 
 import qualified Control.Monad as Monad
 import Data.Aeson ((.=))
-import Data.Aeson.Types (Object)
+import Data.Aeson.Types (Value)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.Foldable as Foldable
@@ -125,9 +125,9 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import qualified Data.Text.Lazy.Builder as Text.Builder
-import Data.Text.Prettyprint.Doc (Pretty (..))
 import Data.Version (Version)
 import qualified Paths_ede as Paths
+import Prettyprinter (Pretty (..))
 import qualified System.Directory as Directory
 import qualified System.FilePath as FilePath
 import qualified Text.EDE.Internal.Eval as Eval
@@ -270,23 +270,23 @@ loadFile path = do
     then failure ("file " <> pretty path <> " doesn't exist.")
     else ByteString.readFile path >>= success
 
--- | Render an 'Object' using the supplied 'Template'.
+-- | Render an 'HashMap Text Value' using the supplied 'Template'.
 render ::
   -- | Parsed 'Template' to render.
   Template ->
   -- | Bindings to make available in the environment.
-  Object ->
+  HashMap Text Value ->
   Result Text.Lazy.Text
 render = renderWith mempty
 
--- | Render an 'Object' using the supplied 'Template'.
+-- | Render an 'HashMap Text Value' using the supplied 'Template'.
 renderWith ::
   -- | Filters to make available in the environment.
   HashMap Id Term ->
   -- | Parsed 'Template' to render.
   Template ->
   -- | Bindings to make available in the environment.
-  Object ->
+  HashMap Text Value ->
   Result Text.Lazy.Text
 renderWith fs (Template _ u ts) =
   fmap Text.Builder.toLazyText . Eval.render ts fs u
@@ -312,7 +312,7 @@ eitherParseWith o f n = fmap eitherResult . parseWith o f n
 -- | /See:/ 'render'
 eitherRender ::
   Template ->
-  Object ->
+  HashMap Text Value ->
   Either String Text.Lazy.Text
 eitherRender t = eitherResult . render t
 
@@ -320,7 +320,7 @@ eitherRender t = eitherResult . render t
 eitherRenderWith ::
   HashMap Id Term ->
   Template ->
-  Object ->
+  HashMap Text Value ->
   Either String Text.Lazy.Text
 eitherRenderWith fs t = eitherResult . renderWith fs t
 
@@ -333,15 +333,15 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- >>> tmpl <- parse "{% if var %}\nHello, {{ var }}!\n{% else %}\nnegative!\n{% endif %}\n" :: Result Template
 --
--- Then an 'Object' is defined containing the environment which will be
+-- Then an 'HashMap Text Value' is defined containing the environment which will be
 -- available to the 'Template' during rendering:
 --
--- >>> let env = fromPairs [ "var" .= "World" ] :: Object
+-- >>> let env = fromPairs [ "var" .= "World" ] :: HashMap Text Value
 --
 -- Note: the 'fromPairs' function above is a wrapper over Aeson's 'object'
--- which removes the outer 'Object' 'Value' constructor, exposing the underlying 'HashMap'.
+-- which removes the outer 'Data.Aeson.Object' 'Value' constructor, exposing the underlying 'HashMap'.
 --
--- Then, the 'Template' is rendered using the 'Object' environment:
+-- Then, the 'Template' is rendered using the 'HashMap Text Value' environment:
 --
 -- >>> render tmpl env :: Result Text
 -- > Success "Hello, World!"
@@ -379,7 +379,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- which can be cached for future use.
 --
 -- * Rendering takes a 'HashMap' of custom 'Fun's (functions available in the
--- template context), an 'Object' as the binding environment, and a parsed
+-- template context), an 'HashMap Text Value' as the binding environment, and a parsed
 -- 'Template' to subsitute the values into.
 -- The result is a Lazy 'Text.Lazy.Text' value containing the rendered output.
 
@@ -487,12 +487,12 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 --
 -- Variables are substituted directly for their renderable representation.
 -- An error is raised if the varaible being substituted is not a literal type
--- (ie. an 'Array' or 'Object') or doesn't exist in the supplied environment.
+-- (ie. an 'Array' or 'HashMap Text Value') or doesn't exist in the supplied environment.
 --
 -- > {{ var }}
 --
--- Nested variable access is also supported for variables which resolve to an 'Object'.
--- Dot delimiters are used to chain access through multiple nested 'Object's.
+-- Nested variable access is also supported for variables which resolve to an 'HashMap Text Value'.
+-- Dot delimiters are used to chain access through multiple nested 'HashMap Text Value's.
 -- The right-most accessor must resolve to a renderable type as with the previous
 -- non-nested variable access.
 --
@@ -564,7 +564,7 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 
 -- $loops
 --
--- Iterating over an 'Array' or 'Object' can be acheived using the 'for ... in' section syntax.
+-- Iterating over an 'Array' or 'HashMap Text Value' can be acheived using the 'for ... in' section syntax.
 -- Attempting to iterate over any other type will raise an error.
 --
 -- Example:
@@ -578,13 +578,13 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- The iteration branch is rendering per item with the else branch being (which is optional)
 -- being rendered if the @{{ list }}@ variable is empty.
 --
--- When iterating over an 'Object', a stable sort using key equivalence is applied, 'Array's
+-- When iterating over an 'HashMap Text Value', a stable sort using key equivalence is applied, 'Array's
 -- are unmodified.
 --
 -- The resulting binding within the iteration expression (in this case, @{{ var }}@) is
--- an 'Object' containing the following keys:
+-- an 'HashMap Text Value' containing the following keys:
 --
--- * @key        :: Text@: They key if the loop target is an 'Object'
+-- * @key        :: Text@: They key if the loop target is an 'HashMap Text Value'
 --
 -- * @value      :: a@: The value of the loop target
 --
@@ -620,8 +620,8 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- Will render each item with its (1-based) loop index as a prefix, separated
 -- by a blank newline, without a trailing at the end of the document.
 --
--- Valid loop targets are 'Object's, 'Array's, and 'String's, with only 'Object's
--- having an available @{{ <var>.key }}@ in scope.
+-- Valid loop targets are 'HashMap Text Value's, 'Array's, and 'String's, with
+-- only 'HashMap Text Value's having an available @{{ <var>.key }}@ in scope.
 
 -- $includes
 --

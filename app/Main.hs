@@ -8,20 +8,23 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.ByteString as Parsec
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
+import Data.HashMap.Strict (HashMap)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import qualified Data.Text.Lazy.IO as Text.Lazy.IO
 import qualified Options.Applicative as Options
 import qualified Options.Applicative.Help.Pretty as Pretty
-import qualified System.Exit as Exit
-import qualified Text.EDE as EDE
 import qualified Prettyprinter as PP
 import qualified Prettyprinter.Render.Terminal as PP
+import qualified System.Exit as Exit
+import qualified Text.EDE as EDE
+import qualified Text.EDE.Internal.Compat as Compat
 
 data Options = Options
   { templateFile :: FilePath,
     jsonFile :: Maybe FilePath,
-    jsonObject :: Maybe Aeson.Object
+    jsonObject :: Maybe (HashMap Text Aeson.Value)
   }
 
 optionsParser :: Options.Parser Options
@@ -117,7 +120,7 @@ main = do
         EDE.Failure err -> PP.putDoc (err <> PP.hardline) >> Exit.exitFailure
         EDE.Success output -> Text.Lazy.IO.putStr output
 
-stdinParser :: Parsec.Parser Aeson.Object
+stdinParser :: Parsec.Parser (HashMap Text Aeson.Value)
 stdinParser = Aeson.json >>= requireObject
 
 readValue :: Options.ReadM Aeson.Value
@@ -129,10 +132,10 @@ decodeJsonStr =
     . Text.Encoding.encodeUtf8
     . Text.pack
 
-readObject :: Options.ReadM Aeson.Object
+readObject :: Options.ReadM (HashMap Text Aeson.Value)
 readObject = readValue >>= requireObject
 
-requireObject :: Fail.MonadFail m => Aeson.Value -> m Aeson.Object
+requireObject :: Fail.MonadFail m => Aeson.Value -> m (HashMap Text Aeson.Value)
 requireObject = \case
-  Aeson.Object obj -> pure obj
+  Aeson.Object obj -> pure (Compat.toHashMapText obj)
   _ -> fail "JSON value must be an object"

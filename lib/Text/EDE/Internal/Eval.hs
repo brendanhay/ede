@@ -26,20 +26,22 @@ import qualified Control.Monad.Reader as Reader
 import Control.Monad.Trans (lift)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Types (Object, Value (..))
+import Data.Aeson.Types (Value (..))
 import qualified Data.Foldable as Foldable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Scientific (isFloating)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Text.Builder
 import Data.Text.Lazy.Builder.Scientific (FPFormat (Fixed), formatScientificBuilder)
 import Data.Text.Manipulate (toOrdinal)
-import Data.Text.Prettyprint.Doc ((<+>))
-import qualified Data.Text.Prettyprint.Doc as PP
+import Prettyprinter ((<+>))
+import qualified Prettyprinter as PP
+import Text.EDE.Internal.Compat
 import Text.EDE.Internal.Filters (stdlib)
 import Text.EDE.Internal.Quoting
 import Text.EDE.Internal.Types
@@ -171,13 +173,13 @@ eval (d :< EIncl i) = do
           <+> PP.brackets (pp (Text.intercalate "," $ HashMap.keys ts))
 {-# INLINEABLE eval #-}
 
-bind :: (Object -> Object) -> Context a -> Context a
+bind :: (HashMap Text Value -> HashMap Text Value) -> Context a -> Context a
 bind f = Reader.withReaderT (\x -> x {_values = f (_values x)})
 {-# INLINEABLE bind #-}
 
 variable :: Delta -> Var -> Context Value
 variable d (Var is) =
-  Reader.asks _values >>= go (NonEmpty.toList is) [] . Object
+  Reader.asks _values >>= go (NonEmpty.toList is) [] . Object . fromHashMapText
   where
     go [] _ v = pure v
     go (k : ks) r v = do
@@ -189,8 +191,8 @@ variable d (Var is) =
       where
         cur = Var (k :| r)
 
-        nest :: Value -> Context Object
-        nest (Object o) = pure o
+        nest :: Value -> Context (HashMap Text Value)
+        nest (Object o) = pure (toHashMapText o)
         nest x =
           throwError d $
             "variable"

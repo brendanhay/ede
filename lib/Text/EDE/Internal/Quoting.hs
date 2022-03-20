@@ -1,5 +1,5 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -26,9 +26,10 @@ import Control.Applicative ((<|>))
 import Control.Monad ((>=>))
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Types (Array, Object, Value (..))
+import Data.Aeson.Types (Value (..))
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.ByteString.Char8 as ByteString.Char8
+import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List (sortBy)
 import Data.Ord (comparing)
@@ -41,15 +42,18 @@ import qualified Data.Text.Lazy as Text.Lazy
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Text.Builder
 import Data.Text.Manipulate (toOrdinal)
-import Data.Text.Prettyprint.Doc (Pretty (..), (<+>))
-import qualified Data.Text.Prettyprint.Doc as PP
+import Data.Vector (Vector)
 import qualified Data.Vector as Vector
+import Prettyprinter (Pretty (..), (<+>))
+import qualified Prettyprinter as PP
 import Text.EDE.Internal.Types
 import Text.Trifecta.Delta (Delta)
 import qualified Text.Trifecta.Delta as Trifecta.Delta
 import qualified Text.Trifecta.Rendering as Trifecta.Rendering
 
-default (AnsiDoc, Double, Integer)
+#if MIN_VERSION_aeson(2,0,0)
+import Data.Aeson.KeyMap (KeyMap)
+#endif
 
 -- | A HOAS representation of (possibly partially applied) values
 -- in the environment.
@@ -96,6 +100,14 @@ class Unquote a where
 
 instance Unquote Value
 
+#if MIN_VERSION_aeson(2,0,0)
+instance Unquote (KeyMap Value)
+#endif
+
+instance Unquote (HashMap Text Value)
+
+instance Unquote (Vector Value)
+
 instance Unquote Text
 
 instance Unquote [Text]
@@ -107,10 +119,6 @@ instance Unquote Bool
 instance Unquote Double
 
 instance Unquote Scientific
-
-instance Unquote Object
-
-instance Unquote Array
 
 instance Unquote Int where
   unquote k n =
@@ -164,6 +172,14 @@ instance Quote Term where
 
 instance Quote Value
 
+#if MIN_VERSION_aeson(2,0,0)
+instance Quote (KeyMap Value)
+#endif
+
+instance Quote (HashMap Text Value)
+
+instance Quote (Vector Value)
+
 instance Quote [Value]
 
 instance Quote Text
@@ -181,10 +197,6 @@ instance Quote Integer
 instance Quote Double
 
 instance Quote Scientific
-
-instance Quote Object
-
-instance Quote Array
 
 instance Quote Builder where
   quote k n = quote k n . Text.Builder.toLazyText
