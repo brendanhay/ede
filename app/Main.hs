@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -5,6 +6,9 @@ module Main (main) where
 
 import qualified Control.Monad.Fail as Fail
 import qualified Data.Aeson as Aeson
+#ifdef VERSION_attoparsec_aeson
+import qualified Data.Aeson.Parser as Aeson
+#endif
 import qualified Data.Attoparsec.ByteString as Parsec
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
@@ -41,8 +45,8 @@ optionsParser =
           ( Options.long "context-file"
               <> Options.metavar "PATH"
               <> Options.help
-                "Path of a file containing a JSON object which is used \
-                \as the template context"
+                ("Path of a file containing a JSON object which is used " <>
+                 "as the template context")
           )
       )
     <*> Options.optional
@@ -63,26 +67,32 @@ parserInfo =
   where
     usage =
       Pretty.vcat
-        [ Pretty.empty,
+        [ Pretty.emptyDoc,
           "The --context-file and --context-json options are processed as follows:",
           Pretty.indent 2 "1.)"
             Pretty.<+> ( Pretty.align
-                           ( "Both are provided"
-                               Pretty.<$$> "Both objects are merged into one with the keys of \
-                                           \--context-json taking precedence over those in the \
-                                           \file provided by --context-file."
+                           ( Pretty.vcat
+                               [ "Both are provided",
+                                 "Both objects are merged into one with the keys of " <>
+                                 "--context-json taking precedence over those in the " <>
+                                 "file provided by --context-file."
+                               ]
                            )
                        ),
           Pretty.indent 2 "2.)"
             Pretty.<+> ( Pretty.align
-                           ( "None of them are provided"
-                               Pretty.<$$> "The JSON object is read from STDIN."
+                           ( Pretty.vcat
+                               [ "None of them are provided",
+                                 "The JSON object is read from STDIN."
+                               ]
                            )
                        ),
           Pretty.indent 2 "3.)"
             Pretty.<+> ( Pretty.align
-                           ( "One of them is provided"
-                               Pretty.<$$> "The JSON object is read from the supplied option."
+                           ( Pretty.vcat
+                               [ "One of them is provided",
+                                 "The JSON object is read from the supplied option."
+                               ]
                            )
                        )
         ]
