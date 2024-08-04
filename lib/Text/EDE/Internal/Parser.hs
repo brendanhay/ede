@@ -184,6 +184,7 @@ statement =
       cases,
       loop,
       include,
+      set,
       binding,
       raw,
       comment
@@ -267,6 +268,14 @@ binding =
       )
     <*> document
     <* exit "endlet"
+
+set :: Parser m => m (Exp Delta)
+set =
+  eset
+  <$> block "set" identifier
+  <*> document
+  <* exit "endset"
+  <*> document
 
 raw :: Parser m => m (Exp Delta)
 raw = ann (ELit <$> body)

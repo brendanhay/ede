@@ -1,0 +1,17 @@
+{
+  "var": true
+}
+---
+{% set x %}
+
+  {% set y %}
+    This is a nested block {{var}}
+  {% endset %}
+
+  This is a big expression! {{var}}
+
+  {{ y }}
+
+{% endset %}
+
+{{x}}

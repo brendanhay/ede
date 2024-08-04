@@ -109,6 +109,9 @@ module Text.EDE
 
     -- ** Let Expressions
     -- $let
+
+    -- ** Set
+    -- $set
   )
 where
 
@@ -696,3 +699,16 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- > {{ var }}
 -- > ...
 -- > {% endlet %}
+
+-- $set
+--
+-- You can also bind an identifier to whole templates which will be available within
+-- the following expression scope. The identifier will be available in subsequent template.
+--
+-- For example:
+--
+-- > {% set var %}
+-- >   ...
+-- > {% endset %}
+-- > ...
+-- > {{ var }}
