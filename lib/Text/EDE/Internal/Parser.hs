@@ -35,7 +35,6 @@ import Control.Monad.State.Strict (MonadState, StateT)
 import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
 import Data.Aeson.Types (Value (..))
-import qualified Data.Bifunctor as Bifunctor
 import Data.ByteString (ByteString)
 import qualified Data.Char as Char
 import Data.HashMap.Strict (HashMap)
@@ -64,7 +63,9 @@ import qualified Text.Trifecta.Delta as Trifecta.Delta
 
 data Env = Env
   { _settings :: !Syntax,
-    _includes :: HashMap Text (NonEmpty Delta)
+    _includes :: HashMap Text (NonEmpty Delta),
+    _extends :: HashMap Text (NonEmpty Delta),
+    _blocks :: HashMap Text (Exp Delta)
   }
 
 $(Lens.makeLenses ''Env)
@@ -120,15 +121,25 @@ runParser ::
   Syntax ->
   Text ->
   ByteString ->
-  Result (Exp Delta, HashMap Text (NonEmpty Delta))
+  Result (Exp Delta, HashMap Text (NonEmpty Delta), HashMap Text (NonEmpty Delta), HashMap Text (Exp Delta))
 runParser o n = res . Trifecta.parseByteString (runEDE run) pos
   where
-    run = State.runStateT (pragma *> document <* Trifecta.eof) (Env o mempty)
+    run = State.runStateT (pragma *> document <* Trifecta.eof) (Env o mempty mempty mempty)
 
     pos = Trifecta.Delta.Directed (Text.Encoding.encodeUtf8 n) 0 0 0 0
 
     res = \case
-      Trifecta.Success x -> Success (Bifunctor.second _includes x)
+      Trifecta.Success (x, env) ->
+        if null (_extends env) then
+          Success (x, _includes env, _extends env, _blocks env)
+        else
+          -- In case the template extends another template we arrange the contained
+          -- blocks in a way that make it easy to evaluate the "inheritance" mechanism.
+          let
+            x' =
+              HashMap.foldrWithKey eOverrideBlock x (_blocks env)
+          in
+            Success (x', _includes env, _extends env, _blocks env)
       Trifecta.Failure e -> Failure (Trifecta._errDoc e)
 
 pragma :: Parser m => m ()
@@ -185,6 +196,8 @@ statement =
       loop,
       include,
       set,
+      block',
+      extends',
       binding,
       raw,
       comment
@@ -258,6 +271,13 @@ include = block "include" $ do
         (,) <$> (keyword "with" *> identifier)
           <*> (Trifecta.symbol "=" *> term)
 
+extends' :: Parser m => m (Exp Delta)
+extends' = block "extends" $ do
+  d <- Trifecta.position
+  k <- Trifecta.stringLiteral
+  extends %= HashMap.insertWith (<>) k (d :| [])
+  pure (d :< EExt k)
+
 binding :: Parser m => m (Exp Delta)
 binding =
   elet . Just
@@ -276,6 +296,14 @@ set =
   <*> document
   <* exit "endset"
   <*> document
+
+block' :: Parser m => m (Exp Delta)
+block' = do
+  k <- block "block" identifier
+  e <- document
+  _ <- exit "endblock"
+  blocks %= HashMap.insert k e
+  pure (eblock k e)
 
 raw :: Parser m => m (Exp Delta)
 raw = ann (ELit <$> body)
