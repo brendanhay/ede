@@ -166,7 +166,9 @@ type Resolver m = Syntax -> Id -> Delta -> m (Result Template)
 data Template = Template
   { _tmplName :: !Text,
     _tmplExp :: !(Exp Delta),
-    _tmplIncl :: HashMap Id (Exp Delta)
+    _tmplIncl :: HashMap Id (Exp Delta),
+    _tmplExtends :: HashMap Id (Exp Delta),
+    _tmplBlocks :: HashMap Id (Exp Delta)
   }
   deriving (Eq)
 
@@ -203,9 +205,12 @@ data ExpF a
   | EFun !Id
   | EApp !a !a
   | ELet !Id !a !a
+  | EBlock !Id !a
+  | EOverrideBlock !Id !a !a
   | ECase !a [Alt a]
   | ELoop !Id !a !a
   | EIncl !Text
+  | EExt !Text
   deriving (Eq, Show, Functor)
 
 instance Functor.Classes.Eq1 ExpF where
@@ -214,11 +219,14 @@ instance Functor.Classes.Eq1 ExpF where
   liftEq _ (EFun a) (EFun b) = a == b
   liftEq c (EApp a1 a2) (EApp b1 b2) = a1 `c` b1 && a2 `c` b2
   liftEq c (ELet a0 a1 a2) (ELet b0 b1 b2) = a0 == b0 && a1 `c` b1 && a2 `c` b2
+  liftEq c (EBlock a0 a1) (EBlock b0 b1) = a0 == b0 && a1 `c` b1
+  liftEq c (EOverrideBlock a0 a1 a2) (EOverrideBlock b0 b1 b2) = a0 == b0 && a1 `c` b1 && a2 `c` b2
   liftEq c (ECase a as) (ECase b bs) = a `c` b && (List.all (uncurry altEq) $ zip as bs)
     where
       altEq (pA, a') (pB, b') = pA == pB && a' `c` b'
   liftEq c (ELoop a0 a1 a2) (ELoop b0 b1 b2) = a0 == b0 && a1 `c` b1 && a2 `c` b2
   liftEq _ (EIncl a) (EIncl b) = a == b
+  liftEq _ (EExt a) (EExt b) = a == b
   liftEq _ _ _ = False
 
 type Exp = Cofree ExpF

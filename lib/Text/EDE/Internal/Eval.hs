@@ -49,9 +49,11 @@ import Text.Trifecta.Delta (Delta)
 import qualified Text.Trifecta.Delta as Trifecta.Delta
 
 data Env = Env
-  { _templates :: HashMap Id (Exp Delta),
+  { _extends :: Bool,
+    _templates :: HashMap Id (Exp Delta),
     _quoted :: HashMap Id Term,
-    _values :: HashMap Id Value
+    _values :: HashMap Id Value,
+    _blocks :: HashMap Id (Exp Delta)
   }
 
 type Context = ReaderT Env Result
@@ -63,7 +65,7 @@ render ::
   HashMap Id Value ->
   Result Builder
 render ts fs e o =
-  Reader.runReaderT (eval e >>= nf) (Env ts (stdlib <> fs) o)
+  Reader.runReaderT (eval e >>= nf) (Env False ts (stdlib <> fs) o mempty)
   where
     nf (TVal v) = build (Trifecta.Delta.delta e) v
     nf _ =
@@ -85,6 +87,26 @@ eval (d :< EApp a b) = do
   x <- eval a
   y <- eval b
   binding d x y
+eval (d :< EOverrideBlock i b e) =
+  setExtended True $ do
+    q <- HashMap.lookup i <$> Reader.asks _blocks
+    case q of
+      Nothing ->
+        bindBlock (HashMap.insert i b) (eval e)
+      Just eb ->
+        bindBlock (HashMap.insert i (d :< ELet "super" b eb)) (eval e)
+eval (_ :< EBlock i b) = do
+  extends <- Reader.asks _extends
+  q <- HashMap.lookup i <$> Reader.asks _blocks
+  if extends then
+    pure (qprim (String mempty))
+  else do
+    x <- eval b
+    v <- lift (unquote i 0 x)
+    maybe
+      (pure x)
+      (bind (HashMap.insert "super" v) . eval)
+      q
 eval (_ :< ELet k rhs bdy) = do
   q <- eval rhs
   v <- lift (unquote k 0 q)
@@ -164,7 +186,21 @@ eval (_ :< ELoop i v bdy) = eval v >>= lift . unquote i 0 >>= loop
 eval (d :< EIncl i) = do
   ts <- Reader.asks _templates
   case HashMap.lookup i ts of
-    Just e -> eval e
+    Just e ->
+      -- Don't inherit any blocks declared so far.
+      setExtended False $
+        bindBlock (\_ -> mempty) (eval e)
+    Nothing ->
+      throwError d $
+        "template"
+          <+> bold (pp i)
+          <+> "is not in scope:"
+          <+> PP.brackets (pp (Text.intercalate "," $ HashMap.keys ts))
+eval (d :< EExt i) = do
+  ts <- Reader.asks _templates
+  case HashMap.lookup i ts of
+    Just e ->
+      setExtended False (eval e)
     Nothing ->
       throwError d $
         "template"
@@ -176,6 +212,15 @@ eval (d :< EIncl i) = do
 bind :: (HashMap Text Value -> HashMap Text Value) -> Context a -> Context a
 bind f = Reader.withReaderT (\x -> x {_values = f (_values x)})
 {-# INLINEABLE bind #-}
+
+bindBlock :: (HashMap Id (Exp Delta) -> HashMap Id (Exp Delta)) -> Context a -> Context a
+bindBlock f = Reader.withReaderT (\x -> x {_blocks = f (_blocks x)})
+{-# INLINEABLE bindBlock #-}
+
+setExtended :: Bool -> Context a -> Context a
+setExtended extends =
+  Reader.withReaderT (\x -> x { _extends = extends })
+{-# INLINEABLE setExtended #-}
 
 variable :: Delta -> Var -> Context Value
 variable d (Var is) =

@@ -109,6 +109,9 @@ module Text.EDE
 
     -- ** Let Expressions
     -- $let
+
+    -- ** Set
+    -- $set
   )
 where
 
@@ -211,18 +214,24 @@ parseWith ::
   -- | Strict 'ByteString' template definition.
   ByteString ->
   m (Result Template)
-parseWith config f name =
-  result failure resolve
-    . Parser.runParser config name
+parseWith config f name input =
+  case Parser.runParser config name input of
+    Success (u, is', es', bs) -> do
+      is <- Foldable.foldrM include (Success (HashMap.singleton name u)) (HashMap.toList is')
+      es <- Foldable.foldrM extends (Success mempty) (HashMap.toList es')
+      pure (Template name u <$> is <*> es <*> pure bs)
+    Failure err ->
+      failure err
   where
-    resolve (u, is) =
-      Foldable.foldrM include (Success (HashMap.singleton name u)) (HashMap.toList is)
-        >>= result failure (success . Template name u)
-
     -- Presuming self is always in self's includes, see singleton above.
     -- FIXME: utilise the list of deltas for failures
     include (_, _) (Failure err) = failure err
     include (key, delta :| _) (Success ss) =
+      f config key delta
+        >>= result failure (success . mappend ss . _tmplIncl)
+
+    extends (_, _) (Failure err) = failure err
+    extends (key, delta :| _) (Success ss) =
       f config key delta
         >>= result failure (success . mappend ss . _tmplIncl)
 
@@ -288,8 +297,12 @@ renderWith ::
   -- | Bindings to make available in the environment.
   HashMap Text Value ->
   Result Text.Lazy.Text
-renderWith fs (Template _ u ts) =
-  fmap Text.Builder.toLazyText . Eval.render ts fs u
+renderWith fs t =
+  fmap Text.Builder.toLazyText .
+    Eval.render
+      (_tmplIncl t <> _tmplExtends t)
+      fs
+      (_tmplExp t)
 
 -- | /See:/ 'parse'
 eitherParse :: ByteString -> Either String Template
@@ -696,3 +709,55 @@ eitherRenderWith fs t = eitherResult . renderWith fs t
 -- > {{ var }}
 -- > ...
 -- > {% endlet %}
+
+-- $set
+--
+-- You can also bind an identifier to whole templates which will be available within
+-- the following expression scope. The identifier will be available in subsequent template.
+--
+-- For example:
+--
+-- > {% set var %}
+-- >   ...
+-- > {% endset %}
+-- > ...
+-- > {{ var }}
+
+-- $block
+--
+-- Blocks are used for inheritance and act as both placeholders and replacements at the same time: The most powerful
+-- part of @ED-E@ is template inheritance. Template inheritance allows you to build a base "skeleton" template that
+-- contains all the common elements of your site and defines blocks that child templates can override.
+--
+-- Base template:
+--
+-- > <!doctype html>
+-- > {% block head %}
+-- > <title>{% block title %}{% endblock %}</title>
+-- > {% endblock %}
+-- > {% block body %}{% endblock %}
+--
+-- Child template:
+--
+-- > {% extends "base.html" %}
+-- > {% block title %}Index{% endblock %}
+-- > {% block head %}
+-- >  {{ super }}
+-- >  <style type="text/css">
+-- >   .important { color: #336699; }
+-- > </style>
+-- > {% endblock %}
+-- > {% block body %}
+-- >  <h1>Index</h1>
+-- >  <p class="important">
+-- >    Welcome to my awesome homepage.
+-- >  </p>
+-- > {% endblock %}
+--
+-- The @{% extends %}@ tag is the key here. It tells the template engine that this template "extends" another template.
+-- When the template system evaluates this template, it first locates the parent. The extends tag should be the first tag in the template.
+--
+-- As you can see it's also possible to render the contents of the parent block by calling super(). You can’t define multiple {% block %}
+-- tags with the same name in the same template. This limitation exists because a block tag works in “both” directions. That is, a block
+-- tag doesn’t just provide a placeholder to fill - it also defines the content that fills the placeholder in the parent. If there were two
+-- similarly-named {% block %} tags in a template, that template's parent wouldn’t know which one of the blocks’ content to use.

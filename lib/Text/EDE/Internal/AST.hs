@@ -57,6 +57,21 @@ elet :: Maybe (Id, Exp a) -> Exp a -> Exp a
 elet m e = maybe e (\(i, b) -> Comonad.extract b :< ELet i b e) m
 {-# INLINEABLE elet #-}
 
+eset :: Id -> Exp a -> Exp a -> Exp a
+eset i e k =
+  elet (Just (i, e)) k
+{-# INLINEABLE eset #-}
+
+eblock :: Id -> Exp a -> Exp a
+eblock i e =
+  Comonad.extract e :< EBlock i e
+{-# INLINEABLE eblock #-}
+
+eOverrideBlock :: Id -> Exp a -> Exp a -> Exp a
+eOverrideBlock i b e =
+  Comonad.extract b :< EOverrideBlock i b e
+{-# INLINEABLE eOverrideBlock #-}
+
 ecase ::
   Exp a ->
   [Alt (Exp a)] ->

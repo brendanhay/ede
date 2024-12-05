@@ -104,7 +104,11 @@ keywordSet =
       "_",
       ".",
       "true",
-      "false"
+      "false",
+      "set",
+      "endset",
+      "block",
+      "endblock"
     ]
 
 pragmaStyle :: TokenParsing m => IdentifierStyle m

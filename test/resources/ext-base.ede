@@ -1,0 +1,7 @@
+{}
+---
+<!doctype html>
+{% block head %}
+<title>{% block title %}{% endblock %}</title>
+{% endblock %}
+{% block body %}{% endblock %}
