@@ -88,6 +88,8 @@ library
     , scientific                   >=0.3.1
     , text                         >=1.2
     , text-manipulate              >=0.1.2
+    , time                         >=1.11
+    , time-compat                  >=1.9.4
     , trifecta                     >=2.1
     , unordered-containers         >=0.2.3
     , vector                       >=0.7.1
