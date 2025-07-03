@@ -5,6 +5,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- |
 -- Module      : Text.EDE.Internal.Filters
@@ -35,6 +37,7 @@ import qualified Data.Text.Lazy as Text.Lazy
 import qualified Data.Text.Lazy.Encoding as Text.Lazy.Encoding
 import qualified Data.Text.Manipulate as Text.Manipulate
 import qualified Data.Text.Unsafe as Text.Unsafe
+import qualified Data.Time as Time
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import Prettyprinter ((<+>))
@@ -102,6 +105,12 @@ stdlib =
       "justifyLeft" @: (\x n -> Text.justifyLeft n ' ' x),
       "justifyRight" @: (\x n -> Text.justifyRight n ' ' x),
       "center" @: (\x n -> Text.center n ' ' x),
+      -- time
+      "formatUTCTime" @: flip (formatTime @Time.UTCTime),
+      "parseUTCTime" @?? flip (parseTimeAs @Time.UTCTime),
+      "diffUTCTime" @: Time.diffUTCTime,
+      "addUTCTime" @: Time.addUTCTime,
+
       -- sequences
       qcol1 "length" Text.length HashMap.size Vector.length,
       qcol1 "empty" Text.null HashMap.null Vector.null,
@@ -130,6 +139,24 @@ stdlib =
 
 (@:) :: Quote a => Id -> a -> (Id, Term)
 k @: q = (k, quote k 0 q)
+
+-- Handy when registering for bespoke parsers and guards.
+(@?) :: (Unquote a, Quote b) => Id -> (a -> Either Text b) -> (Id, Term)
+k @? f = (k,) . TLam $ \term ->
+    unquote k 0 term >>= fromEither . f >>= Success . quote k 0
+  where
+    fromEither = either (Failure . pp) Success
+
+(@??) :: (Unquote a, Unquote b, Quote c) => Id -> (a -> b -> Either Text c) -> (Id, Term)
+k @?? f = (k,) . TLam $ \arg1 -> do
+    val1 <- unquote k 0 arg1
+    pure . TLam $ \arg2 -> do
+        val2 <- unquote k 1 arg2
+        res <- fromEither (f val1 val2)
+        pure (quote k 0 res)
+  where
+    fromEither = either (Failure . pp) Success
+
 
 -- | Quote a binary function which takes the most general binding value.
 qpoly2 :: Quote a => Id -> (Value -> Value -> a) -> (Id, Term)
@@ -197,3 +224,12 @@ safe :: b -> (a -> Bool) -> (a -> b) -> a -> b
 safe v f g x
   | f x = v
   | otherwise = g x
+
+formatTime :: forall t. (Time.FormatTime t) => Text -> t -> Text
+formatTime  = (Text.pack .) . Time.formatTime Time.defaultTimeLocale . Text.unpack
+
+parseTimeAs :: forall t. (Time.ParseTime t) => Text -> Text -> Either Text t
+parseTimeAs format dateText =
+    case Time.parseTimeM True Time.defaultTimeLocale (Text.unpack format) (Text.unpack dateText) of
+        Just day -> Right day
+        Nothing -> Left $ "Invalid data. Doesn't match the expected format '" <> format <> "'."

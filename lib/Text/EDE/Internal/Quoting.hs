@@ -42,6 +42,8 @@ import qualified Data.Text.Lazy as Text.Lazy
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Text.Builder
 import Data.Text.Manipulate (toOrdinal)
+import qualified Data.Time.Compat as Time
+import Data.Time.Clock.System.Compat as Time
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import Prettyprinter (Pretty (..), (<+>))
@@ -120,6 +122,28 @@ instance Unquote Double
 
 instance Unquote Scientific
 
+-------------------------------------------------------------------------------
+-- time-compat >= 1.9.4
+
+instance Unquote Time.Day
+-- instance Unquote Time.Month
+-- instance Unquote Time.Quarter
+instance Unquote Time.TimeOfDay
+instance Unquote Time.LocalTime
+instance Unquote Time.ZonedTime
+instance Unquote Time.UTCTime
+instance Unquote Time.NominalDiffTime
+instance Unquote Time.DiffTime
+instance Unquote Time.SystemTime
+instance Unquote Time.CalendarDiffTime
+instance Unquote Time.CalendarDiffDays
+instance Unquote Time.DayOfWeek
+-- instance Unquote Time.QuarterOfYear
+
+--
+-------------------------------------------------------------------------------
+
+
 instance Unquote Int where
   unquote k n =
     unquote k n
@@ -197,6 +221,27 @@ instance Quote Integer
 instance Quote Double
 
 instance Quote Scientific
+
+-------------------------------------------------------------------------------
+-- time-compat >= 1.9.4
+
+instance Quote Time.Day
+-- instance Quote Time.Month
+-- instance Quote Time.Quarter
+instance Quote Time.TimeOfDay
+instance Quote Time.LocalTime
+instance Quote Time.ZonedTime
+instance Quote Time.UTCTime
+instance Quote Time.NominalDiffTime
+instance Quote Time.DiffTime
+instance Quote Time.SystemTime
+instance Quote Time.CalendarDiffTime
+instance Quote Time.CalendarDiffDays
+instance Quote Time.DayOfWeek
+-- instance Quote Time.QuarterOfYear
+
+--
+-------------------------------------------------------------------------------
 
 instance Quote Builder where
   quote k n = quote k n . Text.Builder.toLazyText

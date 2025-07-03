@@ -1,0 +1,10 @@
+{
+  "day1": "1900-09-12T14:32:56Z",
+  "day2": "1934-01-13T09:15:00Z",
+  "day3": "2004-10-12"
+}
+---
+{{ day1 | formatUTCTime("%Y %d/%m") }}
+{{ day2 | diffUTCTime(day1) }}
+{{ day3 | parseUTCTime("%Y-%m-%d") | formatUTCTime("%y.%m.%d (week: %W) (weekday %w)") }}
+{{ day2 | diffUTCTime(day1) | addUTCTime(day2) }}
