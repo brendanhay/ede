@@ -346,6 +346,7 @@ term0 = Expression.buildExpressionParser table expr
       [ [prefix "!"],
         [infix' "*", infix' "/"],
         [infix' "-", infix' "+"],
+        [infix' "<>"],
         [infix' "==", infix' "!=", infix' ">", infix' ">=", infix' "<", infix' "<="],
         [infix' "&&"],
         [infix' "||"]

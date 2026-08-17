@@ -82,6 +82,7 @@ stdlib =
       "toTrain" @: Text.Manipulate.toTrain,
       "toUpper" @: Text.toUpper,
       "toLower" @: Text.toLower,
+      "<>" @: Text.append,
       "toOrdinal" @: (Text.Manipulate.toOrdinal :: Integer -> Text),
       "dropLower" @: Text.dropWhile (not . Char.isUpper),
       "dropUpper" @: Text.dropWhile (not . Char.isLower),
