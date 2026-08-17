@@ -363,6 +363,16 @@ term0 = Expression.buildExpressionParser table expr
         Expression.AssocLeft
 
     expr =
+      Trifecta.try application
+        <|> atom
+
+    application = do
+      d <- Trifecta.position
+      f <- ann $ EFun <$> identifier
+      args <- Trifecta.some atom
+      pure $ eapp d $ f : args
+
+    atom =
       Trifecta.parens term
         <|> ann (EVar <$> variable)
         <|> ann (ELit <$> literal)

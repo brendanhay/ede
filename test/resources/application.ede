@@ -1,0 +1,7 @@
+{ "name": "world" }
+---
+{{ toUpper "hello" }}
+{{ toLower "WORLD" }}
+{{ stripPrefix "hello world" "hello " }}
+{{ upperHead name }}
+{{ toUpper (toLower "MiXeD") }}
