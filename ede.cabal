@@ -40,6 +40,9 @@ extra-source-files: README.md
 data-files:
   test/resources/*.ede
   test/resources/*.golden
+  test/resources/include.child1
+  test/resources/include.child2
+  test/resources/include.child3
 
 source-repository head
   type:     git
